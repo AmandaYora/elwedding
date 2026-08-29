@@ -1,8 +1,0 @@
-# HTTrack Website Copier Cookie File
-# This file format is compatible with Netscape cookies
-arianaadrian.katsudoto.id	TRUE	/	FALSE	1999999999	PHPSESSID	efb160727f6f5eb9466ef6a5b9ee0029
-arianaadrian.katsudoto.id	TRUE	/	FALSE	1999999999	__cflb	02DiuHy84zz6eSMcG2Dos8TQDkdA18wVQMVpxJxr3JQQB
-arianaadrian.katsudoto.id	TRUE	/	FALSE	1999999999	SameSite	None
-katsudoto.id	TRUE	/	FALSE	1999999999	__cflb	02DiuHy84zz6eSMcG2Dos8TQDkdA18wVQbXPr6fAvS1i3
-katsudoto.id	TRUE	/	FALSE	1999999999	SameSite	None
-
