@@ -1,0 +1,12 @@
+HTTrack3.49-2+htsswf+htsjava launched on Thu, 20 Aug 2026 19:25:41 at http://arianaadrian.katsudoto.id/821963?mode=DREAMBOARD +*.png +*.gif +*.jpg +*.jpeg +*.css +*.js -ad.doubleclick.net/* -mime:application/foobar
+(winhttrack -qwC2%Ps2u1%s%uN0%I0p3DaK0H0%kf2A25000%f#f -F "Mozilla/4.5 (compatible; HTTrack 3.0x; Windows 98)" -%F "<!-- Mirrored from %s%s by HTTrack Website Copier/3.x [XR&CO'2014], %s -->" -%l "en, *" http://arianaadrian.katsudoto.id/821963?mode=DREAMBOARD -O1 "D:\Undangan-new" +*.png +*.gif +*.jpg +*.jpeg +*.css +*.js -ad.doubleclick.net/* -mime:application/foobar )
+
+Information, Warnings and Errors reported for this mirror:
+note:	the hts-log.txt file, and hts-cache folder, may contain sensitive information,
+	such as username/password authentication for websites mirrored in this project
+	do not share these files/folders if you want these information to remain private
+
+19:26:21	Error: 	"Bad Request" (400) at link https://www.googletagmanager.com/gtm.js?id= (from https://arianaadrian.katsudoto.id/821963?mode=DREAMBOARD)
+
+HTTrack Website Copier/3.49-2 mirror complete in 42 seconds : 151 links scanned, 149 files written (18909504 bytes overall) [16672422 bytes received at 396962 bytes/sec], 3047425 bytes transferred using HTTP compression in 45 files, ratio 22%, 5.7 requests per connection
+(1 errors, 0 warnings, 0 messages)

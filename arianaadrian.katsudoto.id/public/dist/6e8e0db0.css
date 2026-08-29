@@ -1,0 +1,1 @@
+.note,section.notes-container{position:relative}.note{align-items:center;display:flex;flex-direction:column;gap:24px;margin:0 auto;padding:40px;width:100%}.note .note-description,.note .note-title{text-align:center}@media (min-width:768px) and (max-width:961px){.note{max-width:650px}}@media (min-width:1536px){.note{max-width:650px}}
