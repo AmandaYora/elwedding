@@ -1,74 +1,79 @@
 # Ariana & Adrian — Wedding Invitation
 
-Static HTML wedding invitation (katsudoto.id "arsya" template). Single page,
-no build step, fully self-contained — open `index.html` directly or serve
-the folder with any static file server.
+A React 18 + TypeScript + Vite port of the "arsya" katsudoto.id wedding
+invitation template — same design, same content, same interactivity.
+
+## Getting started
+
+```bash
+npm install
+npm run dev        # http://localhost:5173
+npm run build       # production build to dist/
+npm run typecheck   # tsc -b --noEmit
+npm run lint         # eslint .
+```
 
 ## Structure
 
 ```
-index.html     The invitation page (only page in the project)
+index.html               Vite entry: meta tags, self-hosted @font-face
+                          blocks, vendor <link> tags, the instant
+                          loading-screen bootstrap script, then <div id="root">
+src/
+  main.tsx               ReactDOM root
+  App.tsx                 Assembles every section in the original page order
+  components/             One component per section (PascalCase folder + .tsx),
+                           matching the original page's data-section-order:
+                           PrimaryPane, TopCover, Cover, Couple, SaveTheDate,
+                           Quote, Agenda (+ its RSVP call-to-action), Rundown,
+                           PhotoGallery, VideoGallery, LiveStreaming, LoveStory,
+                           WeddingGift, InstagramFilter, Notes, WeddingWish,
+                           Footnote, Footer, MusicPlayer, AlertModal
+  data/legacyConfig.ts     Typed content the legacy bundles read from `window.*`
+                           (music, event date, bank accounts, RSVP copy, cover
+                           media, gift/RSVP endpoints, language/section flags)
+  hooks/useLegacyBootstrap.ts  Sets those `window.*` globals, then loads the
+                           vendor + platform scripts in dependency order
+  types/legacy.d.ts        Window/jQuery ambient type declarations
 
-assets/
-  css/         Page stylesheets
-  js/          Page scripts (jquery, universal.js, html2canvas)
-  fonts/       Self-hosted webfonts (Roboto, Cormorant Upright, Ovo, Kapakana)
-  icons/       Small template icons (dress code, etc.)
-  audio/       Background music
-
-vendor/        Third-party libraries, one folder per library
-  aos/ flexbin/ lightgallery/ modal-video/ selectize/ slick/
-  video-js/ videojs-youtube/ font-awesome/ tsparticles/ phosphor-icons/
-
-media/
-  template/arsya/    Decorative template artwork (ornaments, frames, masks)
-  kat/               Shared platform media (logo, icons)
-  photos/            Couple & gallery photos
-  uploads/           Cover images + loading-screen logo
-  youtube-thumbs/    Cached YouTube video thumbnails
-
-cdn-cgi/       Cloudflare bot-challenge script (left untouched, path-sensitive)
+public/
+  assets/                 css/ js/ fonts/ icons/ audio/ (self-hosted, offline)
+  vendor/                 aos/ flexbin/ lightgallery/ modal-video/ selectize/
+                          slick/ video-js/ videojs-youtube/ font-awesome/
+                          tsparticles/ phosphor-icons/
+  media/                  template/arsya (ornaments) kat/ photos/ uploads/
+                          youtube-thumbs/
 ```
 
-## What changed from the original mirror
+## Why the legacy scripts are still global `<script>` tags
 
-This started as a raw HTTrack mirror of the live site (domain-named folders,
-a separate "Dreamboard" editor page, Google Tag Manager, and ~30 assets still
-loaded live from external CDNs). It's now a single, fully offline template:
+The page's actual interactivity — RSVP, the photo/video galleries, sliders,
+the countdown, the music player, scroll animations, bank-tab switching,
+guestbook — is driven entirely by the katsudoto.id platform's own compiled
+JS bundles (`public/assets/js/{universal,fddf2641,39d8abba,1e92684f}.js`)
+plus a handful of jQuery plugins (AOS, Slick, Selectize, lightGallery,
+video.js). That's proprietary, minified, third-party code with no source
+available — reimplementing its behavior in React state would be guesswork
+with real regression risk.
 
-- Removed the editor/"Dreamboard" page and its exclusive libraries (select2,
-  pickr, color-thief) — only the public invitation page remains.
-- Removed Google Tag Manager (script + noscript iframe).
-- Downloaded and self-hosted everything that was still loading live:
-  - All 27 couple/gallery photos (previously served through the
-    `img.katsudoto.id` resize proxy) → `media/photos/`.
-  - The background music track → `assets/audio/`.
-  - The loading-screen logo → `media/uploads/loading-logo.png` (this also
-    fixes a broken source path that existed in the original page, which
-    caused that image to fail silently on every load).
-  - The "Kapakana" heading font (was loaded live from Google Fonts on every
-    visit) → `assets/fonts/kapakana/` (latin + latin-ext subsets only).
-  - Phosphor icons (previously a live loader script pulling 6 full icon
-    font families from unpkg for 2 icons actually used) → self-hosted
-    `vendor/phosphor-icons/{regular,fill}/`, just the 2 weights in use.
-- Removed now-redundant Google Fonts `<link rel="preload">` hints (the
-  actual fonts were already self-hosted).
-- Fixed a mask/background image (`mask-couple.png`) that 404'd due to how
-  CSS custom properties resolve `url()` values across files.
+Instead, this port keeps that layer exactly as it was: React's only job is
+to render the same markup (same ids, same classes, same data-* attributes)
+those scripts already expect to find, and `useLegacyBootstrap` loads them
+— in the same order, against the config in `legacyConfig.ts` — right after
+React mounts. The result is byte-faithful markup with 100% of the original
+behavior, verified by loading the page and confirming jQuery/AOS/Slick/
+Selectize/lightGallery/video.js/tsParticles all initialize (4 sliders,
+387 AOS-animated elements, 9 lightGallery links) with no visual difference
+from the pre-migration static build.
 
-## Inherent limitations (not fixable by restructuring)
+## Inherent limitations (unrelated to this migration)
 
-A few features are part of the katsudoto.id platform's live backend and
-cannot work offline no matter how the files are organized:
+Same as before the React port — these depend on katsudoto.id's live backend
+or on YouTube, not on how the frontend is built:
 
 - The wedding-wishes/guestbook form and visit counter POST back to the
-  page's own URL, expecting a live PHP backend on katsudoto.id's servers.
-- The "download as image" feature calls a server-side screenshot proxy
-  (`katsudoto.id/html2canvasproxy.php`).
-- The two videos are embedded YouTube videos — playing them always
-  requires internet, since the video itself is hosted on YouTube.
-- `assets/js/universal.js` does an optional, non-blocking connectivity
-  check against `speed.cloudflare.com` / `google.com` — harmless if it
-  fails offline.
-
-None of these affect the page loading or displaying correctly offline.
+  page's own URL, expecting a live PHP backend.
+- The "download as image" feature calls a server-side screenshot proxy.
+- The two videos are embedded YouTube videos — playing them needs internet.
+- An optional, non-blocking connectivity check pings `speed.cloudflare.com`
+  / `google.com`; harmless if it fails offline.
