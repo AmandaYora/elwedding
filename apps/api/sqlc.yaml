@@ -1,0 +1,30 @@
+version: "2"
+sql:
+  - engine: "mysql"
+    schema: "migrations"
+    queries: "internal/modules/auth/infrastructure/queries"
+    gen:
+      go:
+        package: "sqlc"
+        out: "internal/modules/auth/infrastructure/sqlc"
+  - engine: "mysql"
+    schema: "migrations"
+    queries: "internal/modules/content/infrastructure/queries"
+    gen:
+      go:
+        package: "sqlc"
+        out: "internal/modules/content/infrastructure/sqlc"
+  - engine: "mysql"
+    schema: "migrations"
+    queries: "internal/modules/guest/infrastructure/queries"
+    gen:
+      go:
+        package: "sqlc"
+        out: "internal/modules/guest/infrastructure/sqlc"
+  - engine: "mysql"
+    schema: "migrations"
+    queries: "internal/modules/whatsapp/infrastructure/queries"
+    gen:
+      go:
+        package: "sqlc"
+        out: "internal/modules/whatsapp/infrastructure/sqlc"

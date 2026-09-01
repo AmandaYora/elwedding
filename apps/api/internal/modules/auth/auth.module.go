@@ -1,0 +1,19 @@
+package auth
+
+import (
+	"database/sql"
+	"time"
+
+	"undangan-ariana-adrian/internal/modules/auth/application"
+	"undangan-ariana-adrian/internal/modules/auth/infrastructure"
+	"undangan-ariana-adrian/internal/modules/auth/presentation"
+)
+
+// New merangkai modul auth: repository -> service -> handler. Hanya
+// presentation.Handler yang diekspor untuk dipasang router (mengikuti pola
+// module wiring backend-modular-monolith.md).
+func New(db *sql.DB, jwtSecret string, jwtExpiresIn time.Duration) *presentation.Handler {
+	repo := infrastructure.NewRepository(db)
+	service := application.NewService(repo, jwtSecret, jwtExpiresIn)
+	return presentation.NewHandler(service)
+}

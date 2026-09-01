@@ -1,0 +1,72 @@
+/* Modern Navy + Slate Design System for Admin Portal
+   Dipakai HANYA oleh admin.html/admin-main.tsx - tidak pernah oleh main.tsx undangan */
+:root {
+  /* Core Navy & Slate Palette */
+  --navy-950: #071224;
+  --navy-900: #0b1f3a;
+  --navy-850: #0e274a;
+  --navy-800: #12305a;
+  --navy-700: #153e75;
+  --navy-600: #1b4f9c;
+  --navy-500: #2563eb;
+  --navy-400: #3b82f6;
+  --navy-200: #bfdbfe;
+  --navy-100: #e7eef8;
+  --navy-50: #f0f5fc;
+
+  /* Surfaces & Canvas */
+  --canvas: #f6f8fb;
+  --surface: #ffffff;
+  --surface-hover: #f9fafb;
+  --surface-subtle: #f1f4f9;
+  --border: #e2e8f0;
+  --border-focus: #3b82f6;
+  --text: #0f172a;
+  --text-secondary: #334155;
+  --muted: #64748b;
+  --muted-light: #94a3b8;
+
+  /* Semantik status RSVP */
+  --status-attending-text: #0f766e;
+  --status-attending-bg: #e6f7f5;
+  --status-attending-border: #99f6e4;
+  --status-not-attending-text: #b91c1c;
+  --status-not-attending-bg: #fef2f2;
+  --status-not-attending-border: #fecaca;
+  --status-remind-later-text: #b45309;
+  --status-remind-later-bg: #fffbeb;
+  --status-remind-later-border: #fde68a;
+  --status-pending-text: #475569;
+  --status-pending-bg: #f1f5f9;
+  --status-pending-border: #e2e8f0;
+
+  /* Danger & Warnings */
+  --danger: #dc2626;
+  --danger-hover: #b91c1c;
+  --danger-bg: #fef2f2;
+  --danger-border: #fecaca;
+
+  /* Elevation & Shadows */
+  --shadow-xs: 0 1px 2px 0 rgba(15, 23, 42, 0.04);
+  --shadow-sm: 0 1px 3px 0 rgba(15, 23, 42, 0.07), 0 1px 2px -1px rgba(15, 23, 42, 0.07);
+  --shadow-md: 0 4px 6px -1px rgba(15, 23, 42, 0.08), 0 2px 4px -2px rgba(15, 23, 42, 0.06);
+  --shadow-lg: 0 10px 15px -3px rgba(15, 23, 42, 0.08), 0 4px 6px -4px rgba(15, 23, 42, 0.04);
+  --shadow-xl: 0 20px 25px -5px rgba(15, 23, 42, 0.1), 0 8px 10px -6px rgba(15, 23, 42, 0.05);
+
+  --radius-sm: 6px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+  --radius-xl: 16px;
+
+  /* Kompatibilitas mundur */
+  --color-primary: var(--navy-600);
+  --color-primary-hover: var(--navy-800);
+  --color-primary-soft: var(--navy-100);
+  --color-secondary: var(--muted);
+  --color-background: var(--canvas);
+  --color-surface: var(--surface);
+  --color-border: var(--border);
+  --color-text: var(--text);
+  --color-muted: var(--muted);
+}
+

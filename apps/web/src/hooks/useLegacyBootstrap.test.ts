@@ -1,0 +1,82 @@
+import { renderHook } from '@testing-library/react'
+import type { InvitationData } from '@/types/api'
+import { __resetLegacyBootstrapForTest, useLegacyBootstrap } from './useLegacyBootstrap'
+
+const data: InvitationData = {
+  content: {
+    brideName: 'Ariana', brideParentsText: '', brideInstagram: '', bridePhotoUrl: '',
+    groomName: 'Adrian', groomParentsText: '', groomInstagram: '', groomPhotoUrl: '',
+    weddingDateUnix: 1778904000, weddingDateLabel: 'Saturday, 16 May 2026', weddingDateRaw: '',
+    hashtag: '#AriaMeetsAdrian', coverLogoUrl: '/logo.webp',
+    coverImageDesktopUrl: '/cover-desktop.gif', coverImageMobileUrl: '/cover-mobile.gif',
+    quoteText: '', thanksTitle: '', thanksDescription: '', musicUrl: '/music.mp3',
+    videoGalleryTitle: '', videoGalleryYoutubeUrl: '', videoGalleryCaption: '',
+    liveStreamingTitle: '', liveStreamingYoutubeUrl: '',
+    instagramFilterTitle: '', instagramFilterCaption: '', instagramFilterPreviewPhotoUrl: '', instagramFilterLink: '',
+    weddingGiftDescription: '', dresscodeTitle: '', dresscodeDescription: '', dresscodeNote: '',
+  },
+  sections: [
+    { key: 'opening_cover', order: 1 },
+    { key: 'cover', order: 2 },
+    { key: 'couple', order: 3 },
+  ],
+  agendaEvents: [],
+  rundownItems: [],
+  galleryPhotos: [],
+  loveStoryChapters: [],
+  giftBanks: [{ id: 1, bankName: 'BANK BRI', accountNumber: '001122301', accountName: 'Ariana', sortOrder: 1 }],
+}
+
+beforeEach(() => {
+  __resetLegacyBootstrapForTest()
+  window.MANAGE_SECTION_ENABLED = undefined
+  window.INVITATION_LAYOUTS = undefined
+  window.EVENT = undefined
+  window.COVERS = undefined
+  window.BANK_OPTIONS = undefined
+})
+
+test('efek TIDAK jalan saat ready=false', () => {
+  renderHook(() => useLegacyBootstrap(data, false))
+
+  expect(window.INVITATION_LAYOUTS).toBeUndefined()
+  expect(window.MANAGE_SECTION_ENABLED).toBeUndefined()
+})
+
+test('saat ready=true: INVITATION_LAYOUTS berbentuk object map (bukan array) dengan order numerik', () => {
+  renderHook(() => useLegacyBootstrap(data, true))
+
+  expect(Array.isArray(window.INVITATION_LAYOUTS)).toBe(false)
+  expect(window.INVITATION_LAYOUTS).toEqual({
+    opening_cover: { enabled: true, order: 1 },
+    cover: { enabled: true, order: 2 },
+    couple: { enabled: true, order: 3 },
+  })
+})
+
+test('MANAGE_SECTION_ENABLED wajib true (F3)', () => {
+  renderHook(() => useLegacyBootstrap(data, true))
+  expect(window.MANAGE_SECTION_ENABLED).toBe(true)
+})
+
+test('window.EVENT bertipe number (epoch), bukan string/Date (F18)', () => {
+  renderHook(() => useLegacyBootstrap(data, true))
+  expect(typeof window.EVENT).toBe('number')
+  expect(window.EVENT).toBe(1778904000)
+})
+
+test('window.COVERS entry MAIN memuat URL cover dari content (F16)', () => {
+  renderHook(() => useLegacyBootstrap(data, true))
+
+  const covers = window.COVERS as Array<{ position: string; details: { desktop: string; mobile: string } }>
+  const main = covers.find((c) => c.position === 'MAIN')
+
+  expect(main?.details.desktop).toContain('/cover-desktop.gif')
+  expect(main?.details.mobile).toContain('/cover-mobile.gif')
+})
+
+test('BANK_OPTIONS diisi dari giftBanks (dipakai dropdown selectize legacy)', () => {
+  renderHook(() => useLegacyBootstrap(data, true))
+
+  expect(window.BANK_OPTIONS).toEqual([{ id: 1, title: 'BANK BRI', credential: '001122301' }])
+})
