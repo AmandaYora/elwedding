@@ -9,7 +9,7 @@ COPY apps/web ./apps/web
 RUN npm install
 RUN npm run build -w apps/web
 
-FROM golang:1.25-alpine AS api
+FROM golang:1.26-alpine AS api
 WORKDIR /src
 COPY apps/api ./apps/api
 WORKDIR /src/apps/api
