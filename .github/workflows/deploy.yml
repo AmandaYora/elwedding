@@ -6,7 +6,7 @@ name: Build and push image
 # <git-sha>`, run manually after this job publishes the image.
 on:
   push:
-    branches: [main]
+    branches: [master]
 
 jobs:
   build-and-push:
