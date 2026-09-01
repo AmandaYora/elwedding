@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react'
-import type { ReactNode } from 'react'
+import type { MouseEvent, ReactNode } from 'react'
 
 type ModalSize = 'lg' | 'xl' | '2xl'
 
@@ -22,23 +22,37 @@ const SIZE_CLASS: Record<ModalSize, string> = {
 /** Modal dialog modern dengan backdrop blur dan transisi elegan */
 export function Modal({ open, onClose, title, children, footer, size = 'lg' }: ModalProps) {
   const dialogRef = useRef<HTMLDivElement>(null)
+  const onCloseRef = useRef(onClose)
+  onCloseRef.current = onClose
+  const pointerDownOnBackdropRef = useRef(false)
 
   useEffect(() => {
     if (!open) return
     function onKeyDown(e: KeyboardEvent) {
-      if (e.key === 'Escape') onClose()
+      if (e.key === 'Escape') onCloseRef.current()
     }
     document.addEventListener('keydown', onKeyDown)
     dialogRef.current?.focus()
     return () => document.removeEventListener('keydown', onKeyDown)
-  }, [open, onClose])
+  }, [open])
 
   if (!open) return null
+
+  function handleBackdropMouseDown(e: MouseEvent<HTMLDivElement>) {
+    pointerDownOnBackdropRef.current = e.target === e.currentTarget
+  }
+
+  function handleBackdropClick(e: MouseEvent<HTMLDivElement>) {
+    const shouldClose = pointerDownOnBackdropRef.current && e.target === e.currentTarget
+    pointerDownOnBackdropRef.current = false
+    if (shouldClose) onClose()
+  }
 
   return (
     <div
       className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-xs p-4 animate-in fade-in duration-150"
-      onClick={onClose}
+      onMouseDown={handleBackdropMouseDown}
+      onClick={handleBackdropClick}
     >
       <div
         ref={dialogRef}
