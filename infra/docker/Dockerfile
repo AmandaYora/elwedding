@@ -16,6 +16,13 @@ WORKDIR /src/apps/api
 RUN go build -o /out/api ./cmd/server
 
 FROM alpine:3.20
+# tzdata: database/db.go membuka koneksi dengan DSN "?loc=Asia%2FJakarta" -
+# parameter loc go-sql-driver/mysql memanggil time.LoadLocation() DI DALAM
+# binary Go itu sendiri (bukan di sisi server MySQL), yang butuh
+# /usr/share/zoneinfo. alpine:3.20 dasar tidak membawanya - tanpa ini,
+# koneksi DB gagal terus dengan "unknown time zone Asia/Jakarta"
+# (ditemukan saat deploy pertama ke elcodelabs).
+RUN apk add --no-cache tzdata
 WORKDIR /app
 COPY --from=api /out/api ./api
 COPY --from=web /repo/apps/web/dist ./public
