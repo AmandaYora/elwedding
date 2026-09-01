@@ -18,7 +18,7 @@ test('total_pages dari API terpetakan ke totalPages', async () => {
     data: { data: [], meta: { page: 1, limit: 20, total: 42, total_pages: 3 } },
   })
 
-  const res = await listGuests({ page: 1, status: '', q: '', invitationType: '', souvenirType: '' })
+  const res = await listGuests({ page: 1, status: '', q: '', invitationType: '', souvenirType: '', respondedOnly: false })
 
   expect(res.meta.totalPages).toBe(3)
   expect((res.meta as unknown as { total_pages?: number }).total_pages).toBeUndefined()
@@ -27,7 +27,7 @@ test('total_pages dari API terpetakan ke totalPages', async () => {
 test('param q terkirim saat ada kata kunci', async () => {
   mockedGet.mockResolvedValueOnce({ data: { data: [], meta: { page: 1, limit: 20, total: 0, total_pages: 1 } } })
 
-  await listGuests({ page: 1, status: '', q: 'budi', invitationType: '', souvenirType: '' })
+  await listGuests({ page: 1, status: '', q: 'budi', invitationType: '', souvenirType: '', respondedOnly: false })
 
   expect(mockedGet).toHaveBeenCalledWith(
     '/api/v1/admin/guests',
@@ -38,7 +38,7 @@ test('param q terkirim saat ada kata kunci', async () => {
 test('q kosong tidak dikirim sebagai parameter', async () => {
   mockedGet.mockResolvedValueOnce({ data: { data: [], meta: { page: 1, limit: 20, total: 0, total_pages: 1 } } })
 
-  await listGuests({ page: 1, status: '', q: '', invitationType: '', souvenirType: '' })
+  await listGuests({ page: 1, status: '', q: '', invitationType: '', souvenirType: '', respondedOnly: false })
 
   const params = mockedGet.mock.calls[0][1]?.params as Record<string, unknown>
   expect(params).not.toHaveProperty('q')
@@ -49,7 +49,7 @@ test('q kosong tidak dikirim sebagai parameter', async () => {
 test('invitationType & souvenirType terkirim sebagai invitation_type/souvenir_type saat terisi', async () => {
   mockedGet.mockResolvedValueOnce({ data: { data: [], meta: { page: 1, limit: 20, total: 0, total_pages: 1 } } })
 
-  await listGuests({ page: 1, status: '', q: '', invitationType: 'physical', souvenirType: 'vip' })
+  await listGuests({ page: 1, status: '', q: '', invitationType: 'physical', souvenirType: 'vip', respondedOnly: false })
 
   expect(mockedGet).toHaveBeenCalledWith(
     '/api/v1/admin/guests',
@@ -60,7 +60,7 @@ test('invitationType & souvenirType terkirim sebagai invitation_type/souvenir_ty
 test('invitationType & souvenirType kosong tidak dikirim sebagai parameter', async () => {
   mockedGet.mockResolvedValueOnce({ data: { data: [], meta: { page: 1, limit: 20, total: 0, total_pages: 1 } } })
 
-  await listGuests({ page: 1, status: '', q: '', invitationType: '', souvenirType: '' })
+  await listGuests({ page: 1, status: '', q: '', invitationType: '', souvenirType: '', respondedOnly: false })
 
   const params = mockedGet.mock.calls[0][1]?.params as Record<string, unknown>
   expect(params).not.toHaveProperty('invitation_type')
