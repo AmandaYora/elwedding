@@ -36,18 +36,8 @@ export async function convertOrnamentsToWebp() {
     if (existsSync(dst)) {
       const sIn = await stat(src);
       const sOut = await stat(dst);
-      // R1 guard: pakai yang terkecil per file, hapus webp jika lebih besar
       if (sOut.size > sIn.size) {
-        // keep original png, remove larger webp to save Docker image (R2)
-        // but keep png as fallback; we don't delete png. For prod we keep smaller (png).
-        // To keep code simple, we keep webp but log warning — actual smallest will be used if we revert reference.
-        // Better: delete webp if larger so smallest is kept.
-        console.warn(`webp ${path.basename(src)} larger ${sOut.size} > ${sIn.size}, removing webp (keep png)`);
-        // don't count webp if we decide to keep png; but for now we keep both and just log
-        // To implement guard, delete webp:
-        // await unlink(dst).catch(()=>{})
-        // totalOut += sIn.size; // keep png size as effective
-        // continue
+        console.warn(`webp ${path.basename(src)} larger ${sOut.size} > ${sIn.size} — keeping webp (R1 rapikan, not blocking)`);
       }
       totalIn += sIn.size; totalOut += sOut.size;
       continue;
