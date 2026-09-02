@@ -2,6 +2,7 @@ package presentation
 
 import (
 	"encoding/json"
+	"log"
 	"net/http"
 
 	"undangan-ariana-adrian/internal/modules/content/application"
@@ -54,7 +55,8 @@ func (h *Handler) UpdateContent(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if err := h.service.UpdateContent(r.Context(), in); err != nil {
-		response.BadRequest(w, "Failed to update content: invalid data", nil)
+		log.Printf("update content failed: weddingDate=%q err=%v", in.WeddingDate, err)
+		response.BadRequest(w, err.Error(), nil)
 		return
 	}
 	response.OK(w, "Content updated successfully", nil)
@@ -92,7 +94,12 @@ const maxUploadSize = 10 << 20 // 10 MB
 func (h *Handler) UploadPhoto(w http.ResponseWriter, r *http.Request) {
 	r.Body = http.MaxBytesReader(w, r.Body, maxUploadSize)
 	if err := r.ParseMultipartForm(maxUploadSize); err != nil {
-		response.BadRequest(w, "File too large or invalid form", nil)
+		// MaxBytesReader error -> 413, lainnya 400; pesan spesifik untuk UX
+		if err.Error() == "http: request body too large" {
+			response.Error(w, http.StatusRequestEntityTooLarge, "File terlalu besar (maks 10 MB)", nil)
+		} else {
+			response.BadRequest(w, "File terlalu besar atau form tidak valid", nil)
+		}
 		return
 	}
 	file, header, err := r.FormFile("file")
@@ -105,10 +112,11 @@ func (h *Handler) UploadPhoto(w http.ResponseWriter, r *http.Request) {
 	url, err := h.service.SaveUpload(r.Context(), header.Filename, file)
 	if err != nil {
 		if err == application.ErrUnsupportedFileType {
-			response.BadRequest(w, "Unsupported file type", nil)
+			response.Error(w, http.StatusUnsupportedMediaType, "Tipe file tidak didukung", nil)
 			return
 		}
-		response.Internal(w, "Failed to save file")
+		log.Printf("save upload failed: file=%q err=%v", header.Filename, err)
+		response.Internal(w, "Gagal menyimpan file")
 		return
 	}
 

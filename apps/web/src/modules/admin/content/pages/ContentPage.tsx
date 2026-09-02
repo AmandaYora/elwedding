@@ -44,9 +44,13 @@ function Field({
   )
 }
 
-function PhotoField({ label, value, onChange }: { label: string; value: string; onChange: (url: string) => void }) {
+function PhotoField({ label, value, onChange, onUploadingChange }: { label: string; value: string; onChange: (url: string) => void; onUploadingChange?: (b: boolean) => void }) {
   const [uploading, setUploading] = useState(false)
   const toast = useToast()
+  function setUploadingTracked(v: boolean) {
+    setUploading(v)
+    onUploadingChange?.(v)
+  }
 
   return (
     <div className="flex flex-col gap-2">
@@ -83,14 +87,15 @@ function PhotoField({ label, value, onChange }: { label: string; value: string; 
             onChange={async (e) => {
               const file = e.target.files?.[0]
               if (!file) return
-              setUploading(true)
+              setUploadingTracked(true)
               try {
                 onChange(await uploadPhoto(file))
                 toast.success('Foto berhasil diunggah.')
-              } catch {
-                toast.error('Gagal mengunggah foto.')
+              } catch (err: unknown) {
+                const msg = err instanceof Error ? err.message : (err as { response?: { data?: { message?: string } } })?.response?.data?.message
+                toast.error(typeof msg === 'string' && msg ? msg : 'Gagal mengunggah foto.')
               } finally {
-                setUploading(false)
+                setUploadingTracked(false)
               }
             }}
           />
@@ -125,6 +130,8 @@ export default function ContentPage() {
   const [error, setError] = useState(false)
   const [saving, setSaving] = useState(false)
   const [reloadToken, setReloadToken] = useState(0)
+  const [uploadingCount, setUploadingCount] = useState(0)
+  const handlePhotoUploading = (b: boolean) => setUploadingCount((c) => (b ? c + 1 : Math.max(0, c - 1)))
   const toast = useToast()
 
   const [agendaEvents, setAgendaEvents] = useState<AgendaEvent[]>([])
@@ -185,13 +192,18 @@ export default function ContentPage() {
 
   async function handleSave() {
     if (!form) return
+    if (uploadingCount > 0) {
+      toast.error('Tunggu unggahan foto selesai.')
+      return
+    }
     setSaving(true)
     try {
       await updateContent(form)
       setInitialForm(form)
       toast.success('Konten tersimpan.')
-    } catch {
-      toast.error('Gagal menyimpan konten.')
+    } catch (err: unknown) {
+      const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message
+      toast.error(typeof msg === 'string' && msg ? msg : 'Gagal menyimpan konten.')
     } finally {
       setSaving(false)
     }
@@ -401,7 +413,7 @@ export default function ContentPage() {
                     <Field label="Nama Mempelai Wanita" value={form.brideName} onChange={(v) => set('brideName', v)} />
                     <Field label="Orang Tua Mempelai Wanita (HTML diperbolehkan)" value={form.brideParentsText} onChange={(v) => set('brideParentsText', v)} textarea />
                     <Field label="Instagram Mempelai Wanita (URL)" value={form.brideInstagram} onChange={(v) => set('brideInstagram', v)} placeholder="https://instagram.com/username" />
-                    <PhotoField label="Foto Mempelai Wanita" value={form.bridePhotoUrl} onChange={(v) => set('bridePhotoUrl', v)} />
+                    <PhotoField label="Foto Mempelai Wanita" value={form.bridePhotoUrl} onChange={(v) => set('bridePhotoUrl', v)} onUploadingChange={handlePhotoUploading} />
                   </div>
 
                   {/* Mempelai Pria */}
@@ -413,7 +425,7 @@ export default function ContentPage() {
                     <Field label="Nama Mempelai Pria" value={form.groomName} onChange={(v) => set('groomName', v)} />
                     <Field label="Orang Tua Mempelai Pria (HTML diperbolehkan)" value={form.groomParentsText} onChange={(v) => set('groomParentsText', v)} textarea />
                     <Field label="Instagram Mempelai Pria (URL)" value={form.groomInstagram} onChange={(v) => set('groomInstagram', v)} placeholder="https://instagram.com/username" />
-                    <PhotoField label="Foto Mempelai Pria" value={form.groomPhotoUrl} onChange={(v) => set('groomPhotoUrl', v)} />
+                    <PhotoField label="Foto Mempelai Pria" value={form.groomPhotoUrl} onChange={(v) => set('groomPhotoUrl', v)} onUploadingChange={handlePhotoUploading} />
                   </div>
                 </div>
 
@@ -437,9 +449,9 @@ export default function ContentPage() {
               </CardHeader>
               <CardBody className="p-6">
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-5">
-                  <PhotoField label="Logo" value={form.coverLogoUrl} onChange={(v) => set('coverLogoUrl', v)} />
-                  <PhotoField label="Gambar Cover (Desktop)" value={form.coverImageDesktopUrl} onChange={(v) => set('coverImageDesktopUrl', v)} />
-                  <PhotoField label="Gambar Cover (Mobile)" value={form.coverImageMobileUrl} onChange={(v) => set('coverImageMobileUrl', v)} />
+                  <PhotoField label="Logo" value={form.coverLogoUrl} onChange={(v) => set('coverLogoUrl', v)} onUploadingChange={handlePhotoUploading} />
+                  <PhotoField label="Gambar Cover (Desktop)" value={form.coverImageDesktopUrl} onChange={(v) => set('coverImageDesktopUrl', v)} onUploadingChange={handlePhotoUploading} />
+                  <PhotoField label="Gambar Cover (Mobile)" value={form.coverImageMobileUrl} onChange={(v) => set('coverImageMobileUrl', v)} onUploadingChange={handlePhotoUploading} />
                 </div>
               </CardBody>
             </Card>
@@ -501,7 +513,7 @@ export default function ContentPage() {
               <CardBody className="p-6 flex flex-col gap-4">
                 <Field label="Judul" value={form.instagramFilterTitle} onChange={(v) => set('instagramFilterTitle', v)} />
                 <Field label="Caption" value={form.instagramFilterCaption} onChange={(v) => set('instagramFilterCaption', v)} textarea />
-                <PhotoField label="Foto Preview" value={form.instagramFilterPreviewPhotoUrl} onChange={(v) => set('instagramFilterPreviewPhotoUrl', v)} />
+                <PhotoField label="Foto Preview" value={form.instagramFilterPreviewPhotoUrl} onChange={(v) => set('instagramFilterPreviewPhotoUrl', v)} onUploadingChange={handlePhotoUploading} />
                 <Field label="Link Filter Instagram" value={form.instagramFilterLink} onChange={(v) => set('instagramFilterLink', v)} placeholder="https://instagram.com/ar/..." />
               </CardBody>
             </Card>
@@ -534,9 +546,9 @@ export default function ContentPage() {
                 title="Agenda / Event"
                 items={agendaEvents}
                 columns={[
-                  { key: 'eventLabel', label: 'Nama Acara' },
+                  { key: 'eventLabel', label: 'Nama Acara', required: true },
                   { key: 'timeLabel', label: 'Jam', type: 'time' },
-                  { key: 'venueName', label: 'Nama Gedung' },
+                  { key: 'venueName', label: 'Nama Gedung', required: true },
                   { key: 'venueAddress', label: 'Alamat', type: 'textarea' },
                   { key: 'city', label: 'Kota' },
                   { key: 'mapsUrl', label: 'Link Maps' },
@@ -558,7 +570,7 @@ export default function ContentPage() {
                 columns={[
                   { key: 'groupLabel', label: 'Grup' },
                   { key: 'timeLabel', label: 'Jam', type: 'time' },
-                  { key: 'activityText', label: 'Aktivitas' },
+                  { key: 'activityText', label: 'Aktivitas', required: true },
                 ]}
                 emptyItem={{ groupLabel: '', timeLabel: '', activityText: '', sortOrder: 0 }}
                 onCreate={async (item) => { await rundownItemsResource.create(item); setRundownItems(await rundownItemsResource.list()) }}
@@ -575,8 +587,8 @@ export default function ContentPage() {
                 title="Galeri Foto"
                 items={galleryPhotos}
                 columns={[
-                  { key: 'thumbUrl', label: 'Foto', type: 'photo' },
-                  { key: 'photoUrl', label: 'Foto (Lightbox)', type: 'photo' },
+                  { key: 'thumbUrl', label: 'Foto', type: 'photo', required: true },
+                  { key: 'photoUrl', label: 'Foto (Lightbox)', type: 'photo', required: true },
                 ]}
                 emptyItem={{ photoUrl: '', thumbUrl: '', sortOrder: 0 }}
                 onCreate={async (item) => { await galleryPhotosResource.create(item); setGalleryPhotos(await galleryPhotosResource.list()) }}
@@ -593,8 +605,8 @@ export default function ContentPage() {
                 title="Love Story"
                 items={loveStoryChapters}
                 columns={[
-                  { key: 'photoUrl', label: 'Foto', type: 'photo' },
-                  { key: 'title', label: 'Judul' },
+                  { key: 'photoUrl', label: 'Foto', type: 'photo', required: true },
+                  { key: 'title', label: 'Judul', required: true },
                   { key: 'caption', label: 'Caption', type: 'textarea' },
                 ]}
                 emptyItem={{ photoUrl: '', title: '', caption: '', sortOrder: 0 }}
@@ -612,9 +624,9 @@ export default function ContentPage() {
                 title="Rekening Wedding Gift"
                 items={giftBanks}
                 columns={[
-                  { key: 'bankName', label: 'Nama Bank' },
-                  { key: 'accountNumber', label: 'No. Rekening' },
-                  { key: 'accountName', label: 'Atas Nama' },
+                  { key: 'bankName', label: 'Nama Bank', required: true },
+                  { key: 'accountNumber', label: 'No. Rekening', required: true },
+                  { key: 'accountName', label: 'Atas Nama', required: true },
                 ]}
                 emptyItem={{ bankName: '', accountNumber: '', accountName: '', sortOrder: 0 }}
                 onCreate={async (item) => { await giftBanksResource.create(item); setGiftBanks(await giftBanksResource.list()) }}
@@ -629,7 +641,7 @@ export default function ContentPage() {
               "Daftar Data" menyimpan per baris lewat SimpleListEditor
               sendiri, tombol Simpan global di sana tidak berarti apa-apa. */}
           {isProfileTab(activeTab) && (
-            <StickyActionBar dirty={dirty} saving={saving} onSave={handleSave} hint="Ada perubahan profil/konten belum disimpan." />
+            <StickyActionBar dirty={dirty} saving={saving} uploading={uploadingCount > 0} onSave={handleSave} hint="Ada perubahan profil/konten belum disimpan." />
           )}
         </div>
       </div>

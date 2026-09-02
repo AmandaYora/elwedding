@@ -7,6 +7,7 @@ export interface ListColumn<T> {
   key: keyof Omit<T, 'id'>
   label: string
   type?: 'text' | 'textarea' | 'number' | 'photo' | 'time' | 'datetime-local'
+  required?: boolean
 }
 
 interface SimpleListEditorProps<T extends { id: number; sortOrder: number }> {
@@ -33,19 +34,22 @@ export default function SimpleListEditor<T extends { id: number; sortOrder: numb
   const [formOpen, setFormOpen] = useState(false)
   const [form, setForm] = useState<Omit<T, 'id'>>(emptyItem)
   const [editingId, setEditingId] = useState<number | null>(null)
-  const [uploading, setUploading] = useState(false)
+  const [uploading, setUploading] = useState<Record<string, boolean>>({})
   const [submitting, setSubmitting] = useState(false)
   const [deleteTarget, setDeleteTarget] = useState<T | null>(null)
   const [deleting, setDeleting] = useState(false)
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({})
   const toast = useToast()
 
   function setField(key: keyof T, value: unknown) {
     setForm((f) => ({ ...f, [key]: value }))
+    setFieldErrors((e) => ({ ...e, [String(key)]: '' }))
   }
 
   function openCreate() {
     setEditingId(null)
     setForm(emptyItem)
+    setFieldErrors({})
     setFormOpen(true)
   }
 
@@ -54,11 +58,25 @@ export default function SimpleListEditor<T extends { id: number; sortOrder: numb
     const rest = { ...item } as Partial<T>
     delete rest.id
     setForm(rest as Omit<T, 'id'>)
+    setFieldErrors({})
     setFormOpen(true)
   }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
+    // FE required validation (mirror BE service_lists.go requireNonEmpty)
+    const errors: Record<string, string> = {}
+    for (const col of columns) {
+      if (col.required) {
+        const v = String(form[col.key] ?? '').trim()
+        if (!v) errors[String(col.key)] = `${col.label} wajib diisi`
+      }
+    }
+    if (Object.keys(errors).length > 0) {
+      setFieldErrors(errors)
+      toast.error('Lengkapi field wajib.')
+      return
+    }
     setSubmitting(true)
     try {
       if (editingId) {
@@ -68,8 +86,15 @@ export default function SimpleListEditor<T extends { id: number; sortOrder: numb
       }
       toast.success('Perubahan tersimpan.')
       setFormOpen(false)
-    } catch {
-      toast.error('Gagal menyimpan perubahan.')
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : (err as { response?: { data?: { message?: string } } })?.response?.data?.message
+      // BE now returns specific message like "eventLabel wajib diisi"
+      const display = typeof msg === 'string' && msg.length > 0 && msg !== 'Failed to create agenda event' ? msg : 'Gagal menyimpan perubahan.'
+      // Map BE message to field if contains field name
+      const m = String(display)
+      const fieldMatch = columns.find((c) => m.toLowerCase().includes(String(c.key).toLowerCase()))
+      if (fieldMatch) setFieldErrors({ [String(fieldMatch.key)]: display })
+      toast.error(display)
     } finally {
       setSubmitting(false)
     }
@@ -77,15 +102,17 @@ export default function SimpleListEditor<T extends { id: number; sortOrder: numb
 
   async function handlePhotoUpload(key: keyof T, file: File | undefined) {
     if (!file) return
-    setUploading(true)
+    const k = String(key)
+    setUploading((u) => ({ ...u, [k]: true }))
     try {
       const url = await onUploadPhoto(file)
       setField(key, url)
       toast.success('Foto berhasil diunggah.')
-    } catch {
-      toast.error('Gagal mengunggah foto.')
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : (err as { response?: { data?: { message?: string } } })?.response?.data?.message
+      toast.error(typeof msg === 'string' && msg ? msg : 'Gagal mengunggah foto.')
     } finally {
-      setUploading(false)
+      setUploading((u) => ({ ...u, [k]: false }))
     }
   }
 
@@ -102,6 +129,8 @@ export default function SimpleListEditor<T extends { id: number; sortOrder: numb
       setDeleting(false)
     }
   }
+
+  const isUploading = Object.values(uploading).some(Boolean)
 
   return (
     <Card className="mb-6 shadow-xs border-slate-200">
@@ -176,7 +205,7 @@ export default function SimpleListEditor<T extends { id: number; sortOrder: numb
             <Button variant="secondary" onClick={() => setFormOpen(false)}>
               Batal
             </Button>
-            <Button onClick={handleSubmit} loading={submitting || uploading}>
+            <Button onClick={handleSubmit} loading={submitting || isUploading} disabled={isUploading}>
               Simpan
             </Button>
           </>
@@ -187,13 +216,15 @@ export default function SimpleListEditor<T extends { id: number; sortOrder: numb
             <div key={String(col.key)}>
               {col.type === 'textarea' ? (
                 <Textarea
-                  label={col.label}
+                  label={`${col.label}${col.required ? ' *' : ''}`}
                   value={String(form[col.key] ?? '')}
                   onChange={(e) => setField(col.key, e.target.value)}
+                  error={fieldErrors[String(col.key)]}
                 />
               ) : col.type === 'photo' ? (
                 <div className="flex flex-col gap-2">
-                  <label className="text-xs font-semibold text-slate-700 tracking-tight">{col.label}</label>
+                  <label className="text-xs font-semibold text-slate-700 tracking-tight">{col.label}{col.required ? ' *' : ''}</label>
+                  {fieldErrors[String(col.key)] && <p className="text-xs text-red-600">{fieldErrors[String(col.key)]}</p>}
                   <div className="flex items-center gap-3">
                     {!!form[col.key] && (
                       <img
@@ -207,12 +238,12 @@ export default function SimpleListEditor<T extends { id: number; sortOrder: numb
                         <svg className="w-4 h-4 mr-1.5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
                         </svg>
-                        {uploading ? 'Mengunggah...' : !!form[col.key] ? 'Ganti file foto' : 'Pilih file foto'}
+                        {uploading[String(col.key)] ? 'Mengunggah...' : !!form[col.key] ? 'Ganti file foto' : 'Pilih file foto'}
                       </div>
                       <input
                         type="file"
                         accept="image/*"
-                        disabled={uploading}
+                        disabled={!!uploading[String(col.key)]}
                         className="sr-only"
                         onChange={(e) => void handlePhotoUpload(col.key, e.target.files?.[0])}
                       />
@@ -221,10 +252,11 @@ export default function SimpleListEditor<T extends { id: number; sortOrder: numb
                 </div>
               ) : (
                 <Input
-                  label={col.label}
+                  label={`${col.label}${col.required ? ' *' : ''}`}
                   type={col.type === 'number' ? 'number' : col.type === 'time' ? 'time' : col.type === 'datetime-local' ? 'datetime-local' : 'text'}
                   value={String(form[col.key] ?? '')}
                   onChange={(e) => setField(col.key, col.type === 'number' ? Number(e.target.value) : e.target.value)}
+                  error={fieldErrors[String(col.key)]}
                 />
               )}
             </div>
@@ -252,4 +284,3 @@ export default function SimpleListEditor<T extends { id: number; sortOrder: numb
     </Card>
   )
 }
-

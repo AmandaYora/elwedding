@@ -7,6 +7,7 @@ interface StickyActionBarProps {
   onSave: () => void
   label?: string
   hint?: string
+  uploading?: boolean
 }
 
 /**
@@ -22,7 +23,7 @@ interface StickyActionBarProps {
  * memakai `BrowserRouter` biasa (bukan data router), dan `useBlocker` akan
  * melempar invariant "must be used within a data router" saat dipanggil.
  */
-export function StickyActionBar({ dirty, saving, onSave, label, hint }: StickyActionBarProps) {
+export function StickyActionBar({ dirty, saving, onSave, label, hint, uploading }: StickyActionBarProps) {
   useEffect(() => {
     if (!dirty) return
     function onBeforeUnload(e: BeforeUnloadEvent) {
@@ -44,8 +45,8 @@ export function StickyActionBar({ dirty, saving, onSave, label, hint }: StickyAc
           <span className="hidden sm:inline">Tidak ada perubahan.</span>
         )}
       </p>
-      <Button onClick={onSave} loading={saving} disabled={!dirty} size="md" className="shadow-sm">
-        {label ?? 'Simpan'}
+      <Button onClick={onSave} loading={saving || !!uploading} disabled={!dirty || !!uploading} size="md" className="shadow-sm">
+        {uploading ? 'Mengunggah...' : (label ?? 'Simpan')}
       </Button>
     </div>
   )

@@ -31,7 +31,7 @@ func (h *Handler) CreateAgendaEvent(w http.ResponseWriter, r *http.Request) {
 	}
 	id, err := h.service.CreateAgendaEvent(r.Context(), in)
 	if err != nil {
-		response.BadRequest(w, "Failed to create agenda event", nil)
+		response.BadRequest(w, err.Error(), nil)
 		return
 	}
 	response.Created(w, "Agenda event created successfully", map[string]int64{"id": id})
@@ -48,7 +48,7 @@ func (h *Handler) UpdateAgendaEvent(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if err := h.service.UpdateAgendaEvent(r.Context(), id, in); err != nil {
-		response.BadRequest(w, "Failed to update agenda event", nil)
+		response.BadRequest(w, err.Error(), nil)
 		return
 	}
 	response.OK(w, "Agenda event updated successfully", nil)
@@ -85,7 +85,7 @@ func (h *Handler) CreateRundownItem(w http.ResponseWriter, r *http.Request) {
 	}
 	id, err := h.service.CreateRundownItem(r.Context(), in)
 	if err != nil {
-		response.BadRequest(w, "Failed to create rundown item", nil)
+		response.BadRequest(w, err.Error(), nil)
 		return
 	}
 	response.Created(w, "Rundown item created successfully", map[string]int64{"id": id})
@@ -102,7 +102,7 @@ func (h *Handler) UpdateRundownItem(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if err := h.service.UpdateRundownItem(r.Context(), id, in); err != nil {
-		response.BadRequest(w, "Failed to update rundown item", nil)
+		response.BadRequest(w, err.Error(), nil)
 		return
 	}
 	response.OK(w, "Rundown item updated successfully", nil)
@@ -139,7 +139,7 @@ func (h *Handler) CreateGalleryPhoto(w http.ResponseWriter, r *http.Request) {
 	}
 	id, err := h.service.CreateGalleryPhoto(r.Context(), in)
 	if err != nil {
-		response.BadRequest(w, "Failed to create gallery photo", nil)
+		response.BadRequest(w, err.Error(), nil)
 		return
 	}
 	response.Created(w, "Gallery photo created successfully", map[string]int64{"id": id})
@@ -156,7 +156,7 @@ func (h *Handler) UpdateGalleryPhoto(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if err := h.service.UpdateGalleryPhoto(r.Context(), id, in); err != nil {
-		response.BadRequest(w, "Failed to update gallery photo", nil)
+		response.BadRequest(w, err.Error(), nil)
 		return
 	}
 	response.OK(w, "Gallery photo updated successfully", nil)
@@ -193,7 +193,7 @@ func (h *Handler) CreateLoveStoryChapter(w http.ResponseWriter, r *http.Request)
 	}
 	id, err := h.service.CreateLoveStoryChapter(r.Context(), in)
 	if err != nil {
-		response.BadRequest(w, "Failed to create love story chapter", nil)
+		response.BadRequest(w, err.Error(), nil)
 		return
 	}
 	response.Created(w, "Love story chapter created successfully", map[string]int64{"id": id})
@@ -210,7 +210,7 @@ func (h *Handler) UpdateLoveStoryChapter(w http.ResponseWriter, r *http.Request)
 		return
 	}
 	if err := h.service.UpdateLoveStoryChapter(r.Context(), id, in); err != nil {
-		response.BadRequest(w, "Failed to update love story chapter", nil)
+		response.BadRequest(w, err.Error(), nil)
 		return
 	}
 	response.OK(w, "Love story chapter updated successfully", nil)
@@ -247,7 +247,7 @@ func (h *Handler) CreateWeddingGiftBank(w http.ResponseWriter, r *http.Request) 
 	}
 	id, err := h.service.CreateWeddingGiftBank(r.Context(), in)
 	if err != nil {
-		response.BadRequest(w, "Failed to create gift bank", nil)
+		response.BadRequest(w, err.Error(), nil)
 		return
 	}
 	response.Created(w, "Gift bank created successfully", map[string]int64{"id": id})
@@ -264,7 +264,7 @@ func (h *Handler) UpdateWeddingGiftBank(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 	if err := h.service.UpdateWeddingGiftBank(r.Context(), id, in); err != nil {
-		response.BadRequest(w, "Failed to update gift bank", nil)
+		response.BadRequest(w, err.Error(), nil)
 		return
 	}
 	response.OK(w, "Gift bank updated successfully", nil)

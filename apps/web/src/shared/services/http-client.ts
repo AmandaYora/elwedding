@@ -23,5 +23,21 @@ httpClient.interceptors.request.use(async (config) => {
       config.headers.Authorization = `Bearer ${token}`
     }
   }
+  // Biar browser set boundary untuk multipart (service_upload.go:49 ParseMultipartForm butuh boundary)
+  // AxiosHeaders adalah class case-insensitive — delete via property saja tidak cukup di beberapa versi
+  if (config.data instanceof FormData && config.headers) {
+    const h = config.headers as unknown as Record<string, unknown> & { delete?: (k: string) => void }
+    if (typeof h.delete === 'function') {
+      try {
+        h.delete('Content-Type')
+      } catch {}
+      try {
+        h.delete('content-type')
+      } catch {}
+    }
+    delete h['Content-Type']
+    delete h['content-type']
+    h['Content-Type'] = undefined
+  }
   return config
 })

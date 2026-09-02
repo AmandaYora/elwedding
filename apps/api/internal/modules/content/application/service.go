@@ -126,7 +126,13 @@ func (s *Service) UpdateContent(ctx context.Context, in UpdateInvitationContentI
 		// Terima juga format lengkap dengan detik, untuk fleksibilitas klien.
 		weddingDate, err = time.ParseInLocation("2006-01-02T15:04:05", in.WeddingDate, jakarta)
 		if err != nil {
-			return err
+			// Fallback date-only (dari <input type="date">) — jam default 09:00 WIB
+			weddingDate, err = time.ParseInLocation("2006-01-02", in.WeddingDate, jakarta)
+			if err != nil {
+				return err
+			}
+			// set jam 09:00 bila hanya tanggal
+			weddingDate = time.Date(weddingDate.Year(), weddingDate.Month(), weddingDate.Day(), 9, 0, 0, 0, jakarta)
 		}
 	}
 

@@ -24,9 +24,7 @@ export async function updateContent(values: ContentFormValues): Promise<void> {
 export async function uploadPhoto(file: File): Promise<string> {
   const formData = new FormData()
   formData.append('file', file)
-  const res = await httpClient.post<{ data: { url: string } }>('/api/v1/admin/uploads', formData, {
-    headers: { 'Content-Type': 'multipart/form-data' },
-  })
+  const res = await httpClient.post<{ data: { url: string } }>('/api/v1/admin/uploads', formData)
   return res.data.data.url
 }
 
