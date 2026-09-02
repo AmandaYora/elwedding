@@ -453,6 +453,37 @@ terverifikasi:
 Task 12–13 tetap manual sesuai desain (§3 keputusan #6 & jawaban migrasi) — butuh kredensial
 asli & lingkungan production yang di luar jangkauan sesi analisis/coding ini.
 
+### Deploy & verifikasi production (2026-09-02)
+
+Task 12 (sebagian) dan push+deploy dikerjakan setelah user memberi izin eksplisit menyalin
+kredensial dari `.env` lokal:
+- Kredensial S3 ditambahkan ke `~/elwedding/.env` di VPS lewat `scp` file sementara + `cat >>`
+  di sisi remote — **bukan** lewat command SSH yang menaruh nilai secret di teks command
+  (menghindari pola yang diblokir classifier, lihat `knowledge/AI_AGENT_OPERATIONS.md` §1).
+  Dicek dulu belum ada baris `S3_ENDPOINT=` sebelumnya (`grep -c`, tanpa membaca isi) supaya
+  tidak dobel; temp file lokal & remote dihapus setelah dipakai.
+- Push `b2a5de3` sempat gagal 2x dengan `git push` **hang sampai timeout** (2 menit lalu 5
+  menit) — didiagnosis dengan `GIT_TERMINAL_PROMPT=0`: Git Credential Manager minta
+  re-autentikasi interaktif (kredensial cache dari sesi sebelumnya rupanya sudah kedaluwarsa),
+  bukan masalah jaringan/ukuran push (dicek: cuma 42 objek). Retry ketiga berhasil tanpa
+  intervensi lain - kemungkinan cache GCM sempat ter-refresh di background.
+- CI `success` untuk `b2a5de3816cc8d1b791a0117a006330d4b0a47a1`; `deploy.sh` di `elcodelabs`
+  sukses 5/5 tahap, `docker ps` menunjukkan `elwedding-app` `(healthy)` di image itu.
+- **Verifikasi yang membuktikan kredensial S3 produksi benar-benar valid** (bukan cuma
+  container hidup — `/api/v1/health` tidak menyentuh S3 sama sekali): request ke
+  `/uploads/images/<file-tak-ada>.jpg` dan `/uploads/audio/<file-tak-ada>.mp3` membalas `404
+  application/json` dalam ~2 detik. Ini penting karena kalau kredensial salah, minio-go akan
+  membalas `AccessDenied` (bukan `NoSuchKey`), yang oleh `isNotFound()` (`storage.go`) TIDAK
+  dipetakan ke 404 — hasilnya akan `500`, bukan `404`. 404 yang bersih membuktikan autentikasi
+  ke bucket `elcodelabs` berhasil, path key benar, dan cuma objeknya yang memang belum ada.
+- Bug #2 (URL skema lama) juga dikonfirmasi langsung di production, bukan cuma di test lokal:
+  `curl` ke salah satu dari 3 file legacy (`1788289587481942658-....jpeg`) membalas
+  `404 application/json` (bukan lagi `200`/`index.html`).
+- **Belum diverifikasi dari sesi ini (butuh login admin, di luar jangkauan):** jalur TULIS
+  (upload sungguhan lewat form admin) belum diuji end-to-end. Task 13 (re-upload 3 foto lama)
+  masih perlu dikerjakan manual oleh user, dan itu sekaligus akan jadi bukti pertama jalur
+  tulis bekerja.
+
 **Catatan urutan:** 1→2 (butuh library sebelum menulis pemakainya) →3 (config duluan supaya
 4-7 punya field yang dibaca) →4→5→6→7 (rantai pemanggilan: `service_upload.go` dipakai
 `service.go`, dipakai `content.module.go`, dipakai `main.go`) →8 (router independen dari 4-7

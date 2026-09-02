@@ -5,6 +5,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -102,6 +103,32 @@ func TestSpaFallback_EmptyPublicDir_GetAlsoJSON404(t *testing.T) {
 	}
 	if ct := rec.Header().Get("Content-Type"); ct != "application/json" {
 		t.Fatalf("GET / (publicDir kosong): expected Content-Type application/json, got %q", ct)
+	}
+}
+
+// Bug nyata di production (2026-09-02, ditemukan lewat laporan user "versi
+// lama belum hilang di browser"): index.html/admin.html dikirim tanpa
+// Cache-Control sama sekali, jadi browser boleh menyajikan snapshot lama
+// tanpa pernah menghubungi server - padahal entry HTML ini mereferensikan
+// nama bundle ber-hash yang berganti total tiap deploy (Dockerfile meng-copy
+// ulang dist/, bukan incremental). Tanpa header ini, deploy baru tidak
+// pernah terlihat tamu sampai mereka hard-refresh manual.
+func TestSpaFallback_EntryHtml_TidakBolehDicacheTanpaRevalidasi(t *testing.T) {
+	dir := t.TempDir()
+	mustWriteFile(t, filepath.Join(dir, "index.html"), "<html>undangan</html>")
+	mustWriteFile(t, filepath.Join(dir, "admin.html"), "<html>admin</html>")
+
+	handler := spaFallback(dir)
+
+	for _, path := range []string{"/", "/admin", "/admin/guests"} {
+		req := httptest.NewRequest(http.MethodGet, path, nil)
+		rec := httptest.NewRecorder()
+		handler.ServeHTTP(rec, req)
+
+		cc := rec.Header().Get("Cache-Control")
+		if !strings.Contains(cc, "no-cache") {
+			t.Errorf("GET %s: Cache-Control = %q, harus mengandung no-cache (entry HTML tidak boleh di-cache tanpa revalidasi)", path, cc)
+		}
 	}
 }
 

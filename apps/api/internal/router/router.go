@@ -219,6 +219,19 @@ func spaFallback(publicDir string) http.Handler {
 		if r.URL.Path == "/admin" || strings.HasPrefix(r.URL.Path, "/admin/") {
 			entry = "admin.html"
 		}
+		// Entry HTML TIDAK BOLEH di-cache browser tanpa revalidasi - dia
+		// mereferensikan nama bundle JS/CSS ber-hash (mis. main-BKYWYRkY.js)
+		// yang berganti nama total tiap build. Setiap image baru berisi
+		// dist/ yang benar-benar baru (Dockerfile meng-copy ulang, bukan
+		// incremental) - hash lama TIDAK ada lagi di server. Tanpa header
+		// ini, browser tamu bisa diam-diam menyajikan snapshot HTML+JS lama
+		// dari cache lokal tanpa pernah menghubungi server sama sekali,
+		// sehingga perubahan konten/deploy baru tidak pernah terlihat sampai
+		// user hard-refresh manual (ditemukan langsung di production,
+		// 2026-09-02). no-cache (bukan no-store) supaya browser tetap boleh
+		// revalidasi lewat If-Modified-Since - request tetap ringan (304)
+		// kalau memang belum berubah.
+		w.Header().Set("Cache-Control", "no-cache, must-revalidate")
 		http.ServeFile(w, r, filepath.Join(publicDir, entry))
 	})
 }
