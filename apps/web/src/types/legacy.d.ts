@@ -3,7 +3,7 @@ export {}
 /**
  * The invitation's interactive behavior (RSVP, gift bank tabs, guestbook,
  * gallery, sliders, countdown, music player, loading screen...) is driven
- * entirely by the katsudoto.id platform's own bundled scripts
+ * entirely by the bundled scripts
  * (public/assets/js/{universal,fddf2641,39d8abba,1e92684f}.js) plus a
  * handful of jQuery-based vendor plugins. We don't own that source - it's
  * loaded as opaque global scripts, exactly as it was in the original

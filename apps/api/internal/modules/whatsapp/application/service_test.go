@@ -33,8 +33,8 @@ func TestNormalizePhone(t *testing.T) {
 // Menguji substitusi placeholder template pesan (dashboard-wa-rsvp §6.2).
 func TestApplyTemplate(t *testing.T) {
 	tpl := "Halo {nama}! Kehadiran {jumlah} orang di pernikahan {mempelai} pada {tanggal}."
-	got := applyTemplate(tpl, "Budi", 2, "Ariana & Adrian", "Minggu, 12 Oktober 2026")
-	want := "Halo Budi! Kehadiran 2 orang di pernikahan Ariana & Adrian pada Minggu, 12 Oktober 2026."
+	got := applyTemplate(tpl, "Budi", 2, "Siti & Budi", "Minggu, 12 Oktober 2026")
+	want := "Halo Budi! Kehadiran 2 orang di pernikahan Siti & Budi pada Minggu, 12 Oktober 2026."
 	if got != want {
 		t.Fatalf("applyTemplate() = %q, want %q", got, want)
 	}

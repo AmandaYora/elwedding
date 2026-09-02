@@ -4,10 +4,10 @@ import { __resetLegacyBootstrapForTest, useLegacyBootstrap } from './useLegacyBo
 
 const data: InvitationData = {
   content: {
-    brideName: 'Ariana', brideParentsText: '', brideInstagram: '', bridePhotoUrl: '',
-    groomName: 'Adrian', groomParentsText: '', groomInstagram: '', groomPhotoUrl: '',
+    brideName: 'Siti', brideParentsText: '', brideInstagram: '', bridePhotoUrl: '',
+    groomName: 'Budi', groomParentsText: '', groomInstagram: '', groomPhotoUrl: '',
     weddingDateUnix: 1778904000, weddingDateLabel: 'Saturday, 16 May 2026', weddingDateRaw: '',
-    hashtag: '#AriaMeetsAdrian', coverLogoUrl: '/logo.webp',
+    hashtag: '#PernikahanBahagia', coverLogoUrl: '/logo.webp',
     coverImageDesktopUrl: '/cover-desktop.gif', coverImageMobileUrl: '/cover-mobile.gif',
     quoteText: '', thanksTitle: '', thanksDescription: '', musicUrl: '/music.mp3',
     videoGalleryTitle: '', videoGalleryYoutubeUrl: '', videoGalleryCaption: '',
@@ -24,7 +24,7 @@ const data: InvitationData = {
   rundownItems: [],
   galleryPhotos: [],
   loveStoryChapters: [],
-  giftBanks: [{ id: 1, bankName: 'BANK BRI', accountNumber: '001122301', accountName: 'Ariana', sortOrder: 1 }],
+  giftBanks: [{ id: 1, bankName: 'BANK BRI', accountNumber: '001122301', accountName: 'Siti', sortOrder: 1 }],
 }
 
 beforeEach(() => {

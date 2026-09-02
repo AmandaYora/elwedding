@@ -6,7 +6,7 @@ import { useToast } from '@/shared/components/toast/ToastProvider'
 export interface ListColumn<T> {
   key: keyof Omit<T, 'id'>
   label: string
-  type?: 'text' | 'textarea' | 'number' | 'photo'
+  type?: 'text' | 'textarea' | 'number' | 'photo' | 'time' | 'datetime-local'
 }
 
 interface SimpleListEditorProps<T extends { id: number; sortOrder: number }> {
@@ -222,7 +222,7 @@ export default function SimpleListEditor<T extends { id: number; sortOrder: numb
               ) : (
                 <Input
                   label={col.label}
-                  type={col.type === 'number' ? 'number' : 'text'}
+                  type={col.type === 'number' ? 'number' : col.type === 'time' ? 'time' : col.type === 'datetime-local' ? 'datetime-local' : 'text'}
                   value={String(form[col.key] ?? '')}
                   onChange={(e) => setField(col.key, col.type === 'number' ? Number(e.target.value) : e.target.value)}
                 />

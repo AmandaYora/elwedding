@@ -28,17 +28,19 @@ function Field({
   onChange,
   textarea,
   placeholder,
+  type,
 }: {
   label: string
   value: string
   onChange: (v: string) => void
   textarea?: boolean
   placeholder?: string
+  type?: string
 }) {
   return textarea ? (
     <Textarea label={label} value={value} onChange={(e) => onChange(e.target.value)} placeholder={placeholder} />
   ) : (
-    <Input label={label} value={value} onChange={(e) => onChange(e.target.value)} placeholder={placeholder} />
+    <Input label={label} value={value} onChange={(e) => onChange(e.target.value)} placeholder={placeholder} type={type} />
   )
 }
 
@@ -416,8 +418,8 @@ export default function ContentPage() {
                 </div>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-5 mt-5 pt-5 border-t border-slate-100">
-                  <Field label="Tanggal & Jam Acara" value={form.weddingDate} onChange={(v) => set('weddingDate', v)} placeholder="Minggu, 12 Oktober 2026" />
-                  <Field label="Hashtag" value={form.hashtag} onChange={(v) => set('hashtag', v)} placeholder="#ArianaAdrianForever" />
+                  <Field label="Tanggal & Jam Acara" value={form.weddingDate} onChange={(v) => set('weddingDate', v)} type="datetime-local" />
+                  <Field label="Hashtag" value={form.hashtag} onChange={(v) => set('hashtag', v)} placeholder="#PernikahanBahagia" />
                 </div>
               </CardBody>
             </Card>
@@ -533,7 +535,7 @@ export default function ContentPage() {
                 items={agendaEvents}
                 columns={[
                   { key: 'eventLabel', label: 'Nama Acara' },
-                  { key: 'timeLabel', label: 'Jam' },
+                  { key: 'timeLabel', label: 'Jam', type: 'time' },
                   { key: 'venueName', label: 'Nama Gedung' },
                   { key: 'venueAddress', label: 'Alamat', type: 'textarea' },
                   { key: 'city', label: 'Kota' },
@@ -555,7 +557,7 @@ export default function ContentPage() {
                 items={rundownItems}
                 columns={[
                   { key: 'groupLabel', label: 'Grup' },
-                  { key: 'timeLabel', label: 'Jam' },
+                  { key: 'timeLabel', label: 'Jam', type: 'time' },
                   { key: 'activityText', label: 'Aktivitas' },
                 ]}
                 emptyItem={{ groupLabel: '', timeLabel: '', activityText: '', sortOrder: 0 }}

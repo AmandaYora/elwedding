@@ -55,7 +55,7 @@ export default function LoginPage() {
         <div className="relative z-10">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-blue-600 to-indigo-500 flex items-center justify-center font-bold text-white shadow-lg shadow-blue-500/25">
-              AA
+              UP
             </div>
             <div>
               <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-blue-500/15 text-blue-300 border border-blue-400/20">
@@ -68,9 +68,9 @@ export default function LoginPage() {
 
         <div className="relative z-10 max-w-lg my-auto py-12">
           <h2 className="text-3xl xl:text-4xl font-bold tracking-tight text-white leading-tight">
-            Undangan Pernikahan
+            Undangan
             <span className="block text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-indigo-300">
-              Ariana &amp; Adrian
+              Pernikahan
             </span>
           </h2>
           <p className="mt-4 text-base text-slate-300 leading-relaxed">
@@ -105,7 +105,7 @@ export default function LoginPage() {
         </div>
 
         <div className="relative z-10 text-xs text-slate-500 flex items-center justify-between">
-          <p>&copy; {new Date().getFullYear()} Ariana &amp; Adrian Wedding</p>
+          <p>&copy; {new Date().getFullYear()} Undangan Pernikahan</p>
           <p className="flex items-center gap-1">
             <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
             Sistem Aktif
@@ -119,11 +119,11 @@ export default function LoginPage() {
           {/* Header Mobile Only */}
           <div className="lg:hidden flex items-center gap-3 mb-8">
             <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-blue-600 to-indigo-600 flex items-center justify-center font-bold text-white shadow-md">
-              AA
+              UP
             </div>
             <div>
               <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">Dashboard Admin</p>
-              <h2 className="text-lg font-bold text-slate-900">Ariana &amp; Adrian</h2>
+              <h2 className="text-lg font-bold text-slate-900">Undangan Pernikahan</h2>
             </div>
           </div>
 

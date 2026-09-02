@@ -131,11 +131,11 @@ export default function AdminLayout() {
         <div className="px-6 py-6 flex items-center justify-between border-b border-slate-800/80">
           <div className="flex items-center gap-3">
             <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-blue-600 to-indigo-500 flex items-center justify-center font-bold text-sm text-white shadow-md shadow-blue-500/20">
-              AA
+              UP
             </div>
             <div>
               <p className="text-[10px] uppercase font-bold tracking-widest text-blue-400">Dashboard</p>
-              <h2 className="text-sm font-bold text-white tracking-tight">Ariana &amp; Adrian</h2>
+              <h2 className="text-sm font-bold text-white tracking-tight">Undangan</h2>
             </div>
           </div>
           <button

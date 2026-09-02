@@ -18,8 +18,8 @@ function mockMatchMedia(isMobile: boolean) {
 }
 
 const baseContent: InvitationContent = {
-  brideName: 'Ariana', brideParentsText: '', brideInstagram: '', bridePhotoUrl: '',
-  groomName: 'Adrian', groomParentsText: '', groomInstagram: '', groomPhotoUrl: '',
+  brideName: 'Siti', brideParentsText: '', brideInstagram: '', bridePhotoUrl: '',
+  groomName: 'Budi', groomParentsText: '', groomInstagram: '', groomPhotoUrl: '',
   weddingDateUnix: 0, weddingDateLabel: '', weddingDateRaw: '',
   hashtag: '', coverLogoUrl: '/logo.webp',
   coverImageDesktopUrl: '/media/uploads/gif-872375-1775705339-9344566539b63ad1a7e5d2b5.mp4',

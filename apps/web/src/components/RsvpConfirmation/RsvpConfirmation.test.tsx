@@ -11,8 +11,8 @@ const mockedGet = vi.mocked(httpClient.get)
 const mockedPatch = vi.mocked(httpClient.patch)
 
 const content: InvitationContent = {
-  brideName: 'Ariana', brideParentsText: '', brideInstagram: '', bridePhotoUrl: '',
-  groomName: 'Adrian', groomParentsText: '', groomInstagram: '', groomPhotoUrl: '',
+  brideName: 'Siti', brideParentsText: '', brideInstagram: '', bridePhotoUrl: '',
+  groomName: 'Budi', groomParentsText: '', groomInstagram: '', groomPhotoUrl: '',
   weddingDateUnix: 1778904000, weddingDateLabel: 'Saturday, 16 May 2026', weddingDateRaw: '',
   hashtag: '', coverLogoUrl: '', coverImageDesktopUrl: '', coverImageMobileUrl: '',
   quoteText: '', thanksTitle: '', thanksDescription: '', musicUrl: '',
