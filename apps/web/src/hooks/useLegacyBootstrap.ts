@@ -1,21 +1,28 @@
 import { useEffect } from 'react'
 import type { InvitationData } from '@/types/api'
 import * as legacy from '@/data/legacyConfig'
+import { coverMediaHtml } from '@/shared/lib/coverMedia'
 
-const LEGACY_SCRIPTS = [
+export const CORE_SCRIPTS = [
   '/vendor/tsparticles/tsparticles.bundle.min.js',
   '/vendor/aos/dist/aos.js',
   '/vendor/slick/slick.min.js',
   '/vendor/selectize/dist/js/standalone/selectize.min.js',
   '/vendor/modal-video/js/jquery-modal-video.min.js',
   '/vendor/lightgallery/dist/js/lightgallery.min.js',
-  '/vendor/video-js/video.min.js',
-  '/vendor/videojs-youtube/Youtube.min.js',
-  '/assets/js/html2canvas-1.4.1.1787212065.js',
   '/assets/js/universal.js',
   '/assets/js/fddf2641.js',
   '/assets/js/39d8abba.js',
 ]
+
+export const DEFERRED_SCRIPTS = [
+  '/vendor/video-js/video.min.js',
+  '/vendor/videojs-youtube/Youtube.min.js',
+  '/assets/js/html2canvas-1.4.1.1787212065.js',
+]
+
+// kept for backward compat, not used in bootstrap
+export const LEGACY_SCRIPTS = [...CORE_SCRIPTS.slice(0, 6), ...DEFERRED_SCRIPTS, ...CORE_SCRIPTS.slice(6)]
 
 function loadScript(src: string): Promise<void> {
   return new Promise((resolve, reject) => {
@@ -75,9 +82,10 @@ export function useLegacyBootstrap(data: InvitationData | null, ready: boolean) 
         position: 'MAIN',
         element: '#cover-main',
         details: {
-          desktop: `<div class="picture desktop"><img src="${content.coverImageDesktopUrl}" alt=""></div>`,
-          mobile: `<div class="picture mobile"><img src="${content.coverImageMobileUrl}" alt=""></div>`,
+          desktop: `<div class="picture desktop">${coverMediaHtml(content.coverImageDesktopUrl)}</div>`,
+          mobile: `<div class="picture mobile">${coverMediaHtml(content.coverImageMobileUrl)}</div>`,
         },
+        options: { infinite: false, autoplay: false },
       },
       { position: 'PANE', details: { desktop: '', mobile: '' }, element: '#cover-pane' },
     ]
@@ -113,15 +121,53 @@ export function useLegacyBootstrap(data: InvitationData | null, ready: boolean) 
     )
 
     async function bootstrap() {
-      for (const src of LEGACY_SCRIPTS) {
-        await loadScript(src)
+      // T26: pra-unduh CORE_SCRIPTS paralel, eksekusi tetap berurutan
+      // pra-unduh hanya optimasi, gagal tidak menghentikan eksekusi
+      if (typeof fetch !== 'undefined') {
+        await Promise.allSettled(
+          CORE_SCRIPTS.map((src) =>
+            fetch(src, { method: 'GET' })
+              .then((r) => r.arrayBuffer())
+              .catch(() => null)
+          )
+        )
+      }
+      for (const src of CORE_SCRIPTS) {
+        try {
+          await loadScript(src)
+        } catch (e) {
+          console.error(`Failed to load script: ${src}`, e)
+        }
+      }
+      // T28: html2canvas dimuat saat interaksi pertama, bukan saat bootstrap
+      const html2canvasSrc = DEFERRED_SCRIPTS.find((s) => s.includes('html2canvas'))
+      if (html2canvasSrc) {
+        const loadHtml2Canvas = () => {
+          // jangan muat dua kali
+          if (document.querySelector(`script[src="${html2canvasSrc}"]`)) return
+          loadScript(html2canvasSrc).catch((e) => console.error(`Failed to load html2canvas: ${html2canvasSrc}`, e))
+        }
+        window.addEventListener('pointerdown', loadHtml2Canvas, { once: true, passive: true } as AddEventListenerOptions)
+        window.addEventListener('scroll', loadHtml2Canvas, { once: true, passive: true } as AddEventListenerOptions)
+        // Fallback IntersectionObserver pada WeddingGift (T28 catatan) — jika user langsung klik tanpa scroll,
+        // tetap dimuat saat section mendekat
+        const giftSection = document.querySelector('.wedding-gift-outer')
+        if (giftSection && typeof IntersectionObserver !== 'undefined') {
+          const obs = new IntersectionObserver((entries) => {
+            if (entries.some((en) => en.isIntersecting)) {
+              loadHtml2Canvas()
+              obs.disconnect()
+            }
+          }, { rootMargin: '200px' })
+          obs.observe(giftSection)
+        }
       }
     }
 
     // Tunggu paint (F6): fddf2641.js membaca DOM section sekali saat
     // dieksekusi, harus dipastikan sudah ter-render.
     requestAnimationFrame(() => {
-      void bootstrap()
+      void bootstrap().catch((e) => console.error('bootstrap failed', e))
     })
   }, [ready, data])
 }

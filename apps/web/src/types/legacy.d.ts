@@ -84,6 +84,7 @@ export interface CoverConfig {
     mobile: string
   }
   element: string
+  options?: unknown
 }
 
 export interface RsvpDataConfig {

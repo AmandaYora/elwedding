@@ -34,19 +34,19 @@ export default function SaveTheDate({ content }: SaveTheDateProps) {
 
         <div className="orn-sd-3">
           <div className="image-wrap" data-aos="zoom-out" data-aos-duration="1500" data-aos-delay="1000">
-            <img src="/media/template/arsya/Orn-31.png" alt="" />
+            <img src="/media/template/arsya/Orn-31.webp" width="840" height="763" alt=""  loading="lazy" decoding="async" />
           </div>
         </div>
 
         <div className="orn-sd-4 right">
           <div className="image-wrap" data-aos="zoom-in-up" data-aos-duration="1800" data-aos-delay="1400">
-            <img src="/media/template/arsya/Orn-32.png" alt="" />
+            <img src="/media/template/arsya/Orn-32.webp" width="600" height="1013" alt=""  loading="lazy" decoding="async" />
           </div>
         </div>
 
         <div className="orn-sd-4 left">
           <div className="image-wrap" data-aos="zoom-in-up" data-aos-duration="1800" data-aos-delay="1400">
-            <img src="/media/template/arsya/Orn-32.png" alt="" />
+            <img src="/media/template/arsya/Orn-32.webp" width="600" height="1013" alt=""  loading="lazy" decoding="async" />
           </div>
         </div>
 
@@ -55,7 +55,7 @@ export default function SaveTheDate({ content }: SaveTheDateProps) {
       <div className="save-date-frame">
 
         <div className="image-wrap" data-aos="zoom-in" data-aos-duration="1000">
-          <img src="/media/template/arsya/frame-sd.png" alt="" />
+          <img src="/media/template/arsya/frame-sd.webp" width="332" height="436" alt=""  loading="lazy" decoding="async" />
         </div>
 
         <div className="save-date-content">
@@ -110,37 +110,37 @@ export default function SaveTheDate({ content }: SaveTheDateProps) {
         <div className="orn-sd-1">
           <div className="orn-sd-1-2">
             <div className="image-wrap" data-aos="zoom-in-up" data-aos-duration="2300" data-aos-delay="1500">
-              <img src="/media/template/arsya/Orn-28.png" alt="" />
+              <img src="/media/template/arsya/Orn-28.webp" width="400" height="954" alt=""  loading="lazy" decoding="async" />
             </div>
           </div>
           <div className="orn-sd-1-1">
             <div className="image-wrap" data-aos="zoom-in-up" data-aos-duration="2100" data-aos-delay="1300">
-              <img src="/media/template/arsya/Orn-27.png" alt="" />
+              <img src="/media/template/arsya/Orn-27.webp" width="312" height="543" alt=""  loading="lazy" decoding="async" />
             </div>
           </div>
           <div className="image-wrap" data-aos="zoom-out" data-aos-duration="1500" data-aos-delay="1000">
-            <img src="/media/template/arsya/Orn-26.png" alt="" />
+            <img src="/media/template/arsya/Orn-26.webp" width="400" height="304" alt=""  loading="lazy" decoding="async" />
           </div>
         </div>
 
         <div className="orn-sd-2">
           <div className="orn-sd-2-3">
             <div className="image-wrap" data-aos="zoom-in-up" data-aos-duration="1900" data-aos-delay="1800">
-              <img src="/media/template/arsya/Orn-05.png" alt="" />
+              <img src="/media/template/arsya/Orn-05.webp" width="400" height="1019" alt=""  loading="lazy" decoding="async" />
             </div>
           </div>
           <div className="orn-sd-2-2">
             <div className="image-wrap" data-aos="zoom-in-up" data-aos-duration="1900" data-aos-delay="1800">
-              <img src="/media/template/arsya/Orn-03.png" alt="" />
+              <img src="/media/template/arsya/Orn-03.webp" width="400" height="841" alt=""  loading="lazy" decoding="async" />
             </div>
           </div>
           <div className="orn-sd-2-1">
             <div className="image-wrap" data-aos="zoom-in-up" data-aos-duration="1500" data-aos-delay="1200">
-              <img src="/media/template/arsya/Orn-30.png" alt="" />
+              <img src="/media/template/arsya/Orn-30.webp" width="266" height="347" alt=""  loading="lazy" decoding="async" />
             </div>
           </div>
           <div className="image-wrap" data-aos="zoom-out" data-aos-duration="1500" data-aos-delay="1000">
-            <img src="/media/template/arsya/Orn-29.png" alt="" />
+            <img src="/media/template/arsya/Orn-29.webp" width="376" height="294" alt=""  loading="lazy" decoding="async" />
           </div>
         </div>
 
@@ -150,7 +150,7 @@ export default function SaveTheDate({ content }: SaveTheDateProps) {
 
         <div className="orn-sd-5">
           <div className="image-wrap" data-aos="zoom-in" data-aos-duration="1800" data-aos-delay="1400">
-            <img src="/media/template/arsya/Orn-33.png" alt="" />
+            <img src="/media/template/arsya/Orn-33.webp" width="600" height="377" alt=""  loading="lazy" decoding="async" />
           </div>
         </div>
 

@@ -7,17 +7,17 @@ export default function WeddingWish() {
         <div className="ornaments-wrapper">
           <div className="orn-wish-2 center">
             <div className="image-wrap" data-aos="zoom-out" data-aos-duration="2400" data-aos-delay="2200">
-              <img src="/media/template/arsya/Orn-31.png" alt="Ornaments" />
+              <img src="/media/template/arsya/Orn-31.webp" width="840" height="763" alt="Ornaments"  loading="lazy" decoding="async" />
             </div>
           </div>
           <div className="orn-wish-1 left">
             <div className="image-wrap" data-aos="zoom-in-up" data-aos-duration="2600" data-aos-delay="2200">
-              <img src="/media/template/arsya/Orn-28.png" alt="Ornaments" />
+              <img src="/media/template/arsya/Orn-28.webp" width="400" height="954" alt="Ornaments"  loading="lazy" decoding="async" />
             </div>
           </div>
           <div className="orn-wish-1 right">
             <div className="image-wrap" data-aos="zoom-in-up" data-aos-duration="2600" data-aos-delay="2200">
-              <img src="/media/template/arsya/Orn-28.png" alt="Ornaments" />
+              <img src="/media/template/arsya/Orn-28.webp" width="400" height="954" alt="Ornaments"  loading="lazy" decoding="async" />
             </div>
           </div>
         </div>
@@ -78,46 +78,46 @@ export default function WeddingWish() {
         <div className="ornaments-wrapper">
           <div className="orn-lv-3">
             <div className="image-wrap" data-aos="fade-up" data-aos-duration="1200" data-aos-delay="500">
-              <img src="/media/template/arsya/Orn-23.png" alt="Ornaments" />
+              <img src="/media/template/arsya/Orn-23.webp" width="600" height="293" alt="Ornaments"  loading="lazy" decoding="async" />
             </div>
           </div>
           <div className="orn-lv-2 left">
             <div className="orn-lv-2-3">
               <div className="image-wrap" data-aos="zoom-in-up" data-aos-duration="1500" data-aos-delay="1200">
-                <img src="/media/template/arsya/Orn-05.png" alt="Ornaments" />
+                <img src="/media/template/arsya/Orn-05.webp" width="400" height="1019" alt="Ornaments"  loading="lazy" decoding="async" />
               </div>
             </div>
             <div className="orn-lv-2-2">
               <div className="image-wrap" data-aos="zoom-in-up" data-aos-duration="1600" data-aos-delay="1100">
-                <img src="/media/template/arsya/Orn-03.png" alt="Ornaments" />
+                <img src="/media/template/arsya/Orn-03.webp" width="400" height="841" alt="Ornaments"  loading="lazy" decoding="async" />
               </div>
             </div>
             <div className="image-wrap" data-aos="fade-right" data-aos-duration="1200" data-aos-delay="500">
-              <img src="/media/template/arsya/Orn-20.png" alt="Ornaments" />
+              <img src="/media/template/arsya/Orn-20.webp" width="534" height="357" alt="Ornaments"  loading="lazy" decoding="async" />
             </div>
             <div className="orn-lv-2-1">
               <div className="image-wrap" data-aos="fade-right" data-aos-duration="1200" data-aos-delay="500">
-                <img src="/media/template/arsya/Orn-29.png" alt="Ornaments" />
+                <img src="/media/template/arsya/Orn-29.webp" width="376" height="294" alt="Ornaments"  loading="lazy" decoding="async" />
               </div>
             </div>
           </div>
           <div className="orn-lv-2 right">
             <div className="orn-lv-2-3">
               <div className="image-wrap" data-aos="zoom-in-up" data-aos-duration="1500" data-aos-delay="1200">
-                <img src="/media/template/arsya/Orn-05.png" alt="Ornaments" />
+                <img src="/media/template/arsya/Orn-05.webp" width="400" height="1019" alt="Ornaments"  loading="lazy" decoding="async" />
               </div>
             </div>
             <div className="orn-lv-2-2">
               <div className="image-wrap" data-aos="zoom-in-up" data-aos-duration="1600" data-aos-delay="1100">
-                <img src="/media/template/arsya/Orn-03.png" alt="Ornaments" />
+                <img src="/media/template/arsya/Orn-03.webp" width="400" height="841" alt="Ornaments"  loading="lazy" decoding="async" />
               </div>
             </div>
             <div className="image-wrap" data-aos="fade-right" data-aos-duration="1200" data-aos-delay="500">
-              <img src="/media/template/arsya/Orn-20.png" alt="Ornaments" />
+              <img src="/media/template/arsya/Orn-20.webp" width="534" height="357" alt="Ornaments"  loading="lazy" decoding="async" />
             </div>
             <div className="orn-lv-2-1">
               <div className="image-wrap" data-aos="fade-right" data-aos-duration="1200" data-aos-delay="500">
-                <img src="/media/template/arsya/Orn-29.png" alt="Ornaments" />
+                <img src="/media/template/arsya/Orn-29.webp" width="376" height="294" alt="Ornaments"  loading="lazy" decoding="async" />
               </div>
             </div>
           </div>

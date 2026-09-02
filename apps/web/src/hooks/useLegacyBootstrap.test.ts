@@ -80,3 +80,24 @@ test('BANK_OPTIONS diisi dari giftBanks (dipakai dropdown selectize legacy)', ()
 
   expect(window.BANK_OPTIONS).toEqual([{ id: 1, title: 'BANK BRI', credential: '001122301' }])
 })
+
+test('window.COVERS MAIN membawa options.infinite===false (T11)', () => {
+  renderHook(() => useLegacyBootstrap(data, true))
+  const covers = window.COVERS as Array<{ position: string; options?: { infinite?: boolean; autoplay?: boolean } }>
+  const main = covers.find((c) => c.position === 'MAIN')
+  expect(main?.options).toEqual(expect.objectContaining({ infinite: false, autoplay: false }))
+})
+
+test('DEFERRED_SCRIPTS tidak dimuat saat bootstrap (T25)', async () => {
+  const { CORE_SCRIPTS, DEFERRED_SCRIPTS } = await import('./useLegacyBootstrap')
+  // Pastikan DEFERRED tidak ada di DOM setelah ready (hanya CORE yang mungkin dimuat)
+  renderHook(() => useLegacyBootstrap(data, true))
+  // tunggu microtask
+  await new Promise((r) => setTimeout(r, 50))
+  for (const src of DEFERRED_SCRIPTS) {
+    expect(document.querySelector(`script[src="${src}"]`)).toBeNull()
+  }
+  // CORE terakhir harus fddf2641 dan 39d8abba
+  expect(CORE_SCRIPTS[CORE_SCRIPTS.length - 2]).toContain('fddf2641.js')
+  expect(CORE_SCRIPTS[CORE_SCRIPTS.length - 1]).toContain('39d8abba.js')
+})

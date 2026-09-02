@@ -1,5 +1,5 @@
 node_modules/
-dist/
+/dist/
 dist-ssr/
 *.tsbuildinfo
 *.local
@@ -8,7 +8,7 @@ dist-ssr/
 
 # --- monorepo additions ---
 node_modules/
-dist/
+/apps/web/dist/
 build/
 tmp/
 .env

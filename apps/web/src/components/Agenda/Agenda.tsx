@@ -28,29 +28,29 @@ export default function Agenda({ content, agendaEvents }: AgendaProps) {
 
         <div className="orn-agenda-1">
           <div className="image-wrap" data-aos="zoom-out" data-aos-duration="1500" data-aos-delay="1000">
-            <img src="/media/template/arsya/Orn-34.png" alt="" />
+            <img src="/media/template/arsya/Orn-34.webp" width="1326" height="281" alt=""  loading="lazy" decoding="async" />
           </div>
         </div>
 
         <div className="orn-agenda-2 left">
           <div className="orn-agenda-2-1">
             <div className="image-wrap" data-aos="zoom-out-down" data-aos-duration="1500" data-aos-delay="1000">
-              <img src="/media/template/arsya/Orn-36.png" alt="" />
+              <img src="/media/template/arsya/Orn-36.webp" width="257" height="538" alt=""  loading="lazy" decoding="async" />
             </div>
           </div>
           <div className="image-wrap" data-aos="zoom-out" data-aos-duration="1500" data-aos-delay="1000">
-            <img src="/media/template/arsya/Orn-35.png" alt="" />
+            <img src="/media/template/arsya/Orn-35.webp" width="600" height="595" alt=""  loading="lazy" decoding="async" />
           </div>
         </div>
 
         <div className="orn-agenda-2 right">
           <div className="orn-agenda-2-1">
             <div className="image-wrap" data-aos="zoom-out-down" data-aos-duration="1500" data-aos-delay="1000">
-              <img src="/media/template/arsya/Orn-36.png" alt="" />
+              <img src="/media/template/arsya/Orn-36.webp" width="257" height="538" alt=""  loading="lazy" decoding="async" />
             </div>
           </div>
           <div className="image-wrap" data-aos="zoom-out" data-aos-duration="1500" data-aos-delay="1000">
-            <img src="/media/template/arsya/Orn-35.png" alt="" />
+            <img src="/media/template/arsya/Orn-35.webp" width="600" height="595" alt=""  loading="lazy" decoding="async" />
           </div>
         </div>
 
@@ -78,19 +78,19 @@ export default function Agenda({ content, agendaEvents }: AgendaProps) {
                     <div className="orn-ev-1">
                       <div className="orn-ev-1-1">
                         <div className="image-wrap" data-aos="fade-up" data-aos-duration="1800" data-aos-delay="1000">
-                          <img src="/media/template/arsya/Orn-38.png" alt="Orn" />
+                          <img src="/media/template/arsya/Orn-38.webp" width="999" height="342" alt="Orn"  loading="lazy" decoding="async" />
                         </div>
                       </div>
 
                       <div className="orn-ev-3 left">
                         <div className="image-wrap" data-aos="zoom-in-up" data-aos-duration="2400" data-aos-delay="1900">
-                          <img src="/media/template/arsya/Orn-40.png" alt="Orn" />
+                          <img src="/media/template/arsya/Orn-40.webp" width="582" height="759" alt="Orn"  loading="lazy" decoding="async" />
                         </div>
                       </div>
 
                       <div className="orn-ev-3 right">
                         <div className="image-wrap" data-aos="zoom-in-up" data-aos-duration="2400" data-aos-delay="1900">
-                          <img src="/media/template/arsya/Orn-40.png" alt="Orn" />
+                          <img src="/media/template/arsya/Orn-40.webp" width="582" height="759" alt="Orn"  loading="lazy" decoding="async" />
                         </div>
                       </div>
 
@@ -98,25 +98,25 @@ export default function Agenda({ content, agendaEvents }: AgendaProps) {
                         <div className="orn-ev-2-2">
                           <div className="orn-ev-2-2-2">
                             <div className="image-wrap" data-aos="zoom-in-up" data-aos-duration="2200" data-aos-delay="1400">
-                              <img src="/media/template/arsya/Orn-28.png" alt="Orn" />
+                              <img src="/media/template/arsya/Orn-28.webp" width="400" height="954" alt="Orn"  loading="lazy" decoding="async" />
                             </div>
                           </div>
                           <div className="orn-ev-2-2-1">
                             <div className="image-wrap" data-aos="zoom-in-up" data-aos-duration="2200" data-aos-delay="1400">
-                              <img src="/media/template/arsya/Orn-05.png" alt="Orn" />
+                              <img src="/media/template/arsya/Orn-05.webp" width="400" height="1019" alt="Orn"  loading="lazy" decoding="async" />
                             </div>
                           </div>
                           <div className="image-wrap" data-aos="zoom-in-up" data-aos-duration="2000" data-aos-delay="1200">
-                            <img src="/media/template/arsya/Orn-08.png" alt="Orn" />
+                            <img src="/media/template/arsya/Orn-08.webp" width="400" height="993" alt="Orn"  loading="lazy" decoding="async" />
                           </div>
                         </div>
                         <div className="orn-ev-2-1">
                           <div className="image-wrap" data-aos="zoom-in-up" data-aos-duration="1800" data-aos-delay="1000">
-                            <img src="/media/template/arsya/Orn-03.png" alt="Orn" />
+                            <img src="/media/template/arsya/Orn-03.webp" width="400" height="841" alt="Orn"  loading="lazy" decoding="async" />
                           </div>
                         </div>
                         <div className="image-wrap" data-aos="zoom-in-up" data-aos-duration="1800" data-aos-delay="1000">
-                          <img src="/media/template/arsya/Orn-39.png" alt="Orn" />
+                          <img src="/media/template/arsya/Orn-39.webp" width="400" height="329" alt="Orn"  loading="lazy" decoding="async" />
                         </div>
                       </div>
 
@@ -124,35 +124,35 @@ export default function Agenda({ content, agendaEvents }: AgendaProps) {
                         <div className="orn-ev-2-2">
                           <div className="orn-ev-2-2-2">
                             <div className="image-wrap" data-aos="zoom-in-up" data-aos-duration="2200" data-aos-delay="1400">
-                              <img src="/media/template/arsya/Orn-28.png" alt="Orn" />
+                              <img src="/media/template/arsya/Orn-28.webp" width="400" height="954" alt="Orn"  loading="lazy" decoding="async" />
                             </div>
                           </div>
                           <div className="orn-ev-2-2-1">
                             <div className="image-wrap" data-aos="zoom-in-up" data-aos-duration="2200" data-aos-delay="1400">
-                              <img src="/media/template/arsya/Orn-05.png" alt="Orn" />
+                              <img src="/media/template/arsya/Orn-05.webp" width="400" height="1019" alt="Orn"  loading="lazy" decoding="async" />
                             </div>
                           </div>
                           <div className="image-wrap" data-aos="zoom-in-up" data-aos-duration="2000" data-aos-delay="1200">
-                            <img src="/media/template/arsya/Orn-08.png" alt="Orn" />
+                            <img src="/media/template/arsya/Orn-08.webp" width="400" height="993" alt="Orn"  loading="lazy" decoding="async" />
                           </div>
                         </div>
                         <div className="orn-ev-2-1">
                           <div className="image-wrap" data-aos="zoom-in-up" data-aos-duration="1800" data-aos-delay="1000">
-                            <img src="/media/template/arsya/Orn-03.png" alt="Orn" />
+                            <img src="/media/template/arsya/Orn-03.webp" width="400" height="841" alt="Orn"  loading="lazy" decoding="async" />
                           </div>
                         </div>
                         <div className="image-wrap" data-aos="zoom-in-up" data-aos-duration="1800" data-aos-delay="1000">
-                          <img src="/media/template/arsya/Orn-39.png" alt="Orn" />
+                          <img src="/media/template/arsya/Orn-39.webp" width="400" height="329" alt="Orn"  loading="lazy" decoding="async" />
                         </div>
                       </div>
 
                       <div className="image-wrap" data-aos="fade-up" data-aos-duration="1800" data-aos-delay="1000">
-                        <img src="/media/template/arsya/Orn-37.png" alt="Orn" />
+                        <img src="/media/template/arsya/Orn-37.webp" width="800" height="480" alt="Orn"  loading="lazy" decoding="async" />
                       </div>
                     </div>
                     <div className="orn-ev-kupu kupu-1">
                       <div className="image-wrap" data-aos="zoom-out" data-aos-duration="2100" data-aos-delay="1800">
-                        <img src="/media/template/arsya/kupu-1.png" alt="Ornaments" />
+                        <img src="/media/template/arsya/kupu-1.webp" width="114" height="137" alt="Ornaments"  loading="lazy" decoding="async" />
                       </div>
                     </div>
                   </div>
@@ -194,19 +194,19 @@ export default function Agenda({ content, agendaEvents }: AgendaProps) {
                     <div className="orn-ev-1">
                       <div className="orn-ev-1-1">
                         <div className="image-wrap" data-aos="fade-up" data-aos-duration="1800" data-aos-delay="1000">
-                          <img src="/media/template/arsya/Orn-38.png" alt="Orn" />
+                          <img src="/media/template/arsya/Orn-38.webp" width="999" height="342" alt="Orn"  loading="lazy" decoding="async" />
                         </div>
                       </div>
 
                       <div className="orn-ev-3 left">
                         <div className="image-wrap" data-aos="zoom-in-up" data-aos-duration="2400" data-aos-delay="1900">
-                          <img src="/media/template/arsya/Orn-40.png" alt="Orn" />
+                          <img src="/media/template/arsya/Orn-40.webp" width="582" height="759" alt="Orn"  loading="lazy" decoding="async" />
                         </div>
                       </div>
 
                       <div className="orn-ev-3 right">
                         <div className="image-wrap" data-aos="zoom-in-up" data-aos-duration="2400" data-aos-delay="1900">
-                          <img src="/media/template/arsya/Orn-40.png" alt="Orn" />
+                          <img src="/media/template/arsya/Orn-40.webp" width="582" height="759" alt="Orn"  loading="lazy" decoding="async" />
                         </div>
                       </div>
 
@@ -214,25 +214,25 @@ export default function Agenda({ content, agendaEvents }: AgendaProps) {
                         <div className="orn-ev-2-2">
                           <div className="orn-ev-2-2-2">
                             <div className="image-wrap" data-aos="zoom-in-up" data-aos-duration="2200" data-aos-delay="1400">
-                              <img src="/media/template/arsya/Orn-28.png" alt="Orn" />
+                              <img src="/media/template/arsya/Orn-28.webp" width="400" height="954" alt="Orn"  loading="lazy" decoding="async" />
                             </div>
                           </div>
                           <div className="orn-ev-2-2-1">
                             <div className="image-wrap" data-aos="zoom-in-up" data-aos-duration="2200" data-aos-delay="1400">
-                              <img src="/media/template/arsya/Orn-05.png" alt="Orn" />
+                              <img src="/media/template/arsya/Orn-05.webp" width="400" height="1019" alt="Orn"  loading="lazy" decoding="async" />
                             </div>
                           </div>
                           <div className="image-wrap" data-aos="zoom-in-up" data-aos-duration="2000" data-aos-delay="1200">
-                            <img src="/media/template/arsya/Orn-08.png" alt="Orn" />
+                            <img src="/media/template/arsya/Orn-08.webp" width="400" height="993" alt="Orn"  loading="lazy" decoding="async" />
                           </div>
                         </div>
                         <div className="orn-ev-2-1">
                           <div className="image-wrap" data-aos="zoom-in-up" data-aos-duration="1800" data-aos-delay="1000">
-                            <img src="/media/template/arsya/Orn-03.png" alt="Orn" />
+                            <img src="/media/template/arsya/Orn-03.webp" width="400" height="841" alt="Orn"  loading="lazy" decoding="async" />
                           </div>
                         </div>
                         <div className="image-wrap" data-aos="zoom-in-up" data-aos-duration="1800" data-aos-delay="1000">
-                          <img src="/media/template/arsya/Orn-39.png" alt="Orn" />
+                          <img src="/media/template/arsya/Orn-39.webp" width="400" height="329" alt="Orn"  loading="lazy" decoding="async" />
                         </div>
                       </div>
 
@@ -240,35 +240,35 @@ export default function Agenda({ content, agendaEvents }: AgendaProps) {
                         <div className="orn-ev-2-2">
                           <div className="orn-ev-2-2-2">
                             <div className="image-wrap" data-aos="zoom-in-up" data-aos-duration="2200" data-aos-delay="1400">
-                              <img src="/media/template/arsya/Orn-28.png" alt="Orn" />
+                              <img src="/media/template/arsya/Orn-28.webp" width="400" height="954" alt="Orn"  loading="lazy" decoding="async" />
                             </div>
                           </div>
                           <div className="orn-ev-2-2-1">
                             <div className="image-wrap" data-aos="zoom-in-up" data-aos-duration="2200" data-aos-delay="1400">
-                              <img src="/media/template/arsya/Orn-05.png" alt="Orn" />
+                              <img src="/media/template/arsya/Orn-05.webp" width="400" height="1019" alt="Orn"  loading="lazy" decoding="async" />
                             </div>
                           </div>
                           <div className="image-wrap" data-aos="zoom-in-up" data-aos-duration="2000" data-aos-delay="1200">
-                            <img src="/media/template/arsya/Orn-08.png" alt="Orn" />
+                            <img src="/media/template/arsya/Orn-08.webp" width="400" height="993" alt="Orn"  loading="lazy" decoding="async" />
                           </div>
                         </div>
                         <div className="orn-ev-2-1">
                           <div className="image-wrap" data-aos="zoom-in-up" data-aos-duration="1800" data-aos-delay="1000">
-                            <img src="/media/template/arsya/Orn-03.png" alt="Orn" />
+                            <img src="/media/template/arsya/Orn-03.webp" width="400" height="841" alt="Orn"  loading="lazy" decoding="async" />
                           </div>
                         </div>
                         <div className="image-wrap" data-aos="zoom-in-up" data-aos-duration="1800" data-aos-delay="1000">
-                          <img src="/media/template/arsya/Orn-39.png" alt="Orn" />
+                          <img src="/media/template/arsya/Orn-39.webp" width="400" height="329" alt="Orn"  loading="lazy" decoding="async" />
                         </div>
                       </div>
 
                       <div className="image-wrap" data-aos="fade-up" data-aos-duration="1800" data-aos-delay="1000">
-                        <img src="/media/template/arsya/Orn-37.png" alt="Orn" />
+                        <img src="/media/template/arsya/Orn-37.webp" width="800" height="480" alt="Orn"  loading="lazy" decoding="async" />
                       </div>
                     </div>
                     <div className="orn-ev-kupu kupu-1">
                       <div className="image-wrap" data-aos="zoom-out" data-aos-duration="2100" data-aos-delay="1800">
-                        <img src="/media/template/arsya/kupu-1.png" alt="Ornaments" />
+                        <img src="/media/template/arsya/kupu-1.webp" width="114" height="137" alt="Ornaments"  loading="lazy" decoding="async" />
                       </div>
                     </div>
                   </div>
@@ -322,7 +322,7 @@ export default function Agenda({ content, agendaEvents }: AgendaProps) {
                         <div className="dress-itwrap">
                           <div className="dress-preview man-preview">
                             <div className="dress-icon">
-                              <img className="dress-icon-img" src="/assets/icons/ic-dress-man-formal.png" alt="Dress Man Formal" width="36" height="36" />
+                              <img className="dress-icon-img" src="/assets/icons/ic-dress-man-formal.png" alt="Dress Man Formal" width="36" height="36"  loading="lazy" decoding="async" />
                               <p className="dress-item-title">Men</p>
                               <p className="dress-icon-label">Formal</p>
                             </div>
@@ -344,7 +344,7 @@ export default function Agenda({ content, agendaEvents }: AgendaProps) {
                         <div className="dress-itwrap">
                           <div className="dress-preview woman-preview">
                             <div className="dress-icon">
-                              <img className="dress-icon-img" src="/assets/icons/ic-dress-woman-formal.png" alt="Dress Woman Formal" width="36" height="36" />
+                              <img className="dress-icon-img" src="/assets/icons/ic-dress-woman-formal.png" alt="Dress Woman Formal" width="36" height="36"  loading="lazy" decoding="async" />
                               <p className="dress-item-title">Women</p>
                               <p className="dress-icon-label">Formal</p>
                             </div>
@@ -374,32 +374,32 @@ export default function Agenda({ content, agendaEvents }: AgendaProps) {
                 <div className="orn-dc-2">
                   <div className="orn-dc-2-2">
                     <div className="image-wrap" data-aos="zoom-in" data-aos-duration="1800" data-aos-delay="1400">
-                      <img src="/media/template/arsya/Orn-35.png" alt="" />
+                      <img src="/media/template/arsya/Orn-35.webp" width="600" height="595" alt=""  loading="lazy" decoding="async" />
                     </div>
                   </div>
                   <div className="orn-dc-2-1">
                     <div className="image-wrap" data-aos="zoom-in-up" data-aos-duration="1800" data-aos-delay="1400">
-                      <img src="/media/template/arsya/Orn-05.png" alt="" />
+                      <img src="/media/template/arsya/Orn-05.webp" width="400" height="1019" alt=""  loading="lazy" decoding="async" />
                     </div>
                   </div>
                   <div className="image-wrap" data-aos="zoom-in-up" data-aos-duration="1800" data-aos-delay="1400">
-                    <img src="/media/template/arsya/Orn-08.png" alt="" />
+                    <img src="/media/template/arsya/Orn-08.webp" width="400" height="993" alt=""  loading="lazy" decoding="async" />
                   </div>
                 </div>
 
                 <div className="orn-dc-3">
                   <div className="orn-dc-2-2">
                     <div className="image-wrap" data-aos="zoom-in" data-aos-duration="1800" data-aos-delay="1400">
-                      <img src="/media/template/arsya/Orn-35.png" alt="" />
+                      <img src="/media/template/arsya/Orn-35.webp" width="600" height="595" alt=""  loading="lazy" decoding="async" />
                     </div>
                   </div>
                   <div className="orn-dc-2-1">
                     <div className="image-wrap" data-aos="zoom-in-up" data-aos-duration="1800" data-aos-delay="1400">
-                      <img src="/media/template/arsya/Orn-05.png" alt="" />
+                      <img src="/media/template/arsya/Orn-05.webp" width="400" height="1019" alt=""  loading="lazy" decoding="async" />
                     </div>
                   </div>
                   <div className="image-wrap" data-aos="zoom-in-up" data-aos-duration="1800" data-aos-delay="1400">
-                    <img src="/media/template/arsya/Orn-08.png" alt="" />
+                    <img src="/media/template/arsya/Orn-08.webp" width="400" height="993" alt=""  loading="lazy" decoding="async" />
                   </div>
                 </div>
 

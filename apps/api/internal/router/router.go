@@ -209,6 +209,9 @@ func spaFallback(publicDir string) http.Handler {
 		// File statis nyata (JS/CSS/gambar) disajikan apa adanya.
 		cleanPath := filepath.Join(publicDir, filepath.Clean(r.URL.Path))
 		if info, err := os.Stat(cleanPath); err == nil && !info.IsDir() {
+			if cc := cacheControlForPath(r.URL.Path); cc != "" {
+				w.Header().Set("Cache-Control", cc)
+			}
 			fileServer.ServeHTTP(w, r)
 			return
 		}
@@ -234,4 +237,20 @@ func spaFallback(publicDir string) http.Handler {
 		w.Header().Set("Cache-Control", "no-cache, must-revalidate")
 		http.ServeFile(w, r, filepath.Join(publicDir, entry))
 	})
+}
+
+func cacheControlForPath(path string) string {
+	if strings.HasPrefix(path, "/assets/") {
+		trimmed := strings.TrimPrefix(path, "/assets/")
+		if !strings.Contains(trimmed, "/") && (strings.HasSuffix(trimmed, ".js") || strings.HasSuffix(trimmed, ".css")) {
+			if strings.Contains(trimmed, "-") {
+				return "public, max-age=31536000, immutable"
+			}
+		}
+		return "public, max-age=2592000"
+	}
+	if strings.HasPrefix(path, "/media/") || strings.HasPrefix(path, "/vendor/") {
+		return "public, max-age=2592000"
+	}
+	return ""
 }

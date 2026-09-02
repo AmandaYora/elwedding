@@ -8,38 +8,38 @@ interface VideoGalleryProps {
 export default function VideoGallery({ content }: VideoGalleryProps) {
     const videoId = extractYoutubeId(content.videoGalleryYoutubeUrl)
     return (
-        <section className="video-gallery autoplay-video-section no-head" data-section-order="gallery_video">
+        <section className="video-gallery no-head" data-section-order="gallery_video">
             <div className="ornaments-wrapper">
 
                 <div className="orn-dc-2">
                     <div className="orn-dc-2-2">
                         <div className="image-wrap" data-aos="zoom-in" data-aos-duration="1800" data-aos-delay="1400">
-                            <img src="/media/template/arsya/Orn-35.png" alt="" />
+                            <img src="/media/template/arsya/Orn-35.webp" width="600" height="595" alt=""  loading="lazy" decoding="async" />
                         </div>
                     </div>
                     <div className="orn-dc-2-1">
                         <div className="image-wrap" data-aos="zoom-in-up" data-aos-duration="1800" data-aos-delay="1400">
-                            <img src="/media/template/arsya/Orn-05.png" alt="" />
+                            <img src="/media/template/arsya/Orn-05.webp" width="400" height="1019" alt=""  loading="lazy" decoding="async" />
                         </div>
                     </div>
                     <div className="image-wrap" data-aos="zoom-in-up" data-aos-duration="1800" data-aos-delay="1400">
-                        <img src="/media/template/arsya/Orn-08.png" alt="" />
+                        <img src="/media/template/arsya/Orn-08.webp" width="400" height="993" alt=""  loading="lazy" decoding="async" />
                     </div>
                 </div>
 
                 <div className="orn-dc-3">
                     <div className="orn-dc-2-2">
                         <div className="image-wrap" data-aos="zoom-in" data-aos-duration="1800" data-aos-delay="1400">
-                            <img src="/media/template/arsya/Orn-35.png" alt="" />
+                            <img src="/media/template/arsya/Orn-35.webp" width="600" height="595" alt=""  loading="lazy" decoding="async" />
                         </div>
                     </div>
                     <div className="orn-dc-2-1">
                         <div className="image-wrap" data-aos="zoom-in-up" data-aos-duration="1800" data-aos-delay="1400">
-                            <img src="/media/template/arsya/Orn-05.png" alt="" />
+                            <img src="/media/template/arsya/Orn-05.webp" width="400" height="1019" alt=""  loading="lazy" decoding="async" />
                         </div>
                     </div>
                     <div className="image-wrap" data-aos="zoom-in-up" data-aos-duration="1800" data-aos-delay="1400">
-                        <img src="/media/template/arsya/Orn-08.png" alt="" />
+                        <img src="/media/template/arsya/Orn-08.webp" width="400" height="993" alt=""  loading="lazy" decoding="async" />
                     </div>
                 </div>
 
@@ -54,8 +54,8 @@ export default function VideoGallery({ content }: VideoGalleryProps) {
                         <div className="video-bg"></div>
                         <div className="preview autoplay-video-box" data-aos="zoom-in" data-aos-duration="1000">
                             <div className="autoplay-video" data-url={content.videoGalleryYoutubeUrl}></div>
-                            <img src={youtubeThumbnailUrl(content.videoGalleryYoutubeUrl)} alt="" />
-                            <button className="play-btn" data-video-id={videoId}><i className="fas fa-play"></i></button>
+                            <img src={youtubeThumbnailUrl(content.videoGalleryYoutubeUrl)} alt=""  loading="lazy" decoding="async" />
+                            <button className="play-btn" data-video-id={videoId} aria-label="Putar video"><i className="fas fa-play" aria-hidden="true"></i></button>
                         </div>
                         <div className="title"><h2 data-aos="fade-up" data-aos-duration="1000">{content.videoGalleryCaption}</h2></div>
 

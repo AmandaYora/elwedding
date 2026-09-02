@@ -25,7 +25,7 @@ export default function PhotoGallery({ photos }: PhotoGalleryProps) {
                                     <div className="photo-img-wrap lightgallery">
                                         <a href={photo.photoUrl} className="photo-link">
                                             <img src={photo.thumbUrl} alt="Gallery"
-                                                className="photo-img" />
+                                                className="photo-img"  loading="lazy" decoding="async" />
                                         </a>
                                     </div>
                                 </div>
@@ -41,22 +41,22 @@ export default function PhotoGallery({ photos }: PhotoGalleryProps) {
                                 <div className="photo-item " key={photo.id}>
                                     <div className="photo-img-wrap">
                                         <img src={photo.thumbUrl} alt="Gallery"
-                                            className="photo-img " />
+                                            className="photo-img "  loading="lazy" decoding="async" />
                                     </div>
                                 </div>
                             ))}
                         </div>
 
                         {/* Slider Nav */}
-                        <button className="photo-arrow next">
-                            <svg width="108" height="198" viewBox="0 0 108 198" fill="none"
+                        <button className="photo-arrow next" aria-label="Foto selanjutnya">
+                            <svg aria-hidden="true" width="108" height="198" viewBox="0 0 108 198" fill="none"
                                 xmlns="http://www.w3.org/2000/svg">
                                 <path d="M8 190L100 99L8 8" stroke="black" strokeWidth="15" strokeLinecap="round"
                                     strokeLinejoin="round" />
                             </svg>
                         </button>
-                        <button className="photo-arrow prev">
-                            <svg width="108" height="198" viewBox="0 0 108 198" fill="none"
+                        <button className="photo-arrow prev" aria-label="Foto sebelumnya">
+                            <svg aria-hidden="true" width="108" height="198" viewBox="0 0 108 198" fill="none"
                                 xmlns="http://www.w3.org/2000/svg">
                                 <path d="M100 190L8 99L100 8" stroke="black" strokeWidth="15" strokeLinecap="round"
                                     strokeLinejoin="round" />

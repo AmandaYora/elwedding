@@ -15,6 +15,11 @@
     "migrate:up": "node scripts/migrate.mjs up",
     "migrate:down": "node scripts/migrate.mjs down 1",
     "migrate:create": "cd apps/api && migrate create -ext sql -dir migrations -seq",
-    "sqlc:generate": "cd apps/api && sqlc generate"
+    "sqlc:generate": "cd apps/api && sqlc generate",
+    "optimize:assets": "node scripts/optimize-assets.mjs"
+  },
+  "devDependencies": {
+    "ffmpeg-static": "^5.3.0",
+    "sharp": "^0.35.4"
   }
 }

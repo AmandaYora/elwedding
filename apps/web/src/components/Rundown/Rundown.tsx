@@ -18,36 +18,36 @@ export default function Rundown({ rundownItems }: RundownProps) {
 
         <div className="orn-rd-2 right">
           <div className="image-wrap" data-aos="zoom-out-up" data-aos-duration="2200" data-aos-delay="1000">
-            <img src="/media/template/arsya/Orn-25.png" alt="" />
+            <img src="/media/template/arsya/Orn-25.webp" width="600" height="770" alt=""  loading="lazy" decoding="async" />
           </div>
         </div>
         <div className="orn-rd-2 left">
           <div className="image-wrap" data-aos="zoom-out-up" data-aos-duration="2200" data-aos-delay="1000">
-            <img src="/media/template/arsya/Orn-25.png" alt="" />
+            <img src="/media/template/arsya/Orn-25.webp" width="600" height="770" alt=""  loading="lazy" decoding="async" />
           </div>
         </div>
         <div className="orn-rd-1 center">
           <div className="image-wrap" data-aos="zoom-out-up" data-aos-duration="2200" data-aos-delay="1000">
-            <img src="/media/template/arsya/Orn-41.png" alt="" />
+            <img src="/media/template/arsya/Orn-41.webp" width="800" height="532" alt=""  loading="lazy" decoding="async" />
           </div>
         </div>
         <div className="orn-cover-2 left">
           <div className="image-wrap" data-aos="zoom-in-right" data-aos-duration="2200" data-aos-delay="1300">
-            <img src="/media/template/arsya/Orn-07.png" alt="" />
+            <img src="/media/template/arsya/Orn-07.webp" width="400" height="1114" alt=""  loading="lazy" decoding="async" />
           </div>
           <div className="orn-cover-2-1">
             <div className="image-wrap" data-aos="zoom-in-right" data-aos-duration="1700" data-aos-delay="800">
-              <img src="/media/template/arsya/Orn-08.png" alt="" />
+              <img src="/media/template/arsya/Orn-08.webp" width="400" height="993" alt=""  loading="lazy" decoding="async" />
             </div>
           </div>
         </div>
         <div className="orn-cover-2 right">
           <div className="image-wrap" data-aos="zoom-in-right" data-aos-duration="2200" data-aos-delay="1300">
-            <img src="/media/template/arsya/Orn-07.png" alt="" />
+            <img src="/media/template/arsya/Orn-07.webp" width="400" height="1114" alt=""  loading="lazy" decoding="async" />
           </div>
           <div className="orn-cover-2-1">
             <div className="image-wrap" data-aos="zoom-in-right" data-aos-duration="1700" data-aos-delay="800">
-              <img src="/media/template/arsya/Orn-08.png" alt="" />
+              <img src="/media/template/arsya/Orn-08.webp" width="400" height="993" alt=""  loading="lazy" decoding="async" />
             </div>
           </div>
         </div>
@@ -58,7 +58,7 @@ export default function Rundown({ rundownItems }: RundownProps) {
         <div className="rundown-event-list" data-aos="fade-up" data-aos-duration="1200" data-aos-delay="500">
           {[...groups.entries()].map(([groupLabel, items]) => (
             <div className="rundown-event" key={groupLabel}>
-              <h5 className="rundown-event-title">{groupLabel}</h5>
+              <h4 className="rundown-event-title">{groupLabel}</h4>
               <div className="rundown-agenda-list">
                 {items.map((item) => (
                   <div className="rundown-agenda" key={item.id}>

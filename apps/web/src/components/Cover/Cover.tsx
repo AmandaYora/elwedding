@@ -1,17 +1,19 @@
 import type { InvitationContent } from '@/types/api'
+import { isVideoUrl } from '@/shared/lib/coverMedia'
 
 interface CoverProps {
   content: InvitationContent
 }
 
 export default function Cover({ content }: CoverProps) {
+    const isMobile = typeof window !== 'undefined' ? window.matchMedia('(max-width: 1024px)').matches : false
     return (
         <section className="cover " data-section-order="cover">
 
             <div className="ornaments-wrapper">
                 <div className="orn-cover-4 center">
                     <div className="image-wrap" data-aos="zoom-out-up" data-aos-duration="2200" data-aos-delay="1300">
-                        <img src="/media/template/arsya/Orn-31.png" alt="" />
+                        <img src="/media/template/arsya/Orn-31.webp" width="840" height="763" alt=""  fetchPriority="high" />
                     </div>
                 </div>
             </div>
@@ -39,16 +41,28 @@ export default function Cover({ content }: CoverProps) {
                         <div className="orn-cover-frame">
 
                             <div className="image-wrap" style={{ opacity: '0 !important' }}>
-                                <img src="/media/template/arsya/frame-cover.png" alt="Cover Frame" />
+                                <img src="/media/template/arsya/frame-cover.webp" width="1144" height="1624" alt="Cover Frame" />
                             </div>
 
                             <div className="cover-frame" id="coverFrame">
                                 <div className="cover-picture cover-show" id="cover-main">
-                                    <div className="picture desktop">
-                                            <img src={content.coverImageDesktopUrl} alt="" />
-                                        </div><div className="picture mobile">
-                                            <img src={content.coverImageMobileUrl} alt="" />
+                                    {isMobile ? (
+                                        <div className="picture mobile">
+                                            {isVideoUrl(content.coverImageMobileUrl) ? (
+                                                <video src={content.coverImageMobileUrl} autoPlay muted loop playsInline />
+                                            ) : (
+                                                <img src={content.coverImageMobileUrl} alt="" />
+                                            )}
                                         </div>
+                                    ) : (
+                                        <div className="picture desktop">
+                                            {isVideoUrl(content.coverImageDesktopUrl) ? (
+                                                <video src={content.coverImageDesktopUrl} autoPlay muted loop playsInline />
+                                            ) : (
+                                                <img src={content.coverImageDesktopUrl} alt="" />
+                                            )}
+                                        </div>
+                                    )}
                                 </div>
                             </div>
 
@@ -61,67 +75,67 @@ export default function Cover({ content }: CoverProps) {
             <div className="ornaments-wrapper">
                 <div className="orn-cover-3 left">
                     <div className="image-wrap" data-aos="zoom-in-down" data-aos-duration="2900" data-aos-delay="1800">
-                        <img src="/media/template/arsya/Orn-09.png" alt="" />
+                        <img src="/media/template/arsya/Orn-09.webp" width="191" height="592" alt="" />
                     </div>
                 </div>
                 <div className="orn-cover-3 right">
                     <div className="image-wrap" data-aos="zoom-in-down" data-aos-duration="2900" data-aos-delay="1800">
-                        <img src="/media/template/arsya/Orn-09.png" alt="" />
+                        <img src="/media/template/arsya/Orn-09.webp" width="191" height="592" alt="" />
                     </div>
                 </div>
 
                 <div className="orn-cover-2 left">
                     <div className="image-wrap" data-aos="zoom-in-right" data-aos-duration="2900" data-aos-delay="1800">
-                        <img src="/media/template/arsya/Orn-07.png" alt="" />
+                        <img src="/media/template/arsya/Orn-07.webp" width="400" height="1114" alt="" />
                     </div>
                     <div className="orn-cover-2-1">
                         <div className="image-wrap" data-aos="zoom-in-right" data-aos-duration="2400" data-aos-delay="1300">
-                            <img src="/media/template/arsya/Orn-08.png" alt="" />
+                            <img src="/media/template/arsya/Orn-08.webp" width="400" height="993" alt="" />
                         </div>
                     </div>
                 </div>
                 <div className="orn-cover-2 right">
                     <div className="image-wrap" data-aos="zoom-in-right" data-aos-duration="2900" data-aos-delay="1800">
-                        <img src="/media/template/arsya/Orn-07.png" alt="" />
+                        <img src="/media/template/arsya/Orn-07.webp" width="400" height="1114" alt="" />
                     </div>
                     <div className="orn-cover-2-1">
                         <div className="image-wrap" data-aos="zoom-in-right" data-aos-duration="2400" data-aos-delay="1300">
-                            <img src="/media/template/arsya/Orn-08.png" alt="" />
+                            <img src="/media/template/arsya/Orn-08.webp" width="400" height="993" alt="" />
                         </div>
                     </div>
                 </div>
 
                 <div className="orn-cover-1 left">
                     <div className="image-wrap" data-aos="zoom-in-right" data-aos-duration="2400" data-aos-delay="1300">
-                        <img src="/media/template/arsya/Orn-01.png" alt="" />
+                        <img src="/media/template/arsya/Orn-01.webp" width="600" height="741" alt="" />
                     </div>
                     <div className="orn-cover-1-3">
                         <div className="orn-cover-1-3-1">
                             <div className="image-wrap" data-aos="zoom-in-right" data-aos-duration="3500" data-aos-delay="2100">
-                                <img src="/media/template/arsya/Orn-05.png" alt="" />
+                                <img src="/media/template/arsya/Orn-05.webp" width="400" height="1019" alt="" />
                             </div>
                         </div>
                         <div className="orn-cover-1-3-2">
                             <div className="image-wrap" data-aos="zoom-in-right" data-aos-duration="3300" data-aos-delay="2000">
-                                <img src="/media/template/arsya/Orn-06.png" alt="" />
+                                <img src="/media/template/arsya/Orn-06.webp" width="400" height="1026" alt="" />
                             </div>
                         </div>
                         <div className="image-wrap" data-aos="zoom-in-right" data-aos-duration="3200" data-aos-delay="1900">
-                            <img src="/media/template/arsya/Orn-04.png" alt="" />
+                            <img src="/media/template/arsya/Orn-04.webp" width="400" height="351" alt="" />
                         </div>
                     </div>
                     <div className="orn-cover-1-2">
                         <div className="image-wrap" data-aos="fade-up-left" data-aos-duration="2900" data-aos-delay="1700">
-                            <img src="/media/template/arsya/Orn-03.png" alt="" />
+                            <img src="/media/template/arsya/Orn-03.webp" width="400" height="841" alt="" />
                         </div>
                     </div>
                     <div className="orn-cover-1-1">
                         <div className="image-wrap" data-aos="zoom-in-right" data-aos-duration="2600" data-aos-delay="1500">
-                            <img src="/media/template/arsya/Orn-02.png" alt="" />
+                            <img src="/media/template/arsya/Orn-02.webp" width="600" height="799" alt="" />
                         </div>
                         <div className="orn-cover-1-1-1">
                             <div className="image-wrap" data-aos="zoom-in-right" data-aos-duration="2600" data-aos-delay="1500">
-                                <img src="/media/template/arsya/Orn-51.png" alt="" />
+                                <img src="/media/template/arsya/Orn-51.webp" width="256" height="224" alt="" />
                             </div>
                         </div>
                     </div>
@@ -129,35 +143,35 @@ export default function Cover({ content }: CoverProps) {
 
                 <div className="orn-cover-1 right">
                     <div className="image-wrap" data-aos="zoom-in-right" data-aos-duration="2400" data-aos-delay="1300">
-                        <img src="/media/template/arsya/Orn-01.png" alt="" />
+                        <img src="/media/template/arsya/Orn-01.webp" width="600" height="741" alt="" />
                     </div>
                     <div className="orn-cover-1-3">
                         <div className="orn-cover-1-3-1">
                             <div className="image-wrap" data-aos="zoom-in-right" data-aos-duration="3500" data-aos-delay="2100">
-                                <img src="/media/template/arsya/Orn-05.png" alt="" />
+                                <img src="/media/template/arsya/Orn-05.webp" width="400" height="1019" alt="" />
                             </div>
                         </div>
                         <div className="orn-cover-1-3-2">
                             <div className="image-wrap" data-aos="zoom-in-right" data-aos-duration="3300" data-aos-delay="2000">
-                                <img src="/media/template/arsya/Orn-06.png" alt="" />
+                                <img src="/media/template/arsya/Orn-06.webp" width="400" height="1026" alt="" />
                             </div>
                         </div>
                         <div className="image-wrap" data-aos="zoom-in-right" data-aos-duration="3200" data-aos-delay="1900">
-                            <img src="/media/template/arsya/Orn-04.png" alt="" />
+                            <img src="/media/template/arsya/Orn-04.webp" width="400" height="351" alt="" />
                         </div>
                     </div>
                     <div className="orn-cover-1-2">
                         <div className="image-wrap" data-aos="fade-up-left" data-aos-duration="2900" data-aos-delay="1700">
-                            <img src="/media/template/arsya/Orn-03.png" alt="" />
+                            <img src="/media/template/arsya/Orn-03.webp" width="400" height="841" alt="" />
                         </div>
                     </div>
                     <div className="orn-cover-1-1">
                         <div className="image-wrap" data-aos="zoom-in-right" data-aos-duration="2600" data-aos-delay="1500">
-                            <img src="/media/template/arsya/Orn-02.png" alt="" />
+                            <img src="/media/template/arsya/Orn-02.webp" width="600" height="799" alt="" />
                         </div>
                         <div className="orn-cover-1-1-1">
                             <div className="image-wrap" data-aos="zoom-in-right" data-aos-duration="2600" data-aos-delay="1500">
-                                <img src="/media/template/arsya/Orn-51.png" alt="" />
+                                <img src="/media/template/arsya/Orn-51.webp" width="256" height="224" alt="" />
                             </div>
                         </div>
                     </div>
@@ -165,7 +179,7 @@ export default function Cover({ content }: CoverProps) {
 
                 <div className="orn-cover-5 center">
                     <div className="image-wrap" data-aos="zoom-in-up" data-aos-duration="2900" data-aos-delay="1800">
-                        <img src="/media/template/arsya/Orn-23.png" alt="" />
+                        <img src="/media/template/arsya/Orn-23.webp" width="600" height="293" alt="" />
                     </div>
                 </div>
             </div>
