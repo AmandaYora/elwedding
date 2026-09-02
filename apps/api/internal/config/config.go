@@ -18,11 +18,18 @@ type Config struct {
 	JWTExpiresIn time.Duration
 
 	// PublicDir: build statis apps/web (index.html + admin.html). Kosong di
-	// dev (Vite yang menyajikan). UploadsDir: folder terpisah untuk foto
-	// yang diunggah admin (keputusan #12/#9 PLAN.md) - dipisah dari
-	// PublicDir supaya tidak tertimpa saat build ulang SPA.
-	PublicDir  string
-	UploadsDir string
+	// dev (Vite yang menyajikan).
+	PublicDir string
+
+	// S3*: object storage IDCloudHost untuk foto/musik yang diunggah admin
+	// (docs/plan/content-uploads-object-storage/PLAN.md - menggantikan
+	// UPLOADS_DIR/disk lokal). Tanpa default - kosong berarti storage.New
+	// gagal saat boot, sama seperti DBDSN.
+	S3Endpoint  string
+	S3Bucket    string
+	S3AccessKey string
+	S3SecretKey string
+	S3UseSSL    bool
 
 	// WAStoreDBPath: file SQLite sesi WhatsApp (dashboard-wa-rsvp keputusan
 	// #5) - TERPISAH dari MySQL project, whatsmeow tidak mendukung MySQL.
@@ -41,8 +48,13 @@ func Load() Config {
 		JWTSecret:    getenv("JWT_SECRET", "change-me"),
 		JWTExpiresIn: parseDuration(getenv("JWT_EXPIRES_IN", "24h"), 24*time.Hour),
 
-		PublicDir:  os.Getenv("PUBLIC_DIR"),
-		UploadsDir: getenv("UPLOADS_DIR", "./uploads"),
+		PublicDir: os.Getenv("PUBLIC_DIR"),
+
+		S3Endpoint:  os.Getenv("S3_ENDPOINT"),
+		S3Bucket:    os.Getenv("S3_BUCKET"),
+		S3AccessKey: os.Getenv("S3_ACCESS_KEY"),
+		S3SecretKey: os.Getenv("S3_SECRET_KEY"),
+		S3UseSSL:    getenv("S3_USE_SSL", "true") == "true",
 
 		WAStoreDBPath: filepath.Join(getenv("WA_STORE_DIR", "./wa-store"), "wa.db"),
 	}

@@ -7,10 +7,12 @@
 package router
 
 import (
+	"errors"
 	"net/http"
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
 	authPresentation "undangan-ariana-adrian/internal/modules/auth/presentation"
 	contentPresentation "undangan-ariana-adrian/internal/modules/content/presentation"
@@ -18,6 +20,7 @@ import (
 	whatsappPresentation "undangan-ariana-adrian/internal/modules/whatsapp/presentation"
 	"undangan-ariana-adrian/internal/shared/authmw"
 	"undangan-ariana-adrian/internal/shared/response"
+	"undangan-ariana-adrian/internal/shared/storage"
 )
 
 type Deps struct {
@@ -27,7 +30,16 @@ type Deps struct {
 	WhatsAppHandler *whatsappPresentation.Handler
 	JWTSecret       string
 	PublicDir       string
-	UploadsDir      string
+	Storage         *storage.Client
+}
+
+// contentTypeByExt: salinan kecil khusus paket router, BUKAN impor dari
+// content/application (tidak diekspor & lintas modul dilarang -
+// .claude/rules/backend-modular-monolith.md). 7 key sama persis dengan
+// whitelist upload di content/application/service_upload.go.
+var contentTypeByExt = map[string]string{
+	".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".png": "image/png", ".webp": "image/webp", ".gif": "image/gif",
+	".mp3": "audio/mpeg", ".wav": "audio/wav", ".ogg": "audio/ogg",
 }
 
 func New(d Deps) http.Handler {
@@ -109,10 +121,52 @@ func New(d Deps) http.Handler {
 
 	mux.Handle("/api/v1/admin/", authmw.RequireAdmin(d.JWTSecret)(admin))
 
-	// --- foto/musik yang diunggah admin (keputusan #12) ---
-	if d.UploadsDir != "" {
-		mux.Handle("/uploads/", http.StripPrefix("/uploads/", http.FileServer(http.Dir(d.UploadsDir))))
-	}
+	// --- foto/musik yang diunggah admin (keputusan #12, dipindah ke object
+	// storage S3 - docs/plan/content-uploads-object-storage/PLAN.md) ---
+	mux.HandleFunc("GET /uploads/{category}/{filename}", func(w http.ResponseWriter, r *http.Request) {
+		category := r.PathValue("category")
+		filename := r.PathValue("filename")
+		if category != "images" && category != "audio" {
+			response.NotFoundJSON(w, r)
+			return
+		}
+
+		reader, err := d.Storage.Open(r.Context(), "elwedding/upload/"+category+"/"+filename)
+		if err != nil {
+			if errors.Is(err, storage.ErrNotFound) {
+				response.NotFoundJSON(w, r)
+				return
+			}
+			response.Internal(w, "Failed to fetch file")
+			return
+		}
+		defer reader.Close()
+
+		// ServeContent (BUKAN io.Copy) memberi dukungan HTTP Range/206
+		// Partial Content secara otomatis - PENTING untuk musik latar yang
+		// diputar lewat elemen <audio> native dengan preload="auto"
+		// (fddf2641.js), yang butuh Range untuk buffer/seek (kritis di
+		// Safari/iOS). Content-Type di-set eksplisit SEBELUM ServeContent
+		// supaya dipakai apa adanya, bukan hasil sniffing. modtime kosong
+		// (time.Time{}) - caching lewat Cache-Control immutable di bawah,
+		// bukan Last-Modified (nama file sudah unik per upload, aman
+		// di-cache permanen).
+		if ct, ok := contentTypeByExt[strings.ToLower(filepath.Ext(filename))]; ok {
+			w.Header().Set("Content-Type", ct)
+		}
+		w.Header().Set("Cache-Control", "public, max-age=31536000, immutable")
+		http.ServeContent(w, r, filename, time.Time{}, reader)
+	})
+
+	// Segala path /uploads/* yang TIDAK cocok pola dua segmen di atas -
+	// terutama URL skema LAMA yang cuma satu segmen (`/uploads/<file>.jpeg`,
+	// bentuk 3 file legacy di produksi) - harus 404 JSON. Tanpa ini, path
+	// tersebut jatuh ke SPA fallback "/" dan dibalas index.html dengan status
+	// 200, sehingga <img> rusak tanpa sinyal error yang jelas (terbukti lewat
+	// uploads_test.go: TestUploads_UrlLamaSatuSegmen_404BukanHTML).
+	mux.HandleFunc("/uploads/", func(w http.ResponseWriter, r *http.Request) {
+		response.NotFoundJSON(w, r)
+	})
 
 	// --- SPA fallback (keputusan #10 & #17) ---
 	// WAJIB didaftarkan tanpa syarat - bukan hanya saat PublicDir terisi.

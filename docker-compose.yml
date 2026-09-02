@@ -9,9 +9,6 @@ services:
     env_file:
       - .env
     volumes:
-      # Foto/musik yang diunggah admin (keputusan #12 PLAN.md) - persist
-      # antar deploy/rebuild image, terpisah dari build statis frontend.
-      - uploads_data:/app/uploads
       # Sesi WhatsApp (dashboard-wa-rsvp keputusan #5) - file SQLite dibuat
       # whatsmeow sendiri, BUKAN MySQL. Wajib persist - kalau hilang, akun
       # WhatsApp harus di-pairing ulang lewat scan QR.
@@ -20,5 +17,4 @@ services:
       - "host.docker.internal:host-gateway"
 
 volumes:
-  uploads_data:
   wa_store_data:

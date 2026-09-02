@@ -33,11 +33,6 @@ COPY --from=web /repo/apps/web/dist ./public
 COPY apps/api/migrations ./migrations
 ENV APP_PORT=8080
 ENV PUBLIC_DIR=/app/public
-# Folder terpisah untuk foto/musik yang diunggah admin (keputusan #12
-# PLAN.md) - dipisah dari PUBLIC_DIR supaya tidak tertimpa saat build ulang
-# SPA; dipasang sebagai volume di docker-compose.yml agar persist antar deploy.
-ENV UPLOADS_DIR=/app/uploads
-RUN mkdir -p /app/uploads
 EXPOSE 8080
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
   CMD wget -qO- http://127.0.0.1:${APP_PORT}/api/v1/health || exit 1

@@ -9,6 +9,7 @@ import (
 	"undangan-ariana-adrian/internal/modules/content/infrastructure"
 	"undangan-ariana-adrian/internal/modules/content/infrastructure/sqlc"
 	"undangan-ariana-adrian/internal/shared/idate"
+	"undangan-ariana-adrian/internal/shared/storage"
 )
 
 var jakarta *time.Location
@@ -22,12 +23,12 @@ func init() {
 }
 
 type Service struct {
-	repo       *infrastructure.Repository
-	uploadsDir string
+	repo    *infrastructure.Repository
+	storage *storage.Client
 }
 
-func NewService(repo *infrastructure.Repository, uploadsDir string) *Service {
-	return &Service{repo: repo, uploadsDir: uploadsDir}
+func NewService(repo *infrastructure.Repository, storage *storage.Client) *Service {
+	return &Service{repo: repo, storage: storage}
 }
 
 func nullStr(s sql.NullString) string {

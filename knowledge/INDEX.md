@@ -13,5 +13,6 @@ see `SOURCE_PRIORITY.md` for what to do when two sources disagree.
 - [DATABASE.md](DATABASE.md) — tables, fields, ownership per module, relations as primitive IDs
 - [FRONTEND.md](FRONTEND.md) — frontend conventions specific to this project
 - [BACKEND.md](BACKEND.md) — backend conventions specific to this project
-- [DEPLOYMENT.md](DEPLOYMENT.md) — local run, build, Docker deploy, host DB, env
+- [DEPLOYMENT.md](DEPLOYMENT.md) — local run, build, Docker deploy, host DB, env, production VPS
+- [AI_AGENT_OPERATIONS.md](AI_AGENT_OPERATIONS.md) — gotchas for an AI agent doing push/deploy work hands-on
 - [decisions/](decisions/) — Architecture Decision Records

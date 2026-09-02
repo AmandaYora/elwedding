@@ -102,7 +102,7 @@ func (h *Handler) UploadPhoto(w http.ResponseWriter, r *http.Request) {
 	}
 	defer file.Close()
 
-	url, err := h.service.SaveUpload(header.Filename, file)
+	url, err := h.service.SaveUpload(r.Context(), header.Filename, file)
 	if err != nil {
 		if err == application.ErrUnsupportedFileType {
 			response.BadRequest(w, "Unsupported file type", nil)
