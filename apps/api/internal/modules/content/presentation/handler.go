@@ -2,6 +2,7 @@ package presentation
 
 import (
 	"encoding/json"
+	"errors"
 	"log"
 	"net/http"
 
@@ -20,6 +21,25 @@ func NewHandler(service *application.Service) *Handler {
 func decodeJSON(w http.ResponseWriter, r *http.Request, dst any) bool {
 	if err := json.NewDecoder(r.Body).Decode(dst); err != nil {
 		response.BadRequest(w, "Invalid request body", nil)
+		return false
+	}
+	return true
+}
+
+// decodeJSONLimited: sama seperti decodeJSON, tapi membedakan body yang
+// melebihi limit (413) dari JSON yang benar-benar rusak (400) - dipakai
+// khusus endpoint upload base64 (docs/plan/admin-content-upload-base64/
+// PLAN.md §3.2). decodeJSON lama TIDAK diubah supaya seluruh handler CRUD
+// lain tidak terpengaruh.
+func decodeJSONLimited(w http.ResponseWriter, r *http.Request, dst any, limit int64) bool {
+	r.Body = http.MaxBytesReader(w, r.Body, limit)
+	if err := json.NewDecoder(r.Body).Decode(dst); err != nil {
+		var maxErr *http.MaxBytesError
+		if errors.As(err, &maxErr) {
+			response.Error(w, http.StatusRequestEntityTooLarge, "File terlalu besar (maks 5 MB)", nil)
+		} else {
+			response.BadRequest(w, "Invalid request body", nil)
+		}
 		return false
 	}
 	return true
@@ -121,4 +141,44 @@ func (h *Handler) UploadPhoto(w http.ResponseWriter, r *http.Request) {
 	}
 
 	response.Created(w, "File uploaded successfully", map[string]string{"url": url})
+}
+
+// --- upload foto base64 (docs/plan/admin-content-upload-base64/PLAN.md keputusan K1/K5) ---
+
+const maxBase64BodySize = 8 << 20 // 8 MB - 5 MB decoded ~= 6.67 MB base64 + overhead JSON
+
+type uploadBase64Request struct {
+	Filename string `json:"filename"`
+	Data     string `json:"data"`
+}
+
+// UploadImageBase64 menangani POST /api/v1/admin/uploads/base64 - jalur
+// image-only yang berdampingan dengan UploadPhoto (multipart, tetap dipakai
+// audio). Byte hasil decode berakhir di S3 lewat Service.SaveUpload yang
+// sama persis dengan jalur multipart (PLAN.md keputusan K1).
+func (h *Handler) UploadImageBase64(w http.ResponseWriter, r *http.Request) {
+	var in uploadBase64Request
+	if !decodeJSONLimited(w, r, &in, maxBase64BodySize) {
+		return
+	}
+
+	url, err := h.service.SaveImageBase64(r.Context(), in.Filename, in.Data)
+	if err != nil {
+		switch {
+		case errors.Is(err, application.ErrUnsupportedFileType):
+			response.Error(w, http.StatusUnsupportedMediaType, "Tipe file tidak didukung", nil)
+		case errors.Is(err, application.ErrImageTooLarge):
+			response.Error(w, http.StatusRequestEntityTooLarge, "File terlalu besar (maks 5 MB)", nil)
+		case errors.Is(err, application.ErrInvalidBase64):
+			response.BadRequest(w, "Data base64 tidak valid", nil)
+		case errors.Is(err, application.ErrContentTypeMismatch):
+			response.BadRequest(w, "Isi file tidak cocok dengan ekstensinya", nil)
+		default:
+			log.Printf("save image base64 failed: file=%q err=%v", in.Filename, err)
+			response.Internal(w, "Gagal menyimpan file")
+		}
+		return
+	}
+
+	response.Created(w, "Image uploaded successfully", map[string]string{"url": url})
 }

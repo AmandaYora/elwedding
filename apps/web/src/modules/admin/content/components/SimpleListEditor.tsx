@@ -2,12 +2,20 @@ import { useState } from 'react'
 import { Button, Input, Textarea, Modal, Card } from '@/shared/components/ui'
 import { EmptyState } from '@/shared/components/feedback/EmptyState'
 import { useToast } from '@/shared/components/toast/ToastProvider'
+import { apiErrorMessage } from '@/shared/lib/api-error'
 
 export interface ListColumn<T> {
   key: keyof Omit<T, 'id'>
   label: string
   type?: 'text' | 'textarea' | 'number' | 'photo' | 'time' | 'datetime-local'
   required?: boolean
+  /** Sisi terpanjang target unggahan foto (diteruskan ke onUploadPhoto). */
+  maxDim?: number
+  /** Kolom foto ini menghasilkan DUA unggahan dari satu file yang dipilih -
+   * dipakai Galeri Foto (docs/plan/admin-content-upload-base64/PLAN.md
+   * keputusan K7) supaya admin cukup memilih file sekali. Kolom target TIDAK
+   * dirender sebagai input tersendiri. */
+  derivesTo?: { key: keyof Omit<T, 'id'>; maxDim: number }
 }
 
 interface SimpleListEditorProps<T extends { id: number; sortOrder: number }> {
@@ -18,7 +26,7 @@ interface SimpleListEditorProps<T extends { id: number; sortOrder: number }> {
   onCreate: (item: Omit<T, 'id'>) => Promise<void>
   onUpdate: (id: number, item: Omit<T, 'id'>) => Promise<void>
   onDelete: (id: number) => Promise<void>
-  onUploadPhoto: (file: File) => Promise<string>
+  onUploadPhoto: (file: File, maxDim?: number) => Promise<string>
 }
 
 export default function SimpleListEditor<T extends { id: number; sortOrder: number }>({
@@ -87,9 +95,9 @@ export default function SimpleListEditor<T extends { id: number; sortOrder: numb
       toast.success('Perubahan tersimpan.')
       setFormOpen(false)
     } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : (err as { response?: { data?: { message?: string } } })?.response?.data?.message
       // BE now returns specific message like "eventLabel wajib diisi"
-      const display = typeof msg === 'string' && msg.length > 0 && msg !== 'Failed to create agenda event' ? msg : 'Gagal menyimpan perubahan.'
+      const msg = apiErrorMessage(err, 'Gagal menyimpan perubahan.')
+      const display = msg !== 'Failed to create agenda event' ? msg : 'Gagal menyimpan perubahan.'
       // Map BE message to field if contains field name
       const m = String(display)
       const fieldMatch = columns.find((c) => m.toLowerCase().includes(String(c.key).toLowerCase()))
@@ -100,17 +108,33 @@ export default function SimpleListEditor<T extends { id: number; sortOrder: numb
     }
   }
 
-  async function handlePhotoUpload(key: keyof T, file: File | undefined) {
+  async function handlePhotoUpload(col: ListColumn<T>, file: File | undefined) {
     if (!file) return
-    const k = String(key)
+    const k = String(col.key)
     setUploading((u) => ({ ...u, [k]: true }))
     try {
-      const url = await onUploadPhoto(file)
-      setField(key, url)
+      const url = await onUploadPhoto(file, col.maxDim)
+      setField(col.key, url)
+
+      if (col.derivesTo) {
+        // Satu file dua unggahan (docs/plan/admin-content-upload-base64/PLAN.md
+        // keputusan K7, Galeri Foto) - HANYA dijalankan setelah unggahan utama
+        // berhasil.
+        try {
+          const derivedUrl = await onUploadPhoto(file, col.derivesTo.maxDim)
+          setField(col.derivesTo.key, derivedUrl)
+        } catch {
+          // Fallback wajib: BE menolak field turunan (mis. thumbUrl) kosong -
+          // lihat service_lists.go requireNonEmpty - jadi tanpa ini baris
+          // gagal tersimpan seluruhnya kalau hanya unggahan turunan yang gagal.
+          setField(col.derivesTo.key, url)
+          toast.error('Gagal membuat thumbnail, memakai foto utama sebagai gantinya.')
+        }
+      }
+
       toast.success('Foto berhasil diunggah.')
     } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : (err as { response?: { data?: { message?: string } } })?.response?.data?.message
-      toast.error(typeof msg === 'string' && msg ? msg : 'Gagal mengunggah foto.')
+      toast.error(apiErrorMessage(err, 'Gagal mengunggah foto.'))
     } finally {
       setUploading((u) => ({ ...u, [k]: false }))
     }
@@ -157,7 +181,10 @@ export default function SimpleListEditor<T extends { id: number; sortOrder: numb
         <ul className="divide-y divide-slate-100">
           {items.map((item) => {
             const photoCol = columns.find((c) => c.type === 'photo')
-            const photoUrl = photoCol ? String(item[photoCol.key] || '') : ''
+            // Kolom dengan derivesTo (mis. Galeri Foto) memilih pratinjau dari
+            // field turunan (thumb) yang lebih kecil, bukan foto utama.
+            const previewKey = photoCol ? (photoCol.derivesTo ? photoCol.derivesTo.key : photoCol.key) : undefined
+            const photoUrl = previewKey ? String(item[previewKey] || '') : ''
 
             return (
               <li
@@ -212,7 +239,14 @@ export default function SimpleListEditor<T extends { id: number; sortOrder: numb
         }
       >
         <form onSubmit={handleSubmit} className="flex flex-col gap-4">
-          {columns.map((col) => (
+          {columns.map((col) => {
+            // Kolom yang menjadi target derivesTo kolom lain (mis. thumbUrl di
+            // Galeri Foto) tidak dirender sebagai input tersendiri - nilainya
+            // diisi otomatis oleh unggahan turunan di handlePhotoUpload.
+            const isDerivedTarget = columns.some((c) => c.derivesTo && c.derivesTo.key === col.key)
+            if (isDerivedTarget) return null
+
+            return (
             <div key={String(col.key)}>
               {col.type === 'textarea' ? (
                 <Textarea
@@ -245,7 +279,7 @@ export default function SimpleListEditor<T extends { id: number; sortOrder: numb
                         accept="image/*"
                         disabled={!!uploading[String(col.key)]}
                         className="sr-only"
-                        onChange={(e) => void handlePhotoUpload(col.key, e.target.files?.[0])}
+                        onChange={(e) => void handlePhotoUpload(col, e.target.files?.[0])}
                       />
                     </label>
                   </div>
@@ -260,7 +294,8 @@ export default function SimpleListEditor<T extends { id: number; sortOrder: numb
                 />
               )}
             </div>
-          ))}
+            )
+          })}
         </form>
       </Modal>
 

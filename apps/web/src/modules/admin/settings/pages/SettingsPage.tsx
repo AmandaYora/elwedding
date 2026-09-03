@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { type ContentFormValues, getContent, toFormValues, updateContent, uploadPhoto } from '@/modules/admin/content/services/content.service'
+import { type ContentFormValues, getContent, toFormValues, updateContent, uploadAudioFile } from '@/modules/admin/content/services/content.service'
 import { Card, CardHeader, CardBody, Input } from '@/shared/components/ui'
 import { PageHeader } from '@/shared/components/layout/PageHeader'
 import { StickyActionBar } from '@/shared/components/layout/StickyActionBar'
@@ -60,7 +60,7 @@ export default function SettingsPage() {
     if (!file || !form) return
     setUploading(true)
     try {
-      const url = await uploadPhoto(file)
+      const url = await uploadAudioFile(file)
       setForm({ ...form, musicUrl: url })
       toast.success('File musik berhasil diunggah.')
     } catch {

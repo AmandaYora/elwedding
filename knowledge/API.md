@@ -13,6 +13,7 @@ di `.claude/rules/api-standard.md`. Endpoint spesifik project ini:
 | GET/POST/PUT/DELETE | `/api/v1/admin/content/{agenda-events,rundown-items,gallery-photos,love-story-chapters,gift-banks}[/{id}]` | JWT | content |
 | GET/PATCH | `/api/v1/admin/sections` | JWT | content |
 | POST | `/api/v1/admin/uploads` | JWT | content |
+| POST | `/api/v1/admin/uploads/base64` | JWT | content |
 | GET/POST/PUT/DELETE | `/api/v1/admin/guests[/{id}]` | JWT | guest |
 | GET | `/api/v1/admin/guests/summary` | JWT | guest |
 | GET | `/api/v1/admin/whatsapp/status` | JWT | whatsapp |
@@ -22,6 +23,19 @@ di `.claude/rules/api-standard.md`. Endpoint spesifik project ini:
 | GET | `/api/v1/admin/whatsapp/logs` | JWT | whatsapp |
 | POST | `/api/v1/admin/whatsapp/logs/{id}/resend` | JWT | whatsapp |
 | GET/POST/PUT/DELETE | `/api/v1/admin/users[/{id}]` | JWT | auth |
+
+`POST /api/v1/admin/uploads/base64` menerima image (JPG/PNG/WebP/GIF -
+audio TIDAK diterima di sini, tetap lewat `/api/v1/admin/uploads` multipart)
+sebagai JSON `{filename, data}`, `data` base64 (boleh berprefix
+`data:<mime>;base64,`). Byte hasil decode dibatasi 5 MB, body request
+dibatasi 8 MB (413 bila lewat); MIME hasil sniff (`http.DetectContentType`)
+harus cocok dengan ekstensi `filename` (400 bila tidak). Hasil akhirnya
+tetap disimpan ke S3 lewat `Service.SaveUpload` yang sama dengan jalur
+multipart dan mengembalikan URL `/uploads/images/...` yang sama - lihat
+`docs/plan/admin-content-upload-base64/PLAN.md`. FE (`ContentPage.tsx`)
+mengompres gambar ke WebP di browser (canvas, maks 1920px, quality 0.82)
+sebelum mengirim, supaya foto asli 8-12 MB dari HP tidak menabrak limit ini
+maupun `client_max_body_size` nginx.
 
 `PATCH /api/v1/admin/content` mengganti **seluruh** baris singleton
 (read-modify-write) - klien (`ContentPage.tsx`/`SettingsPage.tsx`) WAJIB

@@ -4,7 +4,7 @@ import {
   getContent,
   toFormValues,
   updateContent,
-  uploadPhoto,
+  uploadImageBase64,
 } from '@/modules/admin/content/services/content.service'
 import {
   agendaEventsResource,
@@ -21,6 +21,7 @@ import { StickyActionBar } from '@/shared/components/layout/StickyActionBar'
 import { Skeleton } from '@/shared/components/feedback/Skeleton'
 import { ErrorState } from '@/shared/components/feedback/ErrorState'
 import { useToast } from '@/shared/components/toast/ToastProvider'
+import { apiErrorMessage } from '@/shared/lib/api-error'
 
 function Field({
   label,
@@ -81,7 +82,7 @@ function PhotoField({ label, value, onChange, onUploadingChange }: { label: stri
           </div>
           <input
             type="file"
-            accept="image/*,audio/*"
+            accept="image/*"
             disabled={uploading}
             className="sr-only"
             onChange={async (e) => {
@@ -89,11 +90,10 @@ function PhotoField({ label, value, onChange, onUploadingChange }: { label: stri
               if (!file) return
               setUploadingTracked(true)
               try {
-                onChange(await uploadPhoto(file))
+                onChange(await uploadImageBase64(file))
                 toast.success('Foto berhasil diunggah.')
               } catch (err: unknown) {
-                const msg = err instanceof Error ? err.message : (err as { response?: { data?: { message?: string } } })?.response?.data?.message
-                toast.error(typeof msg === 'string' && msg ? msg : 'Gagal mengunggah foto.')
+                toast.error(apiErrorMessage(err, 'Gagal mengunggah foto.'))
               } finally {
                 setUploadingTracked(false)
               }
@@ -202,8 +202,7 @@ export default function ContentPage() {
       setInitialForm(form)
       toast.success('Konten tersimpan.')
     } catch (err: unknown) {
-      const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message
-      toast.error(typeof msg === 'string' && msg ? msg : 'Gagal menyimpan konten.')
+      toast.error(apiErrorMessage(err, 'Gagal menyimpan konten.'))
     } finally {
       setSaving(false)
     }
@@ -557,7 +556,7 @@ export default function ContentPage() {
                 onCreate={async (item) => { await agendaEventsResource.create(item); setAgendaEvents(await agendaEventsResource.list()) }}
                 onUpdate={async (id, item) => { await agendaEventsResource.update(id, item); setAgendaEvents(await agendaEventsResource.list()) }}
                 onDelete={async (id) => { await agendaEventsResource.remove(id); setAgendaEvents(await agendaEventsResource.list()) }}
-                onUploadPhoto={uploadPhoto}
+                onUploadPhoto={uploadImageBase64}
               />
             </div>
           )}
@@ -576,7 +575,7 @@ export default function ContentPage() {
                 onCreate={async (item) => { await rundownItemsResource.create(item); setRundownItems(await rundownItemsResource.list()) }}
                 onUpdate={async (id, item) => { await rundownItemsResource.update(id, item); setRundownItems(await rundownItemsResource.list()) }}
                 onDelete={async (id) => { await rundownItemsResource.remove(id); setRundownItems(await rundownItemsResource.list()) }}
-                onUploadPhoto={uploadPhoto}
+                onUploadPhoto={uploadImageBase64}
               />
             </div>
           )}
@@ -587,14 +586,20 @@ export default function ContentPage() {
                 title="Galeri Foto"
                 items={galleryPhotos}
                 columns={[
-                  { key: 'thumbUrl', label: 'Foto', type: 'photo', required: true },
-                  { key: 'photoUrl', label: 'Foto (Lightbox)', type: 'photo', required: true },
+                  {
+                    key: 'photoUrl',
+                    label: 'Foto',
+                    type: 'photo',
+                    required: true,
+                    maxDim: 1920,
+                    derivesTo: { key: 'thumbUrl', maxDim: 480 },
+                  },
                 ]}
                 emptyItem={{ photoUrl: '', thumbUrl: '', sortOrder: 0 }}
                 onCreate={async (item) => { await galleryPhotosResource.create(item); setGalleryPhotos(await galleryPhotosResource.list()) }}
                 onUpdate={async (id, item) => { await galleryPhotosResource.update(id, item); setGalleryPhotos(await galleryPhotosResource.list()) }}
                 onDelete={async (id) => { await galleryPhotosResource.remove(id); setGalleryPhotos(await galleryPhotosResource.list()) }}
-                onUploadPhoto={uploadPhoto}
+                onUploadPhoto={uploadImageBase64}
               />
             </div>
           )}
@@ -605,7 +610,7 @@ export default function ContentPage() {
                 title="Love Story"
                 items={loveStoryChapters}
                 columns={[
-                  { key: 'photoUrl', label: 'Foto', type: 'photo', required: true },
+                  { key: 'photoUrl', label: 'Foto', type: 'photo', required: true, maxDim: 1920 },
                   { key: 'title', label: 'Judul', required: true },
                   { key: 'caption', label: 'Caption', type: 'textarea' },
                 ]}
@@ -613,7 +618,7 @@ export default function ContentPage() {
                 onCreate={async (item) => { await loveStoryChaptersResource.create(item); setLoveStoryChapters(await loveStoryChaptersResource.list()) }}
                 onUpdate={async (id, item) => { await loveStoryChaptersResource.update(id, item); setLoveStoryChapters(await loveStoryChaptersResource.list()) }}
                 onDelete={async (id) => { await loveStoryChaptersResource.remove(id); setLoveStoryChapters(await loveStoryChaptersResource.list()) }}
-                onUploadPhoto={uploadPhoto}
+                onUploadPhoto={uploadImageBase64}
               />
             </div>
           )}
@@ -632,7 +637,7 @@ export default function ContentPage() {
                 onCreate={async (item) => { await giftBanksResource.create(item); setGiftBanks(await giftBanksResource.list()) }}
                 onUpdate={async (id, item) => { await giftBanksResource.update(id, item); setGiftBanks(await giftBanksResource.list()) }}
                 onDelete={async (id) => { await giftBanksResource.remove(id); setGiftBanks(await giftBanksResource.list()) }}
-                onUploadPhoto={uploadPhoto}
+                onUploadPhoto={uploadImageBase64}
               />
             </div>
           )}

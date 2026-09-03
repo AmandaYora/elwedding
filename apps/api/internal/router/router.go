@@ -92,6 +92,11 @@ func New(d Deps) http.Handler {
 	admin.HandleFunc("PATCH /api/v1/admin/sections", d.ContentHandler.UpdateSections)
 
 	admin.HandleFunc("POST /api/v1/admin/uploads", d.ContentHandler.UploadPhoto)
+	// Jalur image-only base64 (docs/plan/admin-content-upload-base64/PLAN.md
+	// keputusan K1/K5) - berdampingan dengan upload multipart di atas, yang
+	// tetap dipakai audio (K2). Sama-sama di belakang RequireAdmin lewat mux
+	// admin di bawah.
+	admin.HandleFunc("POST /api/v1/admin/uploads/base64", d.ContentHandler.UploadImageBase64)
 
 	// --- admin: guests (JWT) ---
 	// GET /guests/summary didaftarkan sebagai pola literal (bukan {id}) -

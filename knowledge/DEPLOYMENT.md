@@ -57,5 +57,17 @@ with the sibling apps). Never run a box-wide destructive Docker command here - a
 the `elwedding` container/compose project. `WA_STORE_DIR` and `UPLOADS_DIR` (above) must be
 mounted as persistent volumes in `docker-compose.prod.yml`, the same as in local Docker.
 
+## Reverse proxy body size limit
+
+Any nginx in front of this app (`infra/nginx/nginx.conf` locally/Docker, and the VPS vhost at
+`/etc/nginx/sites-enabled/elwedding`) **must** set `client_max_body_size 12m;`. nginx's default
+is 1 MB, which silently rejects admin photo uploads (413) before the request ever reaches Go -
+this was the actual root cause of `/admin/content` upload failures, not a Go-side limit (see
+`docs/plan/admin-content-upload-base64/PLAN.md` T1). 12 MB covers both the base64 image
+endpoint (`POST /api/v1/admin/uploads/base64`, body ≤ 8 MB) and multipart audio uploads
+(`POST /api/v1/admin/uploads`, body ≤ 10 MB). When setting up a new server/proxy in front of
+this app, add this directive **before** anything else - it will look fine until the first admin
+tries to upload a real photo.
+
 See `AI_AGENT_OPERATIONS.md` for gotchas specific to doing this push/deploy cycle as an AI
 agent (credential-in-command blocks, what's safe to read on the VPS vs. not).
