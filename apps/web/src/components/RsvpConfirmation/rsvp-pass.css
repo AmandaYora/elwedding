@@ -1,0 +1,293 @@
+/**
+ * Kartu masuk (undangan masuk) yang tampil setelah tamu konfirmasi hadir.
+ *
+ * KENAPA BERKAS INI ADA, bukan menumpang kelas `.rsvp-qrcard-*` template:
+ * kelas template merender kotak berlabel biasa (border 2px + radius) yang
+ * tidak punya hubungan visual apa pun dengan undangannya. Seluruh gaya di
+ * sini memakai PREFIX SENDIRI (`wpass-`) supaya tidak pernah bertabrakan
+ * dengan CSS template legacy di public/assets/css, dan semua warna/huruf
+ * diturunkan dari token tema yang sama yang dipakai undangan - bukan nilai
+ * baru. Kalau tema diganti, kartu ini ikut berubah sendiri.
+ *
+ * Bentuknya karcis dengan garis sobek berlubang: bagian ATAS milik tamu
+ * (nama, jumlah, tanggal), bagian BAWAH stub yang dipindai penerima tamu.
+ * Pemisahnya bukan hiasan - ia menandai batas nyata antara "keterangan
+ * Anda" dan "yang dipindai di pintu".
+ *
+ * KENAPA SEMUA SELECTOR DIAWALI `.wpass ` (bukan kelas tunggal):
+ * template punya `body.arsya p { font-family: var(--body-text-family);
+ * font-size: calc(var(--body-text-size)) }` di assets/css/4e66ef9e.css.
+ * Spesifisitasnya (0,1,2) MENGALAHKAN kelas tunggal seperti
+ * `.wpass__couple` (0,1,0), jadi tanpa prefix ini nama mempelai diam-diam
+ * kembali ke huruf body dan ukuran template - diverifikasi langsung di
+ * browser, bukan dugaan. Bentuk `.wpass .wpass__x` (0,2,0) menang telak dan
+ * tetap tidak perlu `!important`. Jangan menurunkannya kembali jadi kelas
+ * tunggal.
+ */
+
+.wpass {
+  /* Semua diturunkan dari token tema undangan; nilai kedua hanya jaring
+     pengaman kalau CSS template belum termuat (mis. saat test/jsdom). */
+  --wp-ink: var(--text-primary, #355656);
+  --wp-ink-rgb: var(--text-primary-rgb, 53, 86, 86);
+  --wp-accent: var(--text-secondary, #c95872);
+  --wp-card: var(--background-secondary, #fffae3);
+  --wp-quiet: var(--background-tertiary, #fff);
+  /* Warna "alas". Lubang sobekan diisi warna ini, jadi ia HARUS sama dengan
+     latar di belakang kartu. Alasnya digambar sendiri di sini (bukan
+     mengandalkan latar section) supaya lubangnya selalu pas, apa pun yang
+     ada di belakangnya. */
+  --wp-mat: var(--background-primary, #e6f4f8);
+
+  --wp-pad: 26px;
+  --wp-notch: 22px;
+
+  background: var(--wp-mat);
+  padding: 26px 18px 28px;
+  border-radius: 20px;
+}
+
+/* --- kartu --- */
+
+.wpass .wpass__card {
+  position: relative;
+  max-width: 360px;
+  margin: 0 auto;
+  padding: var(--wp-pad);
+  background: var(--wp-card);
+  color: var(--wp-ink);
+  border: 1px solid rgba(var(--wp-ink-rgb), 0.3);
+  border-radius: 16px;
+  box-shadow: 0 18px 38px -26px rgba(var(--wp-ink-rgb), 0.55);
+  animation: wpass-issue 0.5s ease-out both;
+}
+
+@keyframes wpass-issue {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* --- bagian atas: identitas --- */
+
+.wpass .wpass__eyebrow {
+  margin: 0 0 8px;
+  font-family: var(--body-text-family, "Cormorant Upright", serif);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  text-align: center;
+  color: rgba(var(--wp-ink-rgb), 0.62);
+}
+
+/* Nama pasangan memakai huruf judul undangan (Kapakana) - inilah satu-satunya
+   hal yang mengikat kartu ini ke identitas undangannya. */
+.wpass .wpass__couple {
+  margin: 0;
+  font-family: var(--heading-family, "Kapakana", cursive);
+  font-weight: 400;
+  font-size: 30px;
+  line-height: 1.18;
+  text-align: center;
+  color: var(--wp-ink);
+}
+
+.wpass .wpass__fields {
+  display: grid;
+  gap: 15px;
+  margin: 22px 0 0;
+}
+
+/* `auto 1fr`, BUKAN `1fr 1fr`: kolom kiri ("2 orang") pendek dan tetap,
+   sisa lebar diberikan ke tanggal. Dengan dua kolom sama besar, tanggal
+   pecah jadi dua baris di dalam kontainer sempit (.rsvp-form-outer hanya
+   85,12% lebar layar) sementara kolom kiri menyisakan ruang kosong. */
+.wpass .wpass__row {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 16px;
+}
+
+.wpass .wpass__field dt {
+  margin: 0 0 3px;
+  font-family: var(--body-text-family, "Cormorant Upright", serif);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: rgba(var(--wp-ink-rgb), 0.55);
+}
+
+.wpass .wpass__field dd {
+  margin: 0;
+  font-family: var(--body-text-family, "Cormorant Upright", serif);
+  font-size: 17px;
+  line-height: 1.35;
+  color: var(--wp-ink);
+  overflow-wrap: anywhere;
+}
+
+/* Satu-satunya pemakaian warna aksen di kartu ini - angka jumlah tamu adalah
+   hal yang paling sering dicek ulang orang sebelum berangkat.
+   Selector-nya menyertakan `dd` supaya (0,3,1) mengalahkan aturan warna
+   `.wpass .wpass__field dd` (0,2,1) di atas - tanpa itu aksennya tertimpa
+   oleh CSS kita sendiri. */
+.wpass .wpass__field dd.wpass__count {
+  color: var(--wp-accent);
+  font-weight: 600;
+}
+
+/* --- garis sobek: penanda kartu ini --- */
+
+.wpass .wpass__perf {
+  position: relative;
+  /* margin negatif = melebar sampai TEPI kartu, menembus padding, supaya
+     lubangnya benar-benar duduk di pinggir. */
+  margin: 22px calc(var(--wp-pad) * -1);
+  border-top: 1px dashed rgba(var(--wp-ink-rgb), 0.45);
+}
+
+.wpass .wpass__perf::before,
+.wpass .wpass__perf::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  width: var(--wp-notch);
+  height: var(--wp-notch);
+  border-radius: 50%;
+  background: var(--wp-mat);
+  transform: translateY(-50%);
+}
+
+.wpass .wpass__perf::before {
+  left: calc(var(--wp-notch) / -2);
+}
+
+.wpass .wpass__perf::after {
+  right: calc(var(--wp-notch) / -2);
+}
+
+/* --- stub yang dipindai --- */
+
+.wpass .wpass__qr {
+  width: fit-content;
+  margin: 0 auto;
+  padding: 14px;
+  /* Putih, BUKAN krem: pemindai butuh kontras tinggi dan zona tenang yang
+     bersih di sekeliling kode. Ini alasan fungsional, jangan diganti demi
+     keserasian warna. */
+  background: var(--wp-quiet);
+  border: 1px solid rgba(var(--wp-ink-rgb), 0.16);
+  border-radius: 10px;
+}
+
+.wpass .wpass__qr canvas {
+  display: block;
+  width: 100%;
+  max-width: 200px;
+  height: auto;
+}
+
+.wpass .wpass__hint {
+  /* max-width + balance mencegah baris terakhir menyisakan satu-dua kata
+     menggantung sendirian di bawah QR. */
+  max-width: 26ch;
+  margin: 14px auto 0;
+  font-family: var(--body-text-family, "Cormorant Upright", serif);
+  font-size: 13.5px;
+  line-height: 1.5;
+  text-align: center;
+  text-wrap: balance;
+  color: rgba(var(--wp-ink-rgb), 0.7);
+}
+
+/* --- pesan & tombol --- */
+
+.wpass .wpass__notice {
+  max-width: 360px;
+  margin: 14px auto 0;
+  font-family: var(--body-text-family, "Cormorant Upright", serif);
+  font-size: 13.5px;
+  line-height: 1.5;
+  text-align: center;
+  color: var(--wp-accent);
+}
+
+.wpass .wpass__actions {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  margin-top: 18px;
+}
+
+.wpass .wpass__btn {
+  font-family: var(--body-text-family, "Cormorant Upright", serif);
+  cursor: pointer;
+  transition: background-color 0.25s ease, color 0.25s ease;
+}
+
+.wpass .wpass__btn:focus-visible {
+  outline: 2px solid var(--wp-accent);
+  outline-offset: 3px;
+}
+
+.wpass .wpass__btn--primary {
+  padding: 11px 32px;
+  font-size: 15px;
+  letter-spacing: 0.06em;
+  color: var(--button-text-primary, #f3f2ee);
+  background: var(--button-background-primary, #355656);
+  border: 1px solid transparent;
+  border-radius: 999px;
+}
+
+.wpass .wpass__btn--primary:hover {
+  background: rgba(var(--button-background-primary-rgb, 53, 86, 86), 0.85);
+}
+
+.wpass .wpass__btn--quiet {
+  padding: 6px 8px;
+  font-size: 14px;
+  color: rgba(var(--wp-ink-rgb), 0.7);
+  background: transparent;
+  border: none;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.wpass .wpass__btn--quiet:hover {
+  color: var(--wp-ink);
+}
+
+@media (max-width: 380px) {
+  .wpass {
+    --wp-pad: 20px;
+    padding: 20px 14px 24px;
+  }
+
+  .wpass .wpass__couple {
+    font-size: 26px;
+  }
+
+  .wpass .wpass__row {
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .wpass .wpass__card {
+    animation: none;
+  }
+
+  .wpass .wpass__btn {
+    transition: none;
+  }
+}

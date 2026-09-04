@@ -1,5 +1,6 @@
 import { useRef, useState } from 'react'
 import { QRCodeCanvas } from 'qrcode.react'
+import './rsvp-pass.css'
 import { useGuestSession } from '@/hooks/useGuestSession'
 import { httpClient } from '@/shared/services/http-client'
 import type { InvitationContent, RsvpStatus, RsvpUpdateResponse, ApiEnvelope } from '@/types/api'
@@ -199,42 +200,78 @@ export default function RsvpConfirmation({ content }: RsvpConfirmationProps) {
                 )}
 
                 {choice === 'attending' && (
-                  <div className="rsvp-qrcard-outer">
-                    <div className="rsvp-qrcard-inner">
-                      <div className="rsvp-qrcard-img-wrap">
+                  <div className="wpass">
+                    <div className="wpass__card">
+                      <p className="wpass__eyebrow">Undangan Masuk</p>
+                      <p className="wpass__couple">
+                        {content.groomName} &amp; {content.brideName}
+                      </p>
+
+                      <dl className="wpass__fields">
+                        <div className="wpass__field">
+                          <dt>Tamu</dt>
+                          <dd>{session.name}</dd>
+                        </div>
+                        <div className="wpass__row">
+                          <div className="wpass__field">
+                            <dt>Hadir</dt>
+                            <dd className="wpass__count">{displayAttendingCount} orang</dd>
+                          </div>
+                          <div className="wpass__field">
+                            <dt>Tanggal</dt>
+                            <dd>{content.weddingDateLabel}</dd>
+                          </div>
+                        </div>
+                      </dl>
+
+                      {/* Batas nyata: di atasnya keterangan tamu, di bawahnya
+                          bagian yang dipindai penerima tamu. */}
+                      <div className="wpass__perf" aria-hidden="true" />
+
+                      <div className="wpass__qr">
                         <QRCodeCanvas
                           ref={qrCanvasRef}
                           value={displayQrPayload}
-                          size={240}
+                          // Dirender 320 lalu dikecilkan lewat CSS: tajam di
+                          // layar retina, dan berkas unduhannya ikut resolusi
+                          // penuh ini, bukan ukuran tampilnya.
+                          size={320}
+                          // Zona tenang 4 modul sesuai spesifikasi QR. Tanpa
+                          // ini PNG hasil unduhan tidak punya margin putih dan
+                          // bisa gagal dipindai saat ditempel di chat/cetak.
+                          marginSize={4}
+                          bgColor="#ffffff"
+                          fgColor="#355656"
                           id="rsvp-qr-canvas"
-                          className="rsvp-qrcard-img"
+                          title={`QR konfirmasi kehadiran ${session.name}`}
                         />
                       </div>
-                      <p className="rsvp-message-content" style={{ fontSize: '0.85em' }}>
-                        {displayAttendingCount} tamu akan hadir.
+                      <p className="wpass__hint">
+                        Tunjukkan kode ini kepada penerima tamu saat Anda tiba.
                       </p>
-                      {saveError && (
-                        <p className="rsvp-message-content" style={{ color: 'var(--text-secondary)', fontSize: '0.85em' }}>
-                          Gagal menyimpan status, silakan coba lagi.
-                        </p>
-                      )}
-                      <div className="rsvp-confirm-wrap">
-                        <button
-                          type="button"
-                          className="download rsvp-confirm-btn"
-                          onClick={handleDownloadQr}
-                        >
-                          Unduh QR
-                        </button>
-                        <button
-                          type="button"
-                          className="rsvp-confirm-btn"
-                          style={{ background: 'transparent', color: 'var(--text-secondary)', boxShadow: 'none' }}
-                          onClick={handleReset}
-                        >
-                          Ubah pilihan
-                        </button>
-                      </div>
+                    </div>
+
+                    {saveError && (
+                      <p className="wpass__notice">
+                        Konfirmasi Anda belum tersimpan. Periksa koneksi, lalu pilih ulang kehadiran.
+                      </p>
+                    )}
+
+                    <div className="wpass__actions">
+                      <button
+                        type="button"
+                        className="wpass__btn wpass__btn--primary"
+                        onClick={handleDownloadQr}
+                      >
+                        Unduh QR
+                      </button>
+                      <button
+                        type="button"
+                        className="wpass__btn wpass__btn--quiet"
+                        onClick={handleReset}
+                      >
+                        Ubah pilihan
+                      </button>
                     </div>
                   </div>
                 )}

@@ -66,7 +66,9 @@ test('memilih jumlah tamu menampilkan kartu QR dan tombol unduh', async () => {
 
   await waitFor(() => expect(document.getElementById('rsvp-qr-canvas')).toBeInTheDocument())
   expect(screen.getByRole('button', { name: 'Unduh QR' })).toBeInTheDocument()
-  expect(screen.getByText('2 tamu akan hadir.')).toBeInTheDocument()
+  // Jumlah tamu tampil sebagai field berlabel pada kartu masuk.
+  expect(screen.getByText('Hadir')).toBeInTheDocument()
+  expect(screen.getByText('2 orang')).toBeInTheDocument()
 })
 
 test('tombol "Kembali" di langkah pilih jumlah tamu -> kembali ke 3 tombol awal', () => {
@@ -157,7 +159,7 @@ test('session.status tersimpan attending -> render QR langsung dari session.atte
   // Regresi: tamu yang membuka ulang link (tanpa pernah melewati
   // handleConfirmAttending pada render ini) tetap melihat jumlah tamu yang
   // benar dari sesi, bukan default 1.
-  expect(screen.getByText('2 tamu akan hadir.')).toBeInTheDocument()
+  expect(screen.getByText('2 orang')).toBeInTheDocument()
 })
 
 test('PATCH gagal -> QR tetap tampil (fallback lokal), dengan indikator error', async () => {
@@ -174,5 +176,5 @@ test('PATCH gagal -> QR tetap tampil (fallback lokal), dengan indikator error', 
   fireEvent.click(screen.getByRole('button', { name: '1 Tamu' }))
 
   await waitFor(() => expect(document.getElementById('rsvp-qr-canvas')).toBeInTheDocument())
-  await waitFor(() => expect(screen.getByText(/Gagal menyimpan status/)).toBeInTheDocument())
+  await waitFor(() => expect(screen.getByText(/belum tersimpan/)).toBeInTheDocument())
 })
