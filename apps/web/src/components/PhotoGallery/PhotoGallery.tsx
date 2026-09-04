@@ -22,9 +22,16 @@ export default function PhotoGallery({ photos }: PhotoGalleryProps) {
                         <div className="photo-nav" data-aos="fade-up" data-aos-duration="1200">
                             {photos.map((photo) => (
                                 <div className="photo-item " key={photo.id}>
+                                    {/* resize_photo_nav (assets/js/39d8abba.js) memaksa slot ini
+                                        PERSEGI selebar penuh, dan CSS-nya object-fit:cover - jadi
+                                        SISI PENDEK gambar yang mengisi slot. thumbUrl (480px) di
+                                        sini menghasilkan upscale 3-4x dan tampak pecah; photoUrl
+                                        (1920px) sudah cukup untuk device px setinggi ini. Jangan
+                                        dikembalikan ke thumbUrl (docs/plan/
+                                        admin-content-png-lossless-galeri-tajam/PLAN.md §2.2). */}
                                     <div className="photo-img-wrap lightgallery">
                                         <a href={photo.photoUrl} className="photo-link">
-                                            <img src={photo.thumbUrl} alt="Gallery"
+                                            <img src={photo.photoUrl} alt="Gallery"
                                                 className="photo-img"  loading="lazy" decoding="async" />
                                         </a>
                                     </div>

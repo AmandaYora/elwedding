@@ -6,6 +6,7 @@ import {
   updateContent,
   uploadImageBase64,
 } from '@/modules/admin/content/services/content.service'
+import type { ImageOutputFormat } from '@/shared/lib/image-compress'
 import {
   agendaEventsResource,
   galleryPhotosResource,
@@ -45,7 +46,21 @@ function Field({
   )
 }
 
-function PhotoField({ label, value, onChange, onUploadingChange }: { label: string; value: string; onChange: (url: string) => void; onUploadingChange?: (b: boolean) => void }) {
+function PhotoField({
+  label,
+  value,
+  onChange,
+  onUploadingChange,
+  maxDim,
+  format,
+}: {
+  label: string
+  value: string
+  onChange: (url: string) => void
+  onUploadingChange?: (b: boolean) => void
+  maxDim?: number
+  format?: ImageOutputFormat
+}) {
   const [uploading, setUploading] = useState(false)
   const toast = useToast()
   function setUploadingTracked(v: boolean) {
@@ -90,7 +105,7 @@ function PhotoField({ label, value, onChange, onUploadingChange }: { label: stri
               if (!file) return
               setUploadingTracked(true)
               try {
-                onChange(await uploadImageBase64(file))
+                onChange(await uploadImageBase64(file, maxDim, format))
                 toast.success('Foto berhasil diunggah.')
               } catch (err: unknown) {
                 toast.error(apiErrorMessage(err, 'Gagal mengunggah foto.'))
@@ -448,7 +463,10 @@ export default function ContentPage() {
               </CardHeader>
               <CardBody className="p-6">
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-5">
-                  <PhotoField label="Logo" value={form.coverLogoUrl} onChange={(v) => set('coverLogoUrl', v)} onUploadingChange={handlePhotoUploading} />
+                  {/* PNG lossless, bukan lossy - slot .logo-wrap maksimum 160 CSS px
+                      (assets/css/4e66ef9e.css), dan Logo butuh transparansi tetap
+                      utuh (D2/D4, docs/plan/admin-content-png-lossless-galeri-tajam/PLAN.md) */}
+                  <PhotoField label="Logo" value={form.coverLogoUrl} onChange={(v) => set('coverLogoUrl', v)} onUploadingChange={handlePhotoUploading} maxDim={640} format="lossless" />
                   <PhotoField label="Gambar Cover (Desktop)" value={form.coverImageDesktopUrl} onChange={(v) => set('coverImageDesktopUrl', v)} onUploadingChange={handlePhotoUploading} />
                   <PhotoField label="Gambar Cover (Mobile)" value={form.coverImageMobileUrl} onChange={(v) => set('coverImageMobileUrl', v)} onUploadingChange={handlePhotoUploading} />
                 </div>

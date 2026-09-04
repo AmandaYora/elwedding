@@ -33,14 +33,24 @@
   `prepareImageForUpload`) menerima PNG/JPG/JPEG/GIF/WebP lewat `accept`
   di `ContentPage.tsx`/`SimpleListEditor.tsx` - format lain (HEIC/AVIF/BMP/SVG)
   sengaja tidak bisa dipilih karena gagal di-decode `createImageBitmap`
-  (docs/plan/admin-content-image-format-pipeline/PLAN.md T5). PNG/JPEG
-  dikonversi ke WebP lewat canvas (fallback JPEG bila browser tak punya
-  encoder WebP, dideteksi via probe `canEncodeWebp`, bukan ditebak dari
-  hasil `toBlob`). **GIF dan WebP WAJIB diteruskan apa adanya, TANPA
-  createImageBitmap/canvas** - canvas hanya mengambil frame pertama dan
-  akan membunuh animasi GIF secara senyap (cover animasi dipakai produksi,
-  lihat `Cover.tsx` + `shared/lib/coverMedia.ts`). Jangan menambah format
-  baru ke jalur konversi tanpa memastikan dulu apakah formatnya beranimasi.
+  (docs/plan/admin-content-image-format-pipeline/PLAN.md T5). Output
+  ditentukan **PER-FIELD** lewat parameter `format` (docs/plan/
+  admin-content-png-lossless-galeri-tajam/PLAN.md K1/K2), bukan ditebak
+  dari isi gambar: `"lossy"` (default) mengonversi PNG/JPEG ke WebP lewat
+  canvas (fallback JPEG bila browser tak punya encoder WebP, dideteksi via
+  probe `canEncodeWebp`, bukan ditebak dari hasil `toBlob`); `"lossless"`
+  selalu keluar PNG **tanpa flatten latar apa pun**. Field yang butuh
+  transparansi (mis. Logo di `ContentPage.tsx`) HARUS memakai `"lossless"` -
+  memakai `"lossy"` di situ berisiko latar transparan dibakar putih kalau
+  browser jatuh ke fallback JPEG (JPEG tidak mendukung alpha; bug nyata
+  yang sudah terjadi, lihat `encodeTargetFor` di `image-compress.ts`).
+  Flatten `#ffffff` di `drawToCanvas` hanya sah untuk target JPEG - jangan
+  pernah dipanggil dengan `background` pada target PNG. **GIF dan WebP
+  WAJIB diteruskan apa adanya, TANPA createImageBitmap/canvas, pada KEDUA
+  format** - canvas hanya mengambil frame pertama dan akan membunuh
+  animasi GIF secara senyap (cover animasi dipakai produksi, lihat
+  `Cover.tsx` + `shared/lib/coverMedia.ts`). Jangan menambah format baru
+  ke jalur konversi tanpa memastikan dulu apakah formatnya beranimasi.
 
 ## Shared
 

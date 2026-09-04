@@ -1,12 +1,19 @@
 /**
  * Kompresi image di browser sebelum dikirim sebagai base64 - docs/plan/
- * admin-content-upload-base64/PLAN.md §3.3 (keputusan K6) dan docs/plan/
- * admin-content-image-format-pipeline/PLAN.md (keputusan D1-D4). Tanpa
- * dependency baru, hanya canvas & createImageBitmap bawaan browser.
+ * admin-content-upload-base64/PLAN.md §3.3 (keputusan K6), docs/plan/
+ * admin-content-image-format-pipeline/PLAN.md (keputusan D1-D4), dan docs/plan/
+ * admin-content-png-lossless-galeri-tajam/PLAN.md (keputusan K1/K2/D1-D3).
+ * Tanpa dependency baru, hanya canvas & createImageBitmap bawaan browser.
  *
- * PNG/JPEG dikonversi ke WebP lewat canvas. GIF/WebP diteruskan APA ADANYA
- * (passthrough) - GIF lewat canvas hanya mengambil frame pertama, membunuh
- * animasi (regresi T2), dan WebP yang sudah WebP tidak perlu rugi generasi.
+ * Output ditentukan PER-FIELD lewat parameter `format` (lossy | lossless),
+ * bukan ditebak dari isi gambar. PNG/JPEG pada format "lossy" dikonversi ke
+ * WebP lewat canvas (fallback JPEG + latar putih bila browser tak punya
+ * encoder WebP). Pada format "lossless" selalu keluar PNG TANPA flatten latar
+ * apa pun - field yang memang butuh transparansi (mis. Logo) harus memakai
+ * ini, bukan "lossy", supaya tidak jatuh ke fallback JPEG yang membakar alpha
+ * jadi putih. GIF/WebP diteruskan APA ADANYA (passthrough) pada KEDUA format -
+ * GIF lewat canvas hanya mengambil frame pertama, membunuh animasi (regresi
+ * T2), dan WebP yang sudah WebP tidak perlu rugi generasi.
  */
 
 export class ImageCompressError extends Error {}
@@ -43,6 +50,23 @@ export interface CompressedImage {
 interface EncodedImage {
   base64: string
   ext: string
+}
+
+/** "lossy": dikonversi ke WebP (fallback JPEG+latar putih) - dipakai field
+ * foto. "lossless": selalu PNG tanpa flatten latar - WAJIB untuk field yang
+ * butuh transparansi (docs/plan/admin-content-png-lossless-galeri-tajam/PLAN.md
+ * K1). Bukan heuristik dari isi gambar - field pemanggil yang menentukan. */
+export type ImageOutputFormat = 'lossy' | 'lossless'
+
+export interface EncodeTarget {
+  mime: string
+  quality: number | undefined
+  background: string | undefined
+}
+
+export interface RetryPlan {
+  maxDim: number
+  quality: number
 }
 
 /** Menghitung ukuran target dengan sisi terpanjang dibatasi maxDim, menjaga rasio aspek,
@@ -94,6 +118,33 @@ export function qualityForSourceType(mime: string): number {
   return mime === 'image/png' ? 0.92 : 0.82
 }
 
+/** Memutuskan mime/quality/background hasil encode dari format field pemanggil
+ * dan ketersediaan encoder WebP. "lossless" TIDAK PERNAH mengembalikan
+ * background - PNG mendukung alpha, jadi tidak ada alasan flatten dan tidak
+ * ada jalur fallback yang bisa membakar transparansi jadi putih (beda dari
+ * "lossy" tanpa encoder WebP, yang jatuh ke JPEG+putih karena JPEG memang
+ * tidak mendukung alpha). */
+export function encodeTargetFor(format: ImageOutputFormat, canWebp: boolean, quality: number): EncodeTarget {
+  if (format === 'lossless') {
+    return { mime: 'image/png', quality: undefined, background: undefined }
+  }
+  if (canWebp) {
+    return { mime: 'image/webp', quality, background: undefined }
+  }
+  return { mime: 'image/jpeg', quality: 0.85, background: '#ffffff' }
+}
+
+/** Rencana percobaan kedua bila hasil pertama masih di atas MAX_DECODED_BYTES.
+ * "lossless" (PNG) mengabaikan argumen quality canvas.toBlob, jadi satu-satunya
+ * tuas ukuran adalah memperkecil dimensi. "lossy" mempertahankan nilai lama
+ * (maxDim 1280, quality diturunkan 0.12) supaya jalur foto tetap identik byte. */
+export function retryPlanFor(format: ImageOutputFormat, maxDim: number, quality: number): RetryPlan {
+  if (format === 'lossless') {
+    return { maxDim: Math.max(1, Math.round(maxDim / 2)), quality }
+  }
+  return { maxDim: 1280, quality: Math.max(0.6, quality - 0.12) }
+}
+
 let webpSupportCache: boolean | null = null
 
 /** Probe (bukan tebakan) apakah browser ini bisa meng-encode WebP lewat canvas -
@@ -127,7 +178,7 @@ function drawToCanvas(bitmap: ImageBitmap, width: number, height: number, backgr
   return canvas
 }
 
-function encodeCanvas(canvas: HTMLCanvasElement, mimeType: string, quality: number): Promise<Blob | null> {
+function encodeCanvas(canvas: HTMLCanvasElement, mimeType: string, quality: number | undefined): Promise<Blob | null> {
   return new Promise((resolve) => canvas.toBlob(resolve, mimeType, quality))
 }
 
@@ -145,22 +196,23 @@ function withExt(filename: string, ext: string): string {
   return `${baseName}.${ext}`
 }
 
-async function encodeAttempt(bitmap: ImageBitmap, maxDim: number, quality: number): Promise<EncodedImage> {
+async function encodeAttempt(
+  bitmap: ImageBitmap,
+  maxDim: number,
+  quality: number,
+  format: ImageOutputFormat,
+): Promise<EncodedImage> {
   const { width, height } = computeTargetSize(bitmap.width, bitmap.height, maxDim)
 
-  const useWebp = canEncodeWebp()
-  const targetMime = useWebp ? 'image/webp' : 'image/jpeg'
-  const targetQuality = useWebp ? quality : 0.85
-  // Latar putih HANYA untuk target JPEG (tidak mendukung alpha) - WebP
-  // mendukung alpha, jadi kanvasnya dibiarkan transparan (D3, T4).
-  const canvas = drawToCanvas(bitmap, width, height, useWebp ? undefined : '#ffffff')
+  const target = encodeTargetFor(format, canEncodeWebp(), quality)
+  const canvas = drawToCanvas(bitmap, width, height, target.background)
 
-  const blob = await encodeCanvas(canvas, targetMime, targetQuality)
+  const blob = await encodeCanvas(canvas, target.mime, target.quality)
   if (!blob) {
     throw new ImageCompressError('Browser tidak mendukung kompresi gambar ini.')
   }
 
-  // Ekstensi dari blob.type SEBENARNYA, bukan dari targetMime yang diminta -
+  // Ekstensi dari blob.type SEBENARNYA, bukan dari target.mime yang diminta -
   // memperbaiki T1 (toBlob dengan tipe tak didukung menghasilkan PNG per
   // spesifikasi HTML, bukan null; ini menangkap kasus itu dengan benar alih-alih
   // salah menamainya .webp).
@@ -174,14 +226,22 @@ async function encodeAttempt(bitmap: ImageBitmap, maxDim: number, quality: numbe
 }
 
 /** Menyiapkan satu File image untuk diunggah ke POST /api/v1/admin/uploads/base64.
- * PNG/JPEG dikonversi ke WebP (fallback JPEG bila browser tak mendukung encoder
- * WebP) lewat canvas. GIF/WebP diteruskan apa adanya TANPA canvas, supaya
- * animasi GIF tidak mati dan WebP tidak rugi generasi (D1).
+ * `format` (default "lossy") menentukan encoder jalur KONVERSI (PNG/JPEG
+ * sumber): "lossy" -> WebP (fallback JPEG+latar putih bila browser tak
+ * mendukung encoder WebP), "lossless" -> PNG tanpa flatten latar apa pun -
+ * pakai ini untuk field yang butuh transparansi (docs/plan/
+ * admin-content-png-lossless-galeri-tajam/PLAN.md K1/K2). GIF/WebP diteruskan
+ * apa adanya TANPA canvas pada KEDUA format, supaya animasi GIF tidak mati dan
+ * WebP tidak rugi generasi (D1).
  *
  * Melempar ImageCompressError (pesan berbahasa Indonesia) bila format tidak
  * didukung, berkas terlalu besar, atau (untuk jalur konversi) masih di atas
  * 5 MB setelah dua percobaan kompresi. */
-export async function prepareImageForUpload(file: File, maxDim: number): Promise<CompressedImage> {
+export async function prepareImageForUpload(
+  file: File,
+  maxDim: number,
+  format: ImageOutputFormat = 'lossy',
+): Promise<CompressedImage> {
   const sourceType = effectiveSourceType(file)
   if (!sourceType) {
     throw new ImageCompressError('Format tidak didukung. Pilih PNG, JPG, JPEG, GIF, atau WebP.')
@@ -214,12 +274,20 @@ export async function prepareImageForUpload(file: File, maxDim: number): Promise
 
   try {
     const quality = qualityForSourceType(sourceType)
-    let result = await encodeAttempt(bitmap, maxDim, quality)
+    let result = await encodeAttempt(bitmap, maxDim, quality, format)
     if (base64ByteLength(result.base64) > MAX_DECODED_BYTES) {
-      result = await encodeAttempt(bitmap, 1280, Math.max(0.6, quality - 0.12))
+      const retry = retryPlanFor(format, maxDim, quality)
+      result = await encodeAttempt(bitmap, retry.maxDim, retry.quality, format)
     }
     if (base64ByteLength(result.base64) > MAX_DECODED_BYTES) {
-      throw new ImageCompressError('Ukuran gambar masih terlalu besar setelah dikompres. Coba gambar lain.')
+      // PNG lossless mengabaikan quality canvas.toBlob - pesan "lossy" lama
+      // menyiratkan ada kompresi lossy yang bisa diturunkan lagi, padahal
+      // untuk jalur lossless tidak ada tuas itu sama sekali.
+      throw new ImageCompressError(
+        format === 'lossless'
+          ? 'Gambar logo terlalu kompleks untuk disimpan tanpa kompresi. Gunakan berkas logo yang lebih sederhana.'
+          : 'Ukuran gambar masih terlalu besar setelah dikompres. Coba gambar lain.',
+      )
     }
 
     return { base64: result.base64, filename: withExt(file.name, result.ext) }

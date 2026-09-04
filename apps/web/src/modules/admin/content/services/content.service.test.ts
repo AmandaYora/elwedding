@@ -26,7 +26,7 @@ test('uploadImageBase64 mem-POST ke /api/v1/admin/uploads/base64 dengan filename
   const url = await uploadImageBase64(file, 1920)
 
   expect(url).toBe('/uploads/images/foto.webp')
-  expect(mockedCompress).toHaveBeenCalledWith(file, 1920)
+  expect(mockedCompress).toHaveBeenCalledWith(file, 1920, 'lossy')
   expect(mockedPost).toHaveBeenCalledWith(
     '/api/v1/admin/uploads/base64',
     { filename: 'foto.webp', data: 'QUFB' },
@@ -50,5 +50,5 @@ test('maxDim default 1920 dipakai bila tidak diberikan', async () => {
 
   await uploadImageBase64(new File(['dummy'], 'foto.png'))
 
-  expect(mockedCompress).toHaveBeenCalledWith(expect.any(File), 1920)
+  expect(mockedCompress).toHaveBeenCalledWith(expect.any(File), 1920, 'lossy')
 })

@@ -5,6 +5,8 @@ import {
   effectiveSourceType,
   extFromMimeType,
   qualityForSourceType,
+  encodeTargetFor,
+  retryPlanFor,
   prepareImageForUpload,
   ImageCompressError,
 } from './image-compress'
@@ -73,6 +75,33 @@ test('qualityForSourceType: 0.92 untuk PNG, 0.82 untuk JPEG', () => {
   expect(qualityForSourceType('image/jpeg')).toBe(0.82)
 })
 
+// Test regresi untuk bug latar putih (docs/plan/admin-content-png-lossless-galeri-tajam/
+// PLAN.md §2.1): latar transparan sebelumnya bisa dibakar putih saat browser jatuh ke
+// fallback JPEG. "lossless" HARUS selalu punya background undefined, apa pun status
+// encoder WebP - itulah yang membedakannya secara struktural dari "lossy".
+test('encodeTargetFor("lossless") selalu PNG tanpa background, baik canWebp true maupun false', () => {
+  expect(encodeTargetFor('lossless', true, 0.92)).toEqual({ mime: 'image/png', quality: undefined, background: undefined })
+  expect(encodeTargetFor('lossless', false, 0.92)).toEqual({ mime: 'image/png', quality: undefined, background: undefined })
+})
+
+test('encodeTargetFor("lossy") dengan encoder WebP tersedia menghasilkan WebP tanpa background', () => {
+  expect(encodeTargetFor('lossy', true, 0.92)).toEqual({ mime: 'image/webp', quality: 0.92, background: undefined })
+})
+
+test('encodeTargetFor("lossy") tanpa encoder WebP jatuh ke JPEG dengan latar putih - HANYA di sini flatten sah', () => {
+  expect(encodeTargetFor('lossy', false, 0.92)).toEqual({ mime: 'image/jpeg', quality: 0.85, background: '#ffffff' })
+})
+
+test('retryPlanFor("lossless") memperkecil dimensi karena PNG mengabaikan quality canvas.toBlob', () => {
+  expect(retryPlanFor('lossless', 640, 0.92)).toEqual({ maxDim: 320, quality: 0.92 })
+})
+
+test('retryPlanFor("lossy") mempertahankan nilai retry lama (maxDim 1280, quality -0.12)', () => {
+  const retry = retryPlanFor('lossy', 640, 0.92)
+  expect(retry.maxDim).toBe(1280)
+  expect(retry.quality).toBeCloseTo(0.8) // 0.92 - 0.12 tidak eksak di IEEE-754
+})
+
 test('prepareImageForUpload pada GIF meneruskan byte asli TANPA memanggil createImageBitmap', async () => {
   const createImageBitmapSpy = vi.fn()
   vi.stubGlobal('createImageBitmap', createImageBitmapSpy)
@@ -106,4 +135,28 @@ test('prepareImageForUpload pada tipe yang tidak diterima melempar error sebelum
   } finally {
     vi.unstubAllGlobals()
   }
+})
+
+// D5: format "lossless" TIDAK boleh memengaruhi jalur passthrough GIF/WebP sama
+// sekali - keduanya tetap lewat byte asli tanpa canvas, apa pun formatnya.
+test('prepareImageForUpload pada GIF dengan format "lossless" tetap passthrough TANPA createImageBitmap', async () => {
+  const createImageBitmapSpy = vi.fn()
+  vi.stubGlobal('createImageBitmap', createImageBitmapSpy)
+
+  try {
+    const file = new File(['gif-bytes'], 'cover.gif', { type: 'image/gif' })
+    const result = await prepareImageForUpload(file, 1920, 'lossless')
+
+    expect(result.filename).toBe('cover.gif')
+    expect(createImageBitmapSpy).not.toHaveBeenCalled()
+  } finally {
+    vi.unstubAllGlobals()
+  }
+})
+
+test('prepareImageForUpload pada WebP dengan format "lossless" tetap passthrough, bukan di-re-encode ke PNG', async () => {
+  const file = new File(['webp-bytes'], 'logo.webp', { type: 'image/webp' })
+  const result = await prepareImageForUpload(file, 1920, 'lossless')
+
+  expect(result.filename).toBe('logo.webp')
 })

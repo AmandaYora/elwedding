@@ -1,5 +1,5 @@
 import { httpClient } from '@/shared/services/http-client'
-import { prepareImageForUpload } from '@/shared/lib/image-compress'
+import { prepareImageForUpload, type ImageOutputFormat } from '@/shared/lib/image-compress'
 import type { InvitationContent } from '@/types/api'
 
 // Payload PATCH memakai weddingDate (format datetime-local), BUKAN
@@ -32,12 +32,15 @@ export async function uploadAudioFile(file: File): Promise<string> {
   return res.data.data.url
 }
 
-/** Foto di /admin/content - dikompres di browser (WebP, keputusan K6) lalu
- * dikirim sebagai base64 ke endpoint image-only (keputusan K1/K5). timeout
- * di-override lebih panjang dari default 30s karena unggahan bisa menunggu
- * kompresi + pengiriman body base64 yang lebih besar dari file asli. */
-export async function uploadImageBase64(file: File, maxDim = 1920): Promise<string> {
-  const { base64, filename } = await prepareImageForUpload(file, maxDim)
+/** Foto di /admin/content - dikompres di browser lalu dikirim sebagai base64
+ * ke endpoint image-only (keputusan K1/K5). `format` (default "lossy" - WebP
+ * dengan fallback JPEG) ditentukan PER-FIELD oleh pemanggil; field yang butuh
+ * transparansi (mis. Logo) mengirim "lossless" (PNG) - docs/plan/
+ * admin-content-png-lossless-galeri-tajam/PLAN.md K1/K2. timeout di-override
+ * lebih panjang dari default 30s karena unggahan bisa menunggu kompresi +
+ * pengiriman body base64 yang lebih besar dari file asli. */
+export async function uploadImageBase64(file: File, maxDim = 1920, format: ImageOutputFormat = 'lossy'): Promise<string> {
+  const { base64, filename } = await prepareImageForUpload(file, maxDim, format)
   const res = await httpClient.post<{ data: { url: string } }>(
     '/api/v1/admin/uploads/base64',
     { filename, data: base64 },
