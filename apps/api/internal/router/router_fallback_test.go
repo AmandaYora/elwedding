@@ -318,7 +318,7 @@ func TestSpaFallback_InjeksiOgMetaDariProvider(t *testing.T) {
 		t.Errorf("og:image hasil pilihan tidak tersuntik\n%s", body)
 	}
 	// K2: judul memakai nama pasangan, bukan string generik statis.
-	if !strings.Contains(body, "Ariana &amp; Adrian") {
+	if !strings.Contains(body, "Adrian &amp; Ariana") {
 		t.Errorf("og:title nama pasangan tidak tersuntik\n%s", body)
 	}
 	if strings.Contains(body, "frame-cover.png") {

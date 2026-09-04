@@ -52,7 +52,7 @@ test('error -> tampilkan pesan error, bukan crash', () => {
   expect(screen.getByText(/Gagal memuat undangan/)).toBeInTheDocument()
 })
 
-test('section yang tidak ada di data.sections tidak dirender; urutan sesuai data; Footer selalu ada', () => {
+test('section yang tidak ada di data.sections tidak dirender; urutan sesuai data; TIDAK ada footer/copyright', () => {
   mockedUseInvitationData.mockReturnValue({ data, loading: false, error: false })
   const { container } = render(<App />)
 
@@ -64,7 +64,10 @@ test('section yang tidak ada di data.sections tidak dirender; urutan sesuai data
 
   // "quote" dan "couple" ada, dan urutannya (order 1, 2) sesuai DOM.
   const rendered = [...secondaryPane!.children].map((el) => el.getAttribute('data-section-order'))
-  expect(rendered).toEqual(['quote', 'couple', null]) // null = Footer (data-section-footer, bukan data-section-order)
+  expect(rendered).toEqual(['quote', 'couple'])
 
-  expect(container.querySelector('[data-section-footer]')).toBeInTheDocument()
+  // Footer template dihapus atas permintaan user - tidak boleh ada copyright
+  // sama sekali di bagian bawah undangan.
+  expect(container.querySelector('[data-section-footer]')).not.toBeInTheDocument()
+  expect(container.textContent).not.toMatch(/©|copyright/i)
 })

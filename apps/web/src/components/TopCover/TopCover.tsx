@@ -148,9 +148,9 @@ export default function TopCover({ content }: TopCoverProps) {
                 <div className="head-tc">
                     <div data-aos="zoom-in" data-aos-duration="3400" data-aos-delay="3000">
                                             </div>
-                    <h1 className="top-cover-title no-scrollbar" data-aos="zoom-in" data-aos-duration="3400" data-aos-delay="3000" id="trig-tc">{content.brideName} <br />
+                    <h1 className="top-cover-title no-scrollbar" data-aos="zoom-in" data-aos-duration="3400" data-aos-delay="3000" id="trig-tc">{content.groomName} <br />
 &amp; <br />
-{content.groomName}</h1>
+{content.brideName}</h1>
                 </div>
 
                 <div className=" details">

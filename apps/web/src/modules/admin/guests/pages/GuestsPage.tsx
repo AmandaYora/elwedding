@@ -225,7 +225,7 @@ export default function GuestsPage() {
 
     const text = applyInvitationTemplate(waConfig.invitationTemplate, {
       nama: guest.name,
-      mempelai: `${invitationContent.brideName} & ${invitationContent.groomName}`,
+      mempelai: `${invitationContent.groomName} & ${invitationContent.brideName}`,
       // weddingDateLabel apa adanya - JANGAN memformat ulang weddingDateRaw di
       // klien, supaya tanggalnya identik dengan yang dipakai jalur QR.
       tanggal: invitationContent.weddingDateLabel,

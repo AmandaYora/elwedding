@@ -63,7 +63,7 @@ export default function Footnote({ content }: FootnoteProps) {
                 </div>
 
                 <div className="content">
-                    <p className="top-text" data-aos="fade-up" data-aos-duration="1000" data-aos-delay="1000">Wedding Invitation</p>                    <h2 className="footnote-title" data-aos="fade-up" data-aos-duration="1000" data-aos-delay="1000">{content.brideName}<br />&<br />{content.groomName}</h2>                    <p className="bottom-text" data-aos="fade-up" data-aos-duration="1000" data-aos-delay="1000">{content.hashtag}</p>                </div>
+                    <p className="top-text" data-aos="fade-up" data-aos-duration="1000" data-aos-delay="1000">Wedding Invitation</p>                    <h2 className="footnote-title" data-aos="fade-up" data-aos-duration="1000" data-aos-delay="1000">{content.groomName}<br />&<br />{content.brideName}</h2>                    <p className="bottom-text" data-aos="fade-up" data-aos-duration="1000" data-aos-delay="1000">{content.hashtag}</p>                </div>
 
             </div>
 

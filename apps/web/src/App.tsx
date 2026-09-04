@@ -3,7 +3,6 @@ import { useLegacyBootstrap } from '@/hooks/useLegacyBootstrap'
 
 import PrimaryPane from '@/components/PrimaryPane/PrimaryPane'
 import SectionRegistry from '@/components/SectionRegistry/SectionRegistry'
-import Footer from '@/components/Footer/Footer'
 import MusicPlayer from '@/components/MusicPlayer/MusicPlayer'
 import AlertModal from '@/components/AlertModal/AlertModal'
 
@@ -39,10 +38,17 @@ function App() {
         <PrimaryPane content={data.content} />
 
         <section className="secondary-pane">
+          {/* TIDAK ada <Footer />: footer template hanya berisi teks
+              copyright, dan atas permintaan user tidak boleh ada copyright
+              sama sekali di bagian bawah undangan. Section-nya dihapus utuh,
+              bukan dikosongkan - `.footer` punya background putih +
+              padding 30px, jadi menyisakannya kosong akan memunculkan pita
+              putih tanpa isi. Reorder section di bundle legacy
+              (assets/js/fddf2641.js) sudah menjaga ketiadaannya:
+              `t && d.appendChild(t)`. */}
           {data.sections.map((s) => (
             <SectionRegistry key={s.key} sectionKey={s.key} data={data} />
           ))}
-          <Footer />
         </section>
       </section>
 

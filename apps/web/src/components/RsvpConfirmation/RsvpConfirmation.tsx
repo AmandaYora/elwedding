@@ -44,7 +44,7 @@ export default function RsvpConfirmation({ content }: RsvpConfirmationProps) {
     // Fallback client-side (keputusan #15 mode preview / PATCH gagal) -
     // format sama seperti yang disusun backend (buildQRPayload).
     return [
-      `Wedding Invitation - ${content.brideName} & ${content.groomName}`,
+      `Wedding Invitation - ${content.groomName} & ${content.brideName}`,
       `Nama Tamu: ${session.name}`,
       'Status: Akan Hadir',
       `Jumlah Tamu: ${count}`,

@@ -21,9 +21,9 @@ function toGoogleCalendarStamp(unixSeconds: number): string {
 export default function SaveTheDate({ content }: SaveTheDateProps) {
   const start = toGoogleCalendarStamp(content.weddingDateUnix)
   const end = toGoogleCalendarStamp(content.weddingDateUnix + 3 * 3600)
-  const calendarText = encodeURIComponent(`${content.brideName} & ${content.groomName} Wedding`)
+  const calendarText = encodeURIComponent(`${content.groomName} & ${content.brideName} Wedding`)
   const calendarDetails = encodeURIComponent(
-    `Hi, You're invited to our wedding ceremony | ${content.brideName} & ${content.groomName} Wedding | ${content.weddingDateLabel}`,
+    `Hi, You're invited to our wedding ceremony | ${content.groomName} & ${content.brideName} Wedding | ${content.weddingDateLabel}`,
   )
   const calendarUrl = `https://www.google.com/calendar/render?action=TEMPLATE&text=${calendarText}&dates=${start}/${end}&details=${calendarDetails}`
 

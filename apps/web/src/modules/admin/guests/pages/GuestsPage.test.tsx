@@ -190,7 +190,7 @@ test('tamu ber-nomor -> tombol Kirim Undangan berupa <a> wa.me dengan pesan teri
   // '?' & '&' yang justru datang dari URL undangan itu sendiri.
   const text = decodeURIComponent(href.slice(href.indexOf('?text=') + '?text='.length))
   expect(text).toContain('Halo Budi Santoso')
-  expect(text).toContain('Ariana & Adrian')
+  expect(text).toContain('Adrian & Ariana')
   expect(text).toContain('Sabtu, 16 Mei 2026')
   expect(text).toContain('/?guest=abc123')
 })

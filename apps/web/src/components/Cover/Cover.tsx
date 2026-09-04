@@ -25,7 +25,7 @@ export default function Cover({ content }: CoverProps) {
                                             <div className="logo-wrap" data-aos="fade-down" data-aos-duration="3000" data-aos-delay="3000">
                             <img src={content.coverLogoUrl} alt="" className="logo" />
                         </div>
-                                        <p data-aos="fade-down" data-aos-duration="3000" data-aos-delay="3000">Wedding Invitation</p><h1 data-aos="zoom-in" data-aos-duration="3000" data-aos-delay="3000">{content.brideName} & {content.groomName}</h1><p data-aos="fade-up" data-aos-duration="3000" data-aos-delay="3000">{content.hashtag}</p>                </div>
+                                        <p data-aos="fade-down" data-aos-duration="3000" data-aos-delay="3000">Wedding Invitation</p><h1 data-aos="zoom-in" data-aos-duration="3000" data-aos-delay="3000">{content.groomName} & {content.brideName}</h1><p data-aos="fade-up" data-aos-duration="3000" data-aos-delay="3000">{content.hashtag}</p>                </div>
 
                 {/*
                   PENTING (PLAN.md keputusan #15 / F16 / task #17c): isi

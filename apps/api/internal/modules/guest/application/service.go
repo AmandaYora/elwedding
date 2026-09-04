@@ -427,7 +427,9 @@ func resolveAttendingCount(status string, requested int) (int, error) {
 func buildQRPayload(guestName string, info contentContracts.QRInfo, attendingCount int) string {
 	return fmt.Sprintf(
 		"Wedding Invitation - %s & %s\nNama Tamu: %s\nStatus: Akan Hadir\nJumlah Tamu: %d\nTanggal: %s",
-		info.BrideName, info.GroomName, guestName, attendingCount, info.WeddingDateLabel,
+		// Mempelai PRIA dulu, baru wanita - konsisten dengan tampilan
+		// undangan dan judul preview link (router/og_meta.go).
+		info.GroomName, info.BrideName, guestName, attendingCount, info.WeddingDateLabel,
 	)
 }
 
@@ -477,7 +479,7 @@ func (s *Service) UpdateRsvpStatus(ctx context.Context, token, status string, at
 
 	if s.sender != nil {
 		guestID, guestName, phone := row.ID, row.Name, row.Phone
-		coupleName := info.BrideName + " & " + info.GroomName
+		coupleName := info.GroomName + " & " + info.BrideName
 		eventDateLabel := info.WeddingDateLabel
 		go func() {
 			err := s.sender.SendQR(context.Background(), waContracts.SendQRInput{

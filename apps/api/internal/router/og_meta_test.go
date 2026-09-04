@@ -84,11 +84,13 @@ func TestPickShareImage(t *testing.T) {
 }
 
 // K2: judul preview memakai nama pasangan, bukan "Undangan Pernikahan".
+// Urutannya MEMPELAI PRIA DULU, baru wanita - sama dengan tampilan undangan
+// dan jalur QR WhatsApp. Test ini yang mengunci urutan itu.
 func TestBuildOgTitle(t *testing.T) {
 	tests := []struct {
 		bride, groom, want string
 	}{
-		{"Ariana", "Adrian", "Ariana & Adrian"},
+		{"Ariana", "Adrian", "Adrian & Ariana"},
 		{"Ariana", "", "Ariana"},
 		{"", "Adrian", "Adrian"},
 		{"", "", ""},
@@ -218,7 +220,7 @@ func TestBuildOgTags(t *testing.T) {
 		out := buildOgTags("https://x.test", info)
 
 		for _, want := range []string{
-			`<meta property="og:title" content="Ariana &amp; Adrian" />`,
+			`<meta property="og:title" content="Adrian &amp; Ariana" />`,
 			`<meta property="og:image" content="https://x.test/uploads/images/share.jpg" />`,
 			`<meta property="og:image:type" content="image/jpeg" />`,
 			`<meta property="og:url" content="https://x.test/" />`,

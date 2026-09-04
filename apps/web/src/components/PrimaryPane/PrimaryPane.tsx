@@ -137,9 +137,9 @@ export default function PrimaryPane({ content }: PrimaryPaneProps) {
 
                 <div className=" head-wrap" data-aos="zoom-in" data-aos-duration="3500" data-aos-delay="3500">
 
-                    <h1 className="primary-pane-title" data-aos="zoom-in" data-aos-duration="3500" data-aos-delay="3500">{content.brideName} <br />
+                    <h1 className="primary-pane-title" data-aos="zoom-in" data-aos-duration="3500" data-aos-delay="3500">{content.groomName} <br />
 &amp; <br />
-{content.groomName}</h1>
+{content.brideName}</h1>
 
                 </div>
 

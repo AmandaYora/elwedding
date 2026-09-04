@@ -75,16 +75,22 @@ func pickShareImage(info contentContracts.ShareInfo) string {
 
 // buildOgTitle: realisasi K2 - judul preview memakai nama pasangan, bukan
 // string generik "Undangan Pernikahan".
+//
+// Urutan MEMPELAI PRIA DULU, baru wanita - sama dengan section Couple,
+// Cover, PrimaryPane, TopCover, Footnote di undangan, dan dengan coupleName
+// di jalur QR WhatsApp (guest/application/service.go). Kalau urutannya
+// diubah di satu tempat, ubah SEMUANYA - preview link yang berbeda urutan
+// dari isi undangannya terlihat seperti salah data.
 func buildOgTitle(info contentContracts.ShareInfo) string {
-	bride := strings.TrimSpace(info.BrideName)
 	groom := strings.TrimSpace(info.GroomName)
+	bride := strings.TrimSpace(info.BrideName)
 	switch {
-	case bride != "" && groom != "":
-		return bride + " & " + groom
-	case bride != "":
-		return bride
-	default:
+	case groom != "" && bride != "":
+		return groom + " & " + bride
+	case groom != "":
 		return groom
+	default:
+		return bride
 	}
 }
 
