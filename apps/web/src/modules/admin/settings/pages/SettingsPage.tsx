@@ -1,5 +1,13 @@
 import { useEffect, useRef, useState } from 'react'
-import { type ContentFormValues, getContent, toFormValues, updateContent, uploadAudioFile } from '@/modules/admin/content/services/content.service'
+import {
+  type ContentFormValues,
+  AUDIO_ACCEPT,
+  getContent,
+  toFormValues,
+  updateContent,
+  uploadAudioFile,
+} from '@/modules/admin/content/services/content.service'
+import { apiErrorMessage } from '@/shared/lib/api-error'
 import { Card, CardHeader, CardBody, Input } from '@/shared/components/ui'
 import { PageHeader } from '@/shared/components/layout/PageHeader'
 import { StickyActionBar } from '@/shared/components/layout/StickyActionBar'
@@ -63,8 +71,14 @@ export default function SettingsPage() {
       const url = await uploadAudioFile(file)
       setForm({ ...form, musicUrl: url })
       toast.success('File musik berhasil diunggah.')
-    } catch {
-      toast.error('Gagal mengunggah file musik.')
+    } catch (err: unknown) {
+      // Pesan SEBENARNYA, bukan "Gagal mengunggah file musik." yang generik.
+      // apiErrorMessage sengaja membaca pesan backend lebih dulu lalu jatuh ke
+      // status code - termasuk 413 dari nginx yang datang sebagai HTML, bukan
+      // envelope JSON proyek. Tanpa ini, penyebab gagal (berkas terlalu besar,
+      // sesi habis, batas nginx, koneksi putus) semuanya terlihat sama di
+      // layar admin dan tidak bisa ditindaklanjuti.
+      toast.error(apiErrorMessage(err, 'Gagal mengunggah file musik.'))
     } finally {
       setUploading(false)
     }
@@ -144,11 +158,15 @@ export default function SettingsPage() {
                 <p className="text-xs font-semibold text-slate-700">
                   {uploading ? 'Mengunggah file musik...' : 'Pilih file audio dari perangkat'}
                 </p>
-                <p className="text-[11px] text-slate-400 mt-0.5">Format didukung: MP3, WAV, AAC, M4A</p>
+                {/* Daftar ini HARUS sama dengan allowedUploadExt di backend.
+                    Sebelumnya tertulis "AAC, M4A" - dua format yang justru
+                    DITOLAK server (415), sementara OGG yang diterima tidak
+                    disebut sama sekali. */}
+                <p className="text-[11px] text-slate-400 mt-0.5">Format didukung: MP3, WAV, OGG &middot; maks 10 MB</p>
               </div>
               <input
                 type="file"
-                accept="audio/*"
+                accept={AUDIO_ACCEPT}
                 disabled={uploading}
                 className="sr-only"
                 onChange={(e) => void handleUpload(e.target.files?.[0])}

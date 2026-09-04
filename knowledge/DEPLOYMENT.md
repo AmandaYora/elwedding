@@ -69,5 +69,14 @@ endpoint (`POST /api/v1/admin/uploads/base64`, body ≤ 8 MB) and multipart audi
 this app, add this directive **before** anything else - it will look fine until the first admin
 tries to upload a real photo.
 
+**Symptom & quick check.** An upload that fails for a file comfortably under the Go limit
+(e.g. a 6 MB MP3 on Pengaturan, where Go allows 10 MB) is almost always this, not app code.
+nginx answers 413 with an **HTML** body, not the project's JSON envelope, so it never reaches
+a Go handler and nothing appears in the app log. Verify on the VPS with
+`grep -r client_max_body_size /etc/nginx/` (absent = the 1 MB default is in force), and confirm
+from the browser Network tab that the 413 response is HTML. The admin UI now surfaces the real
+message via `apiErrorMessage`, which has an explicit 413 fallback for exactly this case -
+"Ukuran file terlalu besar." on a small file means the proxy, not the app.
+
 See `AI_AGENT_OPERATIONS.md` for gotchas specific to doing this push/deploy cycle as an AI
 agent (credential-in-command blocks, what's safe to read on the VPS vs. not).

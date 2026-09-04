@@ -22,13 +22,58 @@ export async function updateContent(values: ContentFormValues): Promise<void> {
   await httpClient.patch('/api/v1/admin/content', values)
 }
 
+/** Ekstensi audio yang BENAR-BENAR diterima backend. Harus sama persis
+ * dengan allowedUploadExt di
+ * apps/api/internal/modules/content/application/service_upload.go - kalau
+ * daftar ini lebih longgar, berkasnya baru ditolak SESUDAH terunggah penuh
+ * (415), yang untuk berkas 6 MB berarti menunggu lama demi sebuah error. */
+export const AUDIO_EXTENSIONS = ['.mp3', '.wav', '.ogg'] as const
+
+/** Nilai atribut `accept` untuk input musik. MIME **dan** ekstensi ditulis
+ * dua-duanya, mengikuti pola yang sudah dipakai field foto di ContentPage.
+ * `audio/*` saja TIDAK cukup: dialog berkas Windows menerjemahkan wildcard
+ * itu lewat pemetaan MIME di registry, sehingga sebuah .mp3 bisa tampil
+ * abu-abu / tidak bisa dipilih kalau asosiasi .mp3 di mesin admin rusak atau
+ * diambil alih aplikasi lain. Menyebut ekstensinya eksplisit membuat berkas
+ * tetap bisa dipilih tanpa bergantung registry. */
+export const AUDIO_ACCEPT = 'audio/mpeg,audio/wav,audio/ogg,.mp3,.wav,.ogg'
+
+/** Batas ukuran berkas audio. Cermin maxUploadSize di
+ * apps/api/internal/modules/content/presentation/handler.go (10 MB), yang
+ * dipasang sebagai http.MaxBytesReader pada SELURUH body multipart - jadi
+ * berkas yang mepet 10 MB tetap bisa ditolak server karena overhead
+ * multipart. Dicek di klien supaya admin dapat pesan seketika, bukan setelah
+ * menunggu unggahan panjang. */
+export const MAX_AUDIO_BYTES = 10 * 1024 * 1024
+
+export class AudioUploadError extends Error {}
+
 /** Khusus musik latar (audio) - jalur multipart lama dipertahankan apa
  * adanya (docs/plan/admin-content-upload-base64/PLAN.md keputusan K2).
  * JANGAN dipakai untuk foto - lihat uploadImageBase64 di bawah. */
 export async function uploadAudioFile(file: File): Promise<string> {
+  const dot = file.name.lastIndexOf('.')
+  const ext = dot === -1 ? '' : file.name.slice(dot).toLowerCase()
+  if (!(AUDIO_EXTENSIONS as readonly string[]).includes(ext)) {
+    throw new AudioUploadError('Format audio tidak didukung. Pilih berkas MP3, WAV, atau OGG.')
+  }
+  if (file.size > MAX_AUDIO_BYTES) {
+    throw new AudioUploadError(
+      `Ukuran berkas ${(file.size / 1024 / 1024).toFixed(1)} MB melebihi batas 10 MB. Kompres dulu audionya.`,
+    )
+  }
+
   const formData = new FormData()
   formData.append('file', file)
-  const res = await httpClient.post<{ data: { url: string } }>('/api/v1/admin/uploads', formData)
+  // timeout dinaikkan dari default 30 detik (http-client.ts), sejalan dengan
+  // uploadImageBase64 di bawah. Berkas musik berukuran megabyte-an dikirim
+  // APA ADANYA tanpa kompresi, jadi pada koneksi unggah rumahan yang lambat
+  // sebuah MP3 6 MB gampang melewati 30 detik - dan axios membatalkannya di
+  // tengah jalan, yang di layar admin tidak bisa dibedakan dari "file
+  // ditolak".
+  const res = await httpClient.post<{ data: { url: string } }>('/api/v1/admin/uploads', formData, {
+    timeout: 300000,
+  })
   return res.data.data.url
 }
 
