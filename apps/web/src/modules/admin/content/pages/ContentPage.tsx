@@ -46,6 +46,19 @@ function Field({
   )
 }
 
+/** Latar kotak-kotak ala editor gambar, dipakai pada preview field `lossless`
+ * supaya area transparan terlihat sebagai kotak-kotak alih-alih menyatu dengan
+ * warna latar solid. Inline style (bukan util Tailwind) karena butuh dua
+ * lapis linear-gradient dengan offset - tidak ada padanan util-nya. */
+const CHECKERBOARD_STYLE: React.CSSProperties = {
+  backgroundImage:
+    'linear-gradient(45deg, #e2e8f0 25%, transparent 25%, transparent 75%, #e2e8f0 75%),' +
+    'linear-gradient(45deg, #e2e8f0 25%, transparent 25%, transparent 75%, #e2e8f0 75%)',
+  backgroundSize: '12px 12px',
+  backgroundPosition: '0 0, 6px 6px',
+  backgroundColor: '#ffffff',
+}
+
 function PhotoField({
   label,
   value,
@@ -63,6 +76,7 @@ function PhotoField({
 }) {
   const [uploading, setUploading] = useState(false)
   const toast = useToast()
+  const isLossless = format === 'lossless'
   function setUploadingTracked(v: boolean) {
     setUploading(v)
     onUploadingChange?.(v)
@@ -74,10 +88,20 @@ function PhotoField({
       <div className="flex items-center gap-3">
         {value ? (
           <div className="relative group shrink-0">
+            {/* Field lossless (mis. Logo, Gambar Dress Code) dapat latar
+                kotak-kotak + object-contain supaya admin BISA MELIHAT apakah
+                transparansinya selamat - dengan bg solid + object-cover, PNG
+                transparan dan PNG berlatar putih terlihat identik, yang persis
+                membuat bug latar putih lolos ke produksi (PLAN.md D2). */}
             <img
               src={value}
               alt=""
-              className="h-16 w-16 object-cover rounded-xl border border-slate-200 shadow-2xs bg-slate-100"
+              className={
+                isLossless
+                  ? 'h-16 w-16 object-contain rounded-xl border border-slate-200 shadow-2xs'
+                  : 'h-16 w-16 object-cover rounded-xl border border-slate-200 shadow-2xs bg-slate-100'
+              }
+              style={isLossless ? CHECKERBOARD_STYLE : undefined}
             />
           </div>
         ) : (
@@ -105,8 +129,23 @@ function PhotoField({
               if (!file) return
               setUploadingTracked(true)
               try {
-                onChange(await uploadImageBase64(file, maxDim, format))
-                toast.success('Foto berhasil diunggah.')
+                let noAlpha = false
+                const url = await uploadImageBase64(file, maxDim, format, (hasAlpha) => {
+                  // hasAlpha === undefined berarti TIDAK DIKETAHUI (jalur
+                  // passthrough GIF/WebP), bukan "tidak transparan" - jangan
+                  // memperingatkan untuk kasus itu.
+                  noAlpha = isLossless && hasAlpha === false
+                })
+                onChange(url)
+                if (noAlpha) {
+                  // Unggahan TETAP diterima - admin mungkin memang ingin
+                  // gambar berlatar. Ini peringatan, bukan penolakan.
+                  toast.error(
+                    'Gambar berhasil diunggah, tapi TIDAK punya area transparan - latarnya akan ikut terlihat di undangan. Kalau seharusnya transparan, ekspor ulang sebagai PNG dengan latar transparan lalu unggah lagi.',
+                  )
+                } else {
+                  toast.success('Foto berhasil diunggah.')
+                }
               } catch (err: unknown) {
                 toast.error(apiErrorMessage(err, 'Gagal mengunggah foto.'))
               } finally {
@@ -552,6 +591,19 @@ export default function ContentPage() {
                   <Field label="Judul Dresscode" value={form.dresscodeTitle} onChange={(v) => set('dresscodeTitle', v)} />
                   <Field label="Deskripsi Dresscode" value={form.dresscodeDescription} onChange={(v) => set('dresscodeDescription', v)} textarea />
                   <Field label="Catatan Dresscode" value={form.dresscodeNote} onChange={(v) => set('dresscodeNote', v)} textarea />
+                  {/* Satu gambar ini menggantikan ikon dress + palet warna yang
+                      sebelumnya hardcode di Agenda.tsx (K1/K2). PNG lossless
+                      (K3, keputusan analis) supaya transparansi & tepi tajam
+                      aman; maxDim 1280 karena slot .dress-inner-wrap maksimum
+                      550 CSS px (D7). */}
+                  <PhotoField
+                    label="Gambar Dress Code"
+                    value={form.dresscodeImageUrl}
+                    onChange={(v) => set('dresscodeImageUrl', v)}
+                    onUploadingChange={handlePhotoUploading}
+                    maxDim={1280}
+                    format="lossless"
+                  />
                 </div>
               </CardBody>
             </Card>

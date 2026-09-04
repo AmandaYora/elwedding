@@ -12,21 +12,38 @@
     <meta name="title" content="Undangan Pernikahan">
     <meta name="description" content="Hi, You're invited to our wedding ceremony">
 
-    <!-- Open Graph / Facebook -->
+    <!-- Open Graph / Facebook
+         JANGAN diubah tanpa membaca ini dulu (docs/plan/revisi-uat-logo-og-nama-tamu-dresscode/PLAN.md R2):
+         1. og:url dan og:image WAJIB URL ABSOLUT. Crawler WhatsApp/Facebook
+            tidak menyelesaikan path relatif - nilai relatif membuat preview
+            tampil kosong/hitam.
+         2. og:image WAJIB PNG atau JPEG. Crawler WhatsApp TIDAK merender WebP.
+            Jangan "mengoptimalkan" .png di bawah ini kembali ke .webp - itu
+            persis bug yang sedang diperbaiki di sini.
+         3. Nilainya tidak bisa ditambal lewat JavaScript: crawler WA tidak
+            menjalankan JS. Harus sudah absolut di HTML statis ini.
+         Origin di-hardcode, BUKAN lewat substitusi env Vite di HTML, supaya
+         kegagalan konfigurasi tidak lolos senyap sebagai teks mentah saat
+         build. (Catatan: jangan menulis token substitusi env secara literal
+         di komentar ini - scanner Vite ikut memindai komentar HTML dan akan
+         memunculkan warning build.) -->
     <meta property="og:type" content="website" />
-    <meta property="og:site_name" content="Undangan Pernikahan"> 
-    <meta property="og:url" content="/" />    
+    <meta property="og:site_name" content="Undangan Pernikahan">
+    <meta property="og:url" content="https://elwedding.elcodelabs.com/" />
     <meta property="og:title" content="Undangan Pernikahan" />
     <meta property="og:description" content="Hi, You're invited to our wedding ceremony" />
-    <meta property="og:image" content="/media/template/arsya/frame-cover.webp"/>
+    <meta property="og:image" content="https://elwedding.elcodelabs.com/media/template/arsya/frame-cover.png"/>
+    <meta property="og:image:type" content="image/png" />
+    <meta property="og:image:width" content="1144" />
+    <meta property="og:image:height" content="1624" />
     <meta property="og:locale" content="in_ID">
 
     <!-- Twitter -->
     <meta property="twitter:card" content="summary_large_image">
-    <meta property="twitter:url" content="/">
+    <meta property="twitter:url" content="https://elwedding.elcodelabs.com/">
     <meta property="twitter:title" content="Undangan Pernikahan">
     <meta property="twitter:description" content="Hi, You're invited to our wedding ceremony">
-    <meta property="twitter:image" content="/media/template/arsya/frame-cover.webp">
+    <meta property="twitter:image" content="https://elwedding.elcodelabs.com/media/template/arsya/frame-cover.png">
 
 <script src="/assets/js/jquery.js"></script>
 

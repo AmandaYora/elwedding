@@ -17,7 +17,7 @@ const baseContent: InvitationData['content'] = {
   videoGalleryTitle: '', videoGalleryYoutubeUrl: '', videoGalleryCaption: '',
   liveStreamingTitle: '', liveStreamingYoutubeUrl: '',
   instagramFilterTitle: '', instagramFilterCaption: '', instagramFilterPreviewPhotoUrl: '', instagramFilterLink: '',
-  weddingGiftDescription: '', dresscodeTitle: '', dresscodeDescription: '', dresscodeNote: '',
+  weddingGiftDescription: '', dresscodeTitle: '', dresscodeDescription: '', dresscodeNote: '', dresscodeImageUrl: '',
 }
 
 const data: InvitationData = {

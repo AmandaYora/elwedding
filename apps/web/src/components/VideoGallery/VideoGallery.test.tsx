@@ -13,7 +13,7 @@ const content: InvitationContent = {
   videoGalleryTitle: 'Our Footage', videoGalleryYoutubeUrl: 'https://www.youtube.com/watch?v=dl_VqonCz6Y', videoGalleryCaption: 'Pre-Wedding',
   liveStreamingTitle: '', liveStreamingYoutubeUrl: '',
   instagramFilterTitle: '', instagramFilterCaption: '', instagramFilterPreviewPhotoUrl: '', instagramFilterLink: '',
-  weddingGiftDescription: '', dresscodeTitle: '', dresscodeDescription: '', dresscodeNote: '',
+  weddingGiftDescription: '', dresscodeTitle: '', dresscodeDescription: '', dresscodeNote: '', dresscodeImageUrl: '',
 }
 
 describe('VideoGallery', () => {

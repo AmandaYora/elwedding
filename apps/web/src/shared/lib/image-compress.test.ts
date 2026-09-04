@@ -7,6 +7,7 @@ import {
   qualityForSourceType,
   encodeTargetFor,
   retryPlanFor,
+  hasAlphaChannel,
   prepareImageForUpload,
   ImageCompressError,
 } from './image-compress'
@@ -94,6 +95,29 @@ test('encodeTargetFor("lossy") tanpa encoder WebP jatuh ke JPEG dengan latar put
 
 test('retryPlanFor("lossless") memperkecil dimensi karena PNG mengabaikan quality canvas.toBlob', () => {
   expect(retryPlanFor('lossless', 640, 0.92)).toEqual({ maxDim: 320, quality: 0.92 })
+})
+
+// hasAlphaChannel adalah dasar peringatan alpha (PLAN.md D2). Buffer RGBA:
+// tiap piksel 4 byte, alpha di indeks ke-4 (offset 3).
+test('hasAlphaChannel: semua piksel opaque (alpha 255) -> false', () => {
+  const pixels = new Uint8ClampedArray([10, 20, 30, 255, 40, 50, 60, 255])
+  expect(hasAlphaChannel(pixels)).toBe(false)
+})
+
+test('hasAlphaChannel: satu piksel transparan penuh (alpha 0) -> true', () => {
+  const pixels = new Uint8ClampedArray([10, 20, 30, 255, 40, 50, 60, 0])
+  expect(hasAlphaChannel(pixels)).toBe(true)
+})
+
+test('hasAlphaChannel: piksel semi-transparan (alpha 200) tetap terdeteksi -> true', () => {
+  // Ambang 250 (bukan 255) sengaja dipakai supaya alpha hasil penskalaan
+  // probe tidak lolos sebagai "opaque".
+  const pixels = new Uint8ClampedArray([10, 20, 30, 200])
+  expect(hasAlphaChannel(pixels)).toBe(true)
+})
+
+test('hasAlphaChannel: buffer kosong -> false', () => {
+  expect(hasAlphaChannel(new Uint8ClampedArray([]))).toBe(false)
 })
 
 test('retryPlanFor("lossy") mempertahankan nilai retry lama (maxDim 1280, quality -0.12)', () => {

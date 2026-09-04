@@ -12,7 +12,7 @@ import (
 )
 
 const getInvitationContent = `-- name: GetInvitationContent :one
-SELECT id, bride_name, bride_parents_text, bride_instagram, bride_photo_url, groom_name, groom_parents_text, groom_instagram, groom_photo_url, wedding_date, hashtag, cover_logo_url, cover_image_desktop_url, cover_image_mobile_url, quote_text, thanks_title, thanks_description, music_url, video_gallery_title, video_gallery_youtube_url, video_gallery_caption, live_streaming_title, live_streaming_youtube_url, instagram_filter_title, instagram_filter_caption, instagram_filter_preview_photo_url, instagram_filter_link, wedding_gift_description, dresscode_title, dresscode_description, dresscode_note, updated_at FROM invitation_content WHERE id = 1 LIMIT 1
+SELECT id, bride_name, bride_parents_text, bride_instagram, bride_photo_url, groom_name, groom_parents_text, groom_instagram, groom_photo_url, wedding_date, hashtag, cover_logo_url, cover_image_desktop_url, cover_image_mobile_url, quote_text, thanks_title, thanks_description, music_url, video_gallery_title, video_gallery_youtube_url, video_gallery_caption, live_streaming_title, live_streaming_youtube_url, instagram_filter_title, instagram_filter_caption, instagram_filter_preview_photo_url, instagram_filter_link, wedding_gift_description, dresscode_title, dresscode_description, dresscode_note, updated_at, dresscode_image_url FROM invitation_content WHERE id = 1 LIMIT 1
 `
 
 func (q *Queries) GetInvitationContent(ctx context.Context) (InvitationContent, error) {
@@ -51,6 +51,7 @@ func (q *Queries) GetInvitationContent(ctx context.Context) (InvitationContent, 
 		&i.DresscodeDescription,
 		&i.DresscodeNote,
 		&i.UpdatedAt,
+		&i.DresscodeImageUrl,
 	)
 	return i, err
 }
@@ -68,7 +69,7 @@ UPDATE invitation_content SET
   live_streaming_title = ?, live_streaming_youtube_url = ?,
   instagram_filter_title = ?, instagram_filter_caption = ?, instagram_filter_preview_photo_url = ?, instagram_filter_link = ?,
   wedding_gift_description = ?,
-  dresscode_title = ?, dresscode_description = ?, dresscode_note = ?
+  dresscode_title = ?, dresscode_description = ?, dresscode_note = ?, dresscode_image_url = ?
 WHERE id = 1
 `
 
@@ -103,6 +104,7 @@ type UpdateInvitationContentParams struct {
 	DresscodeTitle                 string
 	DresscodeDescription           sql.NullString
 	DresscodeNote                  sql.NullString
+	DresscodeImageUrl              string
 }
 
 func (q *Queries) UpdateInvitationContent(ctx context.Context, arg UpdateInvitationContentParams) error {
@@ -137,6 +139,7 @@ func (q *Queries) UpdateInvitationContent(ctx context.Context, arg UpdateInvitat
 		arg.DresscodeTitle,
 		arg.DresscodeDescription,
 		arg.DresscodeNote,
+		arg.DresscodeImageUrl,
 	)
 	return err
 }

@@ -2,6 +2,7 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { httpClient } from '@/shared/services/http-client'
 import type { InvitationContent } from '@/types/api'
 import RsvpConfirmation from './RsvpConfirmation'
+import { resetGuestSessionCache } from '@/hooks/useGuestSession'
 
 vi.mock('@/shared/services/http-client', () => ({
   httpClient: { get: vi.fn(), patch: vi.fn() },
@@ -19,7 +20,7 @@ const content: InvitationContent = {
   videoGalleryTitle: '', videoGalleryYoutubeUrl: '', videoGalleryCaption: '',
   liveStreamingTitle: '', liveStreamingYoutubeUrl: '',
   instagramFilterTitle: '', instagramFilterCaption: '', instagramFilterPreviewPhotoUrl: '', instagramFilterLink: '',
-  weddingGiftDescription: '', dresscodeTitle: '', dresscodeDescription: '', dresscodeNote: '',
+  weddingGiftDescription: '', dresscodeTitle: '', dresscodeDescription: '', dresscodeNote: '', dresscodeImageUrl: '',
 }
 
 function setSearch(search: string) {
@@ -30,6 +31,10 @@ afterEach(() => {
   mockedGet.mockReset()
   mockedPatch.mockReset()
   setSearch('')
+  // Tiga test di bawah memakai token 'abc123' yang SAMA. Tanpa reset, cache
+  // promise level modul di useGuestSession mengembalikan respons mock test
+  // pertama ke test berikutnya.
+  resetGuestSessionCache()
 })
 
 test('renders the 3 confirmation buttons and no QR on initial mount', () => {

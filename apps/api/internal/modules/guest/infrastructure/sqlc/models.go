@@ -344,6 +344,7 @@ type InvitationContent struct {
 	DresscodeDescription           sql.NullString
 	DresscodeNote                  sql.NullString
 	UpdatedAt                      time.Time
+	DresscodeImageUrl              string
 }
 
 type LoveStoryChapter struct {

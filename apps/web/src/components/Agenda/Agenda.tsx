@@ -1,4 +1,3 @@
-import type { CSSProperties } from 'react'
 import type { AgendaEvent, InvitationContent } from '@/types/api'
 
 interface AgendaProps {
@@ -317,52 +316,22 @@ export default function Agenda({ content, agendaEvents }: AgendaProps) {
                     <p className="dress-desc">{content.dresscodeDescription}</p>
                   </div>
                   <div className="dress-body">
-                    <div className="dress-list" data-aos="fade-up" data-aos-duration="1000">
-                      <div className="dress-item ">
-                        <div className="dress-itwrap">
-                          <div className="dress-preview man-preview">
-                            <div className="dress-icon">
-                              <img className="dress-icon-img" src="/assets/icons/ic-dress-man-formal.png" alt="Dress Man Formal" width="36" height="36"  loading="lazy" decoding="async" />
-                              <p className="dress-item-title">Men</p>
-                              <p className="dress-icon-label">Formal</p>
-                            </div>
-                          </div>
-                        </div>
-                        <div className="dress-color-list">
-                          <div className="dress-color-item" style={{ '--bg-color': '#BAAF5F' } as CSSProperties} title="#BAAF5F">
-
-                          </div>
-                          <div className="dress-color-item" style={{ '--bg-color': '#CC7C73' } as CSSProperties} title="#CC7C73">
-
-                          </div>
-                          <div className="dress-color-item" style={{ '--bg-color': '#8195AE' } as CSSProperties} title="#8195AE">
-
-                          </div>
-                        </div>
+                    {/* Satu gambar dari admin menggantikan dua ikon dress +
+                        enam kotak palet warna yang sebelumnya hardcode di sini
+                        (R4/K1/K2). Dirender BERSYARAT: dresscodeImageUrl
+                        bernilai '' untuk semua baris tepat setelah migration
+                        000011, dan <img src=""> akan memicu request ke URL
+                        halaman ini sendiri lalu menampilkan ikon rusak. */}
+                    {content.dresscodeImageUrl && (
+                      <div className="dress-list" data-aos="fade-up" data-aos-duration="1000">
+                        <img
+                          src={content.dresscodeImageUrl}
+                          alt="Dress code dan palet warna"
+                          loading="lazy"
+                          decoding="async"
+                        />
                       </div>
-                      <div className="dress-item wm ">
-                        <div className="dress-itwrap">
-                          <div className="dress-preview woman-preview">
-                            <div className="dress-icon">
-                              <img className="dress-icon-img" src="/assets/icons/ic-dress-woman-formal.png" alt="Dress Woman Formal" width="36" height="36"  loading="lazy" decoding="async" />
-                              <p className="dress-item-title">Women</p>
-                              <p className="dress-icon-label">Formal</p>
-                            </div>
-                          </div>
-                        </div>
-                        <div className="dress-color-list">
-                          <div className="dress-color-item" style={{ '--bg-color': '#BAAF5F' } as CSSProperties} title="#BAAF5F">
-
-                          </div>
-                          <div className="dress-color-item" style={{ '--bg-color': '#CC7C73' } as CSSProperties} title="#CC7C73">
-
-                          </div>
-                          <div className="dress-color-item" style={{ '--bg-color': '#8195AE' } as CSSProperties} title="#8195AE">
-
-                          </div>
-                        </div>
-                      </div>
-                    </div>
+                    )}
                     <div className="dress-footer" data-aos="fade-up" data-aos-duration="1000">
                       <p className="dress-note">{content.dresscodeNote}</p>
                     </div>

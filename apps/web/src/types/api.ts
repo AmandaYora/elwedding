@@ -49,6 +49,10 @@ export interface InvitationContent {
   dresscodeTitle: string
   dresscodeDescription: string
   dresscodeNote: string
+  /** Satu gambar yang menggantikan ikon dress + palet warna di Agenda.tsx
+   * (R4). String kosong = belum ada gambar, dan Agenda.tsx merender
+   * bersyarat - jangan render <img src=""> untuk nilai ini. */
+  dresscodeImageUrl: string
 }
 
 export interface SectionEntry {

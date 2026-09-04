@@ -16,6 +16,38 @@
   (lihat F4 di PLAN.md, kasus nyata `footnote` yang sempat terlewat).
 - Jangan menambah props ke `Cover.tsx` untuk gambar `#cover-main` - isinya
   sengaja ditimpa jQuery (`window.COVERS`, lihat `useLegacyBootstrap.ts`).
+- **Meta Open Graph di `index.html` WAJIB URL absolut + PNG/JPEG** (docs/plan/
+  revisi-uat-logo-og-nama-tamu-dresscode/PLAN.md R2). Crawler WhatsApp/Facebook
+  **tidak menyelesaikan path relatif** dan **tidak merender WebP** - dua-duanya
+  membuat preview link tampil hitam/kosong, dan itu bug nyata yang sudah
+  terjadi. Jangan "mengoptimalkan" `og:image` PNG kembali ke `.webp`.
+  Origin **di-hardcode**, bukan lewat `%VITE_*%`: kalau env lupa diisi saat
+  build, nilainya tertinggal sebagai teks mentah dan preview rusak lagi tanpa
+  peringatan. Dan tidak bisa ditambal lewat JavaScript - crawler WA tidak
+  menjalankan JS, jadi nilainya harus sudah absolut di HTML statis.
+- **Nama tamu di `TopCover`** memakai `useGuestSession()` yang dipanggil
+  **langsung di komponen** (pola sama seperti `RsvpConfirmation`), bukan
+  dialirkan sebagai prop lewat `SectionRegistry`/`App.tsx`. Hook-nya
+  **memoisasi promise per token** di level modul, jadi dua konsumen tetap
+  memicu satu request `by-token`. Fallback tanpa token WAJIB
+  `Dear Mr/Mrs/Ms` - **jangan** mencetak `session.name` apa adanya, karena
+  `DEFAULT_SESSION.name` adalah `'Tamu Undangan'`. Pakai penanda
+  `session.resolved`; itu juga yang menutup jendela "token ada tapi fetch
+  belum selesai".
+- **Dress code**: ikon dress + palet warna yang dulu hardcode sudah diganti
+  **satu gambar** dari admin (`dresscodeImageUrl`, PNG `lossless`). Dirender
+  **bersyarat** - nilai `''` berarti belum ada gambar, dan `<img src="">`
+  memicu request ke URL halaman itu sendiri. Judul/deskripsi/Catatan tetap
+  dari `dresscodeTitle`/`dresscodeDescription`/`dresscodeNote`. Selektor
+  `.dress-color-item`/`--bg-color` di `4e66ef9e.css` jadi tidak terpakai tapi
+  **sengaja tidak dihapus** - berkas itu aset template ter-minify bersama.
+- **Form "Fill the form below" di section Wedding Gift sudah dihapus** dan
+  jangan dikembalikan: itu kode mati sisa template PHP (`action="#"`,
+  `post=sendGift`) dan **tidak ada endpoint** gift submission di backend.
+  Daftar rekening tetap ada; `#weddingGiftForm` sekarang `<div>` dengan `id`
+  yang sama supaya CSS dan animasi slide jQuery tidak kehilangan target.
+  Tombol salin rekening bergantung pada atribut `[data-copy]` (handler
+  delegasi di `universal.js`), bukan pada kelas `.bank-copy`.
 
 ## Dashboard admin (`admin.html` / `src/admin-main.tsx`,
 `src/modules/admin/*`, `src/app/routes/*`)
@@ -51,6 +83,25 @@
   animasi GIF secara senyap (cover animasi dipakai produksi, lihat
   `Cover.tsx` + `shared/lib/coverMedia.ts`). Jangan menambah format baru
   ke jalur konversi tanpa memastikan dulu apakah formatnya beranimasi.
+- **Peringatan alpha pada field `lossless`** (docs/plan/
+  revisi-uat-logo-og-nama-tamu-dresscode/PLAN.md D2): setelah decode,
+  `prepareImageForUpload` menjalankan `probeAlpha` **sekali** (kanvas probe
+  64x64, bukan gambar ukuran penuh) dan melaporkan hasilnya lewat
+  `CompressedImage.hasAlpha`; `uploadImageBase64` meneruskannya ke pemanggil
+  lewat **callback opsional keempat** `onAlphaInfo`. Kalau field `lossless`
+  menerima gambar tanpa area transparan, `PhotoField` **memperingatkan** admin
+  tapi **tetap menerima** unggahannya - ini bukan penolakan, dan bukan
+  pemindah format otomatis. `hasAlpha === undefined` berarti **tidak
+  diketahui** (jalur passthrough GIF/WebP), bukan "tidak transparan" - jangan
+  memperingatkan untuk kasus itu.
+  Nilai kembalian `uploadImageBase64` **WAJIB tetap `Promise<string>`**: ia
+  dipasang langsung sebagai `onUploadPhoto={uploadImageBase64}` di lima
+  `SimpleListEditor`, jadi mengubah bentuknya menggagalkan typecheck di
+  kelima tempat itu.
+  Preview field `lossless` memakai **latar kotak-kotak + `object-contain`**;
+  dengan latar solid + `object-cover`, PNG transparan dan PNG berlatar putih
+  terlihat identik - itu yang membuat bug logo berlatar putih lolos ke
+  produksi tanpa disadari.
 
 ## Shared
 

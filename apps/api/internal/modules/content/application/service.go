@@ -92,6 +92,9 @@ func (s *Service) toContentDTO(row sqlc.InvitationContent) InvitationContentDTO 
 		DresscodeTitle:       row.DresscodeTitle,
 		DresscodeDescription: nullStr(row.DresscodeDescription),
 		DresscodeNote:        nullStr(row.DresscodeNote),
+		// Tanpa nullStr - kolomnya NOT NULL DEFAULT '' (migration 000011),
+		// beda dari DresscodeDescription/Note di atas yang NULLABLE.
+		DresscodeImageUrl: row.DresscodeImageUrl,
 	}
 }
 
@@ -167,6 +170,10 @@ func (s *Service) UpdateContent(ctx context.Context, in UpdateInvitationContentI
 		DresscodeTitle:                 in.DresscodeTitle,
 		DresscodeDescription:           toNullStr(in.DresscodeDescription),
 		DresscodeNote:                  toNullStr(in.DresscodeNote),
+		// Tanpa toNullStr - kolomnya NOT NULL. '' adalah keadaan sah
+		// "belum ada gambar"; Agenda.tsx yang merender bersyarat, jadi
+		// sengaja TIDAK ada validasi wajib di sini.
+		DresscodeImageUrl: in.DresscodeImageUrl,
 	})
 }
 

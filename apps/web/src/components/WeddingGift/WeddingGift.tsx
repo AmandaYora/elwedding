@@ -71,7 +71,7 @@ export default function WeddingGift({ content, banks }: WeddingGiftProps) {
                                 <div className="wedding-gift-body-inner">
 
                                     <div className="wedding-gift-form">
-                                        <form action="#" method="POST" id="weddingGiftForm">
+                                        <div id="weddingGiftForm">
 
                                             {/* Details */}
                                             <div className="wedding-gift-details wedding-gift__first-slide wedding-gift-slide">
@@ -105,88 +105,13 @@ export default function WeddingGift({ content, banks }: WeddingGiftProps) {
                                                     ))}
                                                 </div>
 
-                                                <div className="bank-sender-wrap p-relative" data-aos="fade-up" data-aos-duration="1600" data-aos-delay="1200">
-                                                    <div className="bank-sender-body">
-                                                        {/* Sender Data */}
-                                                        <div className="wedding-gift-sender-data-wrap">
-                                                            <label>Fill the form below, please</label>
-
-                                                            <div className="form-group">
-                                                                <input type="text" className="form-control" name="name"
-                                                                    placeholder="Name"
-                                                                    defaultValue="" />
-                                                            </div>
-
-                                                            <div className="form-group">
-                                                                <input type="text" className="form-control" name="account_name"
-                                                                    placeholder="Account Owner Name" />
-                                                            </div>
-
-                                                            <div className="form-group">
-                                                                <textarea name="message" rows={1} className="form-control"
-                                                                    placeholder="Message"></textarea>
-                                                            </div>
-
-                                                            <div className="form-group">
-                                                                <input type="number" className="form-control" name="amount"
-                                                                    placeholder="Amount" />
-                                                            </div>
-                                                        </div>
-
-                                                        <div style={{ display: 'none' }}>
-                                                            <input type="file" name="picture" id="weddingGiftPicture"
-                                                                data-wgu-preview="#weddingGiftPreview" style={{ display: 'none' }} />
-                                                            <input type="hidden" name="template" defaultValue="chitra" />
-                                                            <input type="hidden" name="post" defaultValue="sendGift" />
-                                                        </div>
-
-                                                        {/* Wedding Gift Page */}
-                                                        <div className="wedding-gift-page-wrap">
-                                                            <button type="button"
-                                                                className="wedding-gift-page wedding-gift__next">Next</button>
-                                                        </div>
-                                                    </div>
-                                                </div>
 
                                                 <div className="ornaments-wrapper"></div>
 
                                             </div>
 
-                                            {/* Picture */}
-                                            <div className="wedding-gift-picture wedding-gift-slide">
-                                                {/* Wedding Gift Back */}
-                                                <div className="wedding-gift-back-page-wrap">
-                                                    <button type="button" className="wedding-gift-back-page wedding-gift__prev" aria-label="Halaman sebelumnya"><i
-                                                        className="fas fa-chevron-left" aria-hidden="true"></i></button>
-                                                </div>
 
-                                                {/* Select Bank */}
-                                                <div className="wedding-gift-select-bank-wrap">
-                                                    <select name="select_bank" id="selectBank" className="form-control" aria-label="Pilih bank"></select>
-                                                </div>
-
-                                                {/* Wedding Gift Upload */}
-                                                <div className="wedding-gift-upload-wrap" data-wgu-file="#weddingGiftPicture">
-                                                    <div className="wgu-description show">
-                                                        <img className="wgu-icon"
-                                                            src="/media/kat/cloud-upload.png" alt=""  loading="lazy" decoding="async" />
-                                                        <p className="wgu-title">Upload proof of transfer</p>
-                                                        <p className="wgu-desc">Screen Shoot / Photo Slip Transfer</p>
-                                                    </div>
-
-                                                    <div className="wgu-img-wrap">
-                                                        <img className="wgu-img" id="weddingGiftPreview" src="#" alt=""  loading="lazy" decoding="async" />
-                                                    </div>
-                                                </div>
-
-                                                {/* Wedding Gift Page */}
-                                                <div className="wedding-gift-page-wrap">
-                                                    <button type="submit"
-                                                        className="wedding-gift-page submit">Confirm</button>
-                                                </div>
-                                            </div>
-
-                                        </form>
+                                        </div>
                                     </div>
 
                                 </div>

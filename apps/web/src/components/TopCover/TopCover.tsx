@@ -1,3 +1,4 @@
+import { useGuestSession } from '@/hooks/useGuestSession'
 import type { InvitationContent } from '@/types/api'
 
 interface TopCoverProps {
@@ -5,6 +6,17 @@ interface TopCoverProps {
 }
 
 export default function TopCover({ content }: TopCoverProps) {
+    // Hook dipanggil LANGSUNG di sini (D5), mengikuti pola RsvpConfirmation -
+    // bukan dialirkan sebagai prop lewat SectionRegistry/App.tsx. Request-nya
+    // tidak berlipat karena useGuestSession memoisasi promise per token (D6).
+    const session = useGuestSession()
+    // WAJIB pakai `resolved`, JANGAN mencetak session.name apa adanya:
+    // fallback-nya adalah "Tamu Undangan", sedangkan teks tanpa token harus
+    // tetap "Dear Mr/Mrs/Ms" (K7). Ini juga menutup jendela "token ada tapi
+    // fetch belum selesai", yang kalau tidak dijaga akan sempat menampilkan
+    // "Dear Tamu Undangan" sekejap.
+    const greeting = session.resolved ? session.name : 'Mr/Mrs/Ms'
+
     return (
         <section className="top-cover" data-section-order="opening_cover">
 
@@ -144,7 +156,7 @@ export default function TopCover({ content }: TopCoverProps) {
                 <div className=" details">
 
                                             <p data-aos="fade-up" data-aos-duration="3400" data-aos-delay="3000" style={{}}>
-                            Dear Mr/Mrs/Ms                        </p>
+                            Dear {greeting}                        </p>
 
 
                     <div className="link-wrap" data-aos="fade-up" data-aos-duration="3400" data-aos-delay="3000">

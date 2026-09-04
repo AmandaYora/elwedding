@@ -45,6 +45,11 @@ const MIME_BY_EXT: Record<string, string> = {
 export interface CompressedImage {
   base64: string
   filename: string
+  /** Apakah berkas SUMBER punya area transparan. Hanya diisi di jalur
+   * KONVERSI (PNG/JPEG); pada jalur passthrough GIF/WebP tetap `undefined`
+   * karena jalur itu sengaja tidak menyentuh kanvas sama sekali. `undefined`
+   * berarti "tidak diketahui", BUKAN "tidak transparan". */
+  hasAlpha?: boolean
 }
 
 interface EncodedImage {
@@ -134,6 +139,27 @@ export function encodeTargetFor(format: ImageOutputFormat, canWebp: boolean, qua
   return { mime: 'image/jpeg', quality: 0.85, background: '#ffffff' }
 }
 
+/** Ambang alpha untuk hasAlphaChannel. Dipasang di 250, bukan 255, supaya
+ * piksel semi-transparan hasil penskalaan probe tetap terhitung transparan. */
+const ALPHA_OPAQUE_THRESHOLD = 250
+
+/** True bila ADA piksel dengan alpha < 250 pada buffer RGBA. Fungsi MURNI dan
+ * bebas DOM supaya bisa dites di jsdom (jsdom tidak mengimplementasikan
+ * canvas.toBlob/createImageBitmap - lihat catatan di image-compress.test.ts).
+ *
+ * Dipakai untuk MEMPERINGATKAN admin bila gambar yang diunggah ke field
+ * lossless ternyata tidak punya area transparan - BUKAN untuk memindah format
+ * secara diam-diam. Inilah yang membuat bug "logo berlatar putih" tidak bisa
+ * terulang tanpa disadari (docs/plan/revisi-uat-logo-og-nama-tamu-dresscode/
+ * PLAN.md D2). */
+export function hasAlphaChannel(pixels: Uint8ClampedArray): boolean {
+  // Langkah 4 = RGBA; indeks 3 adalah kanal alpha piksel pertama.
+  for (let i = 3; i < pixels.length; i += 4) {
+    if (pixels[i] < ALPHA_OPAQUE_THRESHOLD) return true
+  }
+  return false
+}
+
 /** Rencana percobaan kedua bila hasil pertama masih di atas MAX_DECODED_BYTES.
  * "lossless" (PNG) mengabaikan argumen quality canvas.toBlob, jadi satu-satunya
  * tuas ukuran adalah memperkecil dimensi. "lossy" mempertahankan nilai lama
@@ -176,6 +202,33 @@ function drawToCanvas(bitmap: ImageBitmap, width: number, height: number, backgr
   }
   ctx.drawImage(bitmap, 0, 0, width, height)
   return canvas
+}
+
+/** Ukuran kanvas probe alpha. Kecil disengaja: 64x64 = 4.096 piksel (~16 KB)
+ * alih-alih memindai gambar ukuran penuh (1280px = ~1,6 juta piksel / ~6,5 MB
+ * per unggahan). Penskalaan ber-smoothing membuat area transparan tetap turun
+ * di bawah alpha 255, sehingga ambang 250 di hasAlphaChannel menangkapnya. */
+const ALPHA_PROBE_DIM = 64
+
+/** Mendeteksi apakah bitmap SUMBER punya area transparan, lewat kanvas probe
+ * kecil. Sengaja TIDAK dipanggil dari encodeAttempt: encodeAttempt bisa
+ * berjalan dua kali (jalur retryPlanFor), sedangkan alpha adalah properti
+ * berkas sumber - bukan properti percobaan encode. Mengembalikan `undefined`
+ * bila probe gagal (mis. kanvas diblokir), supaya kegagalan probe tidak
+ * pernah menggagalkan unggahan. */
+function probeAlpha(bitmap: ImageBitmap): boolean | undefined {
+  try {
+    const { width, height } = computeTargetSize(bitmap.width, bitmap.height, ALPHA_PROBE_DIM)
+    const canvas = document.createElement('canvas')
+    canvas.width = width
+    canvas.height = height
+    const ctx = canvas.getContext('2d')
+    if (!ctx) return undefined
+    ctx.drawImage(bitmap, 0, 0, width, height)
+    return hasAlphaChannel(ctx.getImageData(0, 0, width, height).data)
+  } catch {
+    return undefined
+  }
 }
 
 function encodeCanvas(canvas: HTMLCanvasElement, mimeType: string, quality: number | undefined): Promise<Blob | null> {
@@ -273,6 +326,10 @@ export async function prepareImageForUpload(
   }
 
   try {
+    // SEKALI saja, sebelum encode - alpha adalah properti berkas SUMBER, dan
+    // encodeAttempt di bawah bisa berjalan dua kali (jalur retryPlanFor).
+    const hasAlpha = probeAlpha(bitmap)
+
     const quality = qualityForSourceType(sourceType)
     let result = await encodeAttempt(bitmap, maxDim, quality, format)
     if (base64ByteLength(result.base64) > MAX_DECODED_BYTES) {
@@ -290,7 +347,7 @@ export async function prepareImageForUpload(
       )
     }
 
-    return { base64: result.base64, filename: withExt(file.name, result.ext) }
+    return { base64: result.base64, filename: withExt(file.name, result.ext), hasAlpha }
   } finally {
     bitmap.close()
   }

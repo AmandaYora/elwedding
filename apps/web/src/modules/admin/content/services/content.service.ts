@@ -38,9 +38,23 @@ export async function uploadAudioFile(file: File): Promise<string> {
  * transparansi (mis. Logo) mengirim "lossless" (PNG) - docs/plan/
  * admin-content-png-lossless-galeri-tajam/PLAN.md K1/K2. timeout di-override
  * lebih panjang dari default 30s karena unggahan bisa menunggu kompresi +
- * pengiriman body base64 yang lebih besar dari file asli. */
-export async function uploadImageBase64(file: File, maxDim = 1920, format: ImageOutputFormat = 'lossy'): Promise<string> {
-  const { base64, filename } = await prepareImageForUpload(file, maxDim, format)
+ * pengiriman body base64 yang lebih besar dari file asli.
+ *
+ * `onAlphaInfo` (opsional) melaporkan apakah berkas SUMBER punya area
+ * transparan - `undefined` berarti tidak diketahui (jalur passthrough
+ * GIF/WebP). Disampaikan lewat callback, BUKAN lewat nilai kembalian, karena
+ * fungsi ini dipasang langsung sebagai `onUploadPhoto={uploadImageBase64}` di
+ * lima SimpleListEditor yang tipenya `=> Promise<string>`; mengubah bentuk
+ * kembaliannya akan menggagalkan typecheck di kelima tempat itu (docs/plan/
+ * revisi-uat-logo-og-nama-tamu-dresscode/PLAN.md T3). */
+export async function uploadImageBase64(
+  file: File,
+  maxDim = 1920,
+  format: ImageOutputFormat = 'lossy',
+  onAlphaInfo?: (hasAlpha: boolean | undefined) => void,
+): Promise<string> {
+  const { base64, filename, hasAlpha } = await prepareImageForUpload(file, maxDim, format)
+  onAlphaInfo?.(hasAlpha)
   const res = await httpClient.post<{ data: { url: string } }>(
     '/api/v1/admin/uploads/base64',
     { filename, data: base64 },

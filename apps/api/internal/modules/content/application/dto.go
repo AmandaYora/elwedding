@@ -50,6 +50,7 @@ type InvitationContentDTO struct {
 	DresscodeTitle       string `json:"dresscodeTitle"`
 	DresscodeDescription string `json:"dresscodeDescription"`
 	DresscodeNote        string `json:"dresscodeNote"`
+	DresscodeImageUrl    string `json:"dresscodeImageUrl"`
 
 	// WeddingDateRaw dipakai HANYA untuk mengisi ulang form admin (input
 	// datetime-local butuh nilai lokal, bukan epoch). Tidak dipakai countdown.
@@ -102,6 +103,7 @@ type UpdateInvitationContentInput struct {
 	DresscodeTitle       string `json:"dresscodeTitle"`
 	DresscodeDescription string `json:"dresscodeDescription"`
 	DresscodeNote        string `json:"dresscodeNote"`
+	DresscodeImageUrl    string `json:"dresscodeImageUrl"`
 }
 
 type AgendaEventDTO struct {
