@@ -53,6 +53,13 @@ export interface InvitationContent {
    * (R4). String kosong = belum ada gambar, dan Agenda.tsx merender
    * bersyarat - jangan render <img src=""> untuk nilai ini. */
   dresscodeImageUrl: string
+
+  /** Gambar khusus preview link WhatsApp/Facebook (og:image), landscape
+   * ~1200x630. String kosong = belum diunggah, dan itu keadaan SAH: server
+   * jatuh ke coverImageDesktopUrl, lalu ke tag statis index.html
+   * (docs/plan/og-share-image-dinamis/PLAN.md K4). Nilai ini TIDAK dirender
+   * di halaman undangan - hanya dipakai injeksi meta server-side. */
+  shareImageUrl: string
 }
 
 export interface SectionEntry {

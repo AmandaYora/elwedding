@@ -13,7 +13,19 @@
     <meta name="description" content="Hi, You're invited to our wedding ceremony">
 
     <!-- Open Graph / Facebook
-         JANGAN diubah tanpa membaca ini dulu (docs/plan/revisi-uat-logo-og-nama-tamu-dresscode/PLAN.md R2):
+         JANGAN diubah tanpa membaca ini dulu (docs/plan/revisi-uat-logo-og-nama-tamu-dresscode/PLAN.md R2
+         dan docs/plan/og-share-image-dinamis/PLAN.md T9):
+
+         PENTING - nilai di antara OG_META_START/END di bawah DITIMPA
+         SERVER-SIDE. Paket router (apps/api/internal/router/og_meta.go)
+         mengganti isi blok itu dengan nama mempelai & gambar preview dari
+         database sebelum HTML dikirim. Jadi menyunting nilai statis di sini
+         TIDAK akan mengubah preview produksi selama datanya tersedia -
+         ubah lewat menu admin Konten > Cover > "Gambar Preview Link".
+         Nilai statis di bawah tetap dipertahankan dan tetap penting: itulah
+         fallback yang disajikan saat DB gagal dibaca, saat kedua kolom
+         gambar kosong, dan di dev (PUBLIC_DIR kosong / provider nil).
+
          1. og:url dan og:image WAJIB URL ABSOLUT. Crawler WhatsApp/Facebook
             tidak menyelesaikan path relatif - nilai relatif membuat preview
             tampil kosong/hitam.
@@ -21,12 +33,15 @@
             Jangan "mengoptimalkan" .png di bawah ini kembali ke .webp - itu
             persis bug yang sedang diperbaiki di sini.
          3. Nilainya tidak bisa ditambal lewat JavaScript: crawler WA tidak
-            menjalankan JS. Harus sudah absolut di HTML statis ini.
+            menjalankan JS. Harus sudah benar di byte HTML yang dikirim server.
+         4. JANGAN menghapus kedua marker komentar. Tanpa keduanya injeksi
+            diam-diam mati dan preview kembali ke frame template.
          Origin di-hardcode, BUKAN lewat substitusi env Vite di HTML, supaya
          kegagalan konfigurasi tidak lolos senyap sebagai teks mentah saat
          build. (Catatan: jangan menulis token substitusi env secara literal
          di komentar ini - scanner Vite ikut memindai komentar HTML dan akan
          memunculkan warning build.) -->
+    <!--OG_META_START-->
     <meta property="og:type" content="website" />
     <meta property="og:site_name" content="Undangan Pernikahan">
     <meta property="og:url" content="https://elwedding.elcodelabs.com/" />
@@ -44,6 +59,7 @@
     <meta property="twitter:title" content="Undangan Pernikahan">
     <meta property="twitter:description" content="Hi, You're invited to our wedding ceremony">
     <meta property="twitter:image" content="https://elwedding.elcodelabs.com/media/template/arsya/frame-cover.png">
+    <!--OG_META_END-->
 
 <script src="/assets/js/jquery.js"></script>
 

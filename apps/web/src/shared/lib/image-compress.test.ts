@@ -184,3 +184,57 @@ test('prepareImageForUpload pada WebP dengan format "lossless" tetap passthrough
 
   expect(result.filename).toBe('logo.webp')
 })
+
+// --- format "jpeg" (docs/plan/og-share-image-dinamis/PLAN.md T11) ---
+
+// Mengunci K3: hasilnya TIDAK boleh bergantung dukungan encoder WebP browser.
+// Kalau cabang ini ikut memakai canWebp seperti "lossy", gambar preview bisa
+// diam-diam tersimpan .webp di browser modern dan preview WhatsApp rusak.
+test('encodeTargetFor("jpeg") selalu JPEG + latar putih, apa pun dukungan WebP browser', () => {
+  const withWebp = encodeTargetFor('jpeg', true, 0.92)
+  const withoutWebp = encodeTargetFor('jpeg', false, 0.92)
+
+  expect(withWebp).toEqual({ mime: 'image/jpeg', quality: 0.85, background: '#ffffff' })
+  expect(withoutWebp).toEqual({ mime: 'image/jpeg', quality: 0.85, background: '#ffffff' })
+})
+
+test('retryPlanFor("jpeg") tidak pernah MEMPERBESAR maxDim (Math.min, bukan 1280 tetap)', () => {
+  const retry = retryPlanFor('jpeg', 1200, 0.82)
+  expect(retry.maxDim).toBe(1200) // bukan 1280 - percobaan ulang harus mengecilkan
+  expect(retry.quality).toBeCloseTo(0.7) // 0.82 - 0.12 tidak eksak di IEEE-754
+})
+
+// Penjagaan D9: `accept` di input file hanya filter dialog, jadi WebP/GIF
+// tetap bisa terpilih. Untuk field preview keduanya harus DITOLAK, bukan
+// diteruskan lewat passthrough.
+test('prepareImageForUpload pada WebP dengan format "jpeg" ditolak dengan pesan menyebut WhatsApp', async () => {
+  const createImageBitmapSpy = vi.fn()
+  vi.stubGlobal('createImageBitmap', createImageBitmapSpy)
+
+  try {
+    const file = new File(['webp-bytes'], 'preview.webp', { type: 'image/webp' })
+
+    await expect(prepareImageForUpload(file, 1200, 'jpeg')).rejects.toBeInstanceOf(ImageCompressError)
+    await expect(prepareImageForUpload(file, 1200, 'jpeg')).rejects.toThrow(/WhatsApp/)
+    expect(createImageBitmapSpy).not.toHaveBeenCalled()
+  } finally {
+    vi.unstubAllGlobals()
+  }
+})
+
+// Bukti T10 tidak meregresi invarian GIF: penolakan di atas HANYA berlaku
+// untuk format "jpeg", jalur lossy/lossless harus tetap passthrough.
+test('prepareImageForUpload pada GIF dengan format "lossless" TETAP passthrough setelah penjagaan "jpeg" ditambahkan', async () => {
+  const createImageBitmapSpy = vi.fn()
+  vi.stubGlobal('createImageBitmap', createImageBitmapSpy)
+
+  try {
+    const file = new File(['gif-bytes'], 'cover.gif', { type: 'image/gif' })
+    const result = await prepareImageForUpload(file, 1200, 'lossless')
+
+    expect(result.filename).toBe('cover.gif')
+    expect(createImageBitmapSpy).not.toHaveBeenCalled()
+  } finally {
+    vi.unstubAllGlobals()
+  }
+})

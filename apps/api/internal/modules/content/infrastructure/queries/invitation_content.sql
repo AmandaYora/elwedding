@@ -14,5 +14,6 @@ UPDATE invitation_content SET
   live_streaming_title = ?, live_streaming_youtube_url = ?,
   instagram_filter_title = ?, instagram_filter_caption = ?, instagram_filter_preview_photo_url = ?, instagram_filter_link = ?,
   wedding_gift_description = ?,
-  dresscode_title = ?, dresscode_description = ?, dresscode_note = ?, dresscode_image_url = ?
+  dresscode_title = ?, dresscode_description = ?, dresscode_note = ?, dresscode_image_url = ?,
+  share_image_url = ?
 WHERE id = 1;

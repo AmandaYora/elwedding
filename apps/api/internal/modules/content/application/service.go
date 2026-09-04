@@ -95,6 +95,10 @@ func (s *Service) toContentDTO(row sqlc.InvitationContent) InvitationContentDTO 
 		// Tanpa nullStr - kolomnya NOT NULL DEFAULT '' (migration 000011),
 		// beda dari DresscodeDescription/Note di atas yang NULLABLE.
 		DresscodeImageUrl: row.DresscodeImageUrl,
+		// Sama seperti DresscodeImageUrl: NOT NULL DEFAULT '' (migration
+		// 000012), jadi tanpa nullStr. '' = admin belum mengunggah gambar
+		// preview, bukan error.
+		ShareImageUrl: row.ShareImageUrl,
 	}
 }
 
@@ -120,6 +124,28 @@ func (s *Service) GetQRInfo(ctx context.Context) (contracts.QRInfo, error) {
 		BrideName:        dto.BrideName,
 		GroomName:        dto.GroomName,
 		WeddingDateLabel: dto.WeddingDateLabel,
+	}, nil
+}
+
+// GetShareInfo implementasi contracts.InvitationInfoProvider - satu-satunya
+// cara paket router memperoleh nama mempelai & URL gambar preview tanpa
+// membaca tabel invitation_content secara langsung (docs/plan/
+// og-share-image-dinamis/PLAN.md D2/D3). Memakai ulang GetContent, bukan
+// query baru, persis seperti GetQRInfo di atas.
+func (s *Service) GetShareInfo(ctx context.Context) (contracts.ShareInfo, error) {
+	dto, err := s.GetContent(ctx)
+	if err != nil {
+		return contracts.ShareInfo{}, err
+	}
+	return contracts.ShareInfo{
+		BrideName:        dto.BrideName,
+		GroomName:        dto.GroomName,
+		WeddingDateLabel: dto.WeddingDateLabel,
+		ShareImageUrl:    dto.ShareImageUrl,
+		// CoverImageDesktopUrl BISA berisi video/webp - penyaringannya ada
+		// di router (isWaCompatibleImage), bukan di sini; lihat komentar
+		// pada contracts.ShareInfo.CoverImageUrl.
+		CoverImageUrl: dto.CoverImageDesktopUrl,
 	}, nil
 }
 
@@ -174,6 +200,10 @@ func (s *Service) UpdateContent(ctx context.Context, in UpdateInvitationContentI
 		// "belum ada gambar"; Agenda.tsx yang merender bersyarat, jadi
 		// sengaja TIDAK ada validasi wajib di sini.
 		DresscodeImageUrl: in.DresscodeImageUrl,
+		// Tanpa toNullStr - NOT NULL. '' adalah keadaan sah "belum ada
+		// gambar preview"; fallback-nya ada di router (pickShareImage),
+		// jadi sengaja TIDAK ada validasi wajib di sini.
+		ShareImageUrl: in.ShareImageUrl,
 	})
 }
 

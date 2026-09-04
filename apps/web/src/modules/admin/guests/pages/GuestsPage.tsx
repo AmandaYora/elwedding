@@ -8,6 +8,15 @@ import {
   updateGuest,
 } from '@/modules/admin/guests/services/guests.service'
 import { guestSchema, type GuestFormValues } from '@/modules/admin/guests/schemas/guest.schema'
+// Mengimpor service milik modul admin LAIN bukan pelanggaran di sisi frontend -
+// aturan batas contracts/ yang ketat berlaku untuk apps/api/** saja
+// (.claude/rules/backend-modular-monolith.md). Preseden yang sudah ada:
+// SettingsPage mengimpor content.service; DashboardPage & ReservationsPage
+// mengimpor guests.service.
+import { getConfig, type WhatsAppConfig } from '@/modules/admin/whatsapp/services/whatsapp.service'
+import { getContent } from '@/modules/admin/content/services/content.service'
+import { normalizePhoneForWa, applyInvitationTemplate, buildWaMeUrl } from '@/shared/lib/waInvite'
+import type { InvitationContent } from '@/types/api'
 import {
   PAGE_SIZE,
   GENDER_LABEL,
@@ -67,6 +76,30 @@ export default function GuestsPage() {
   const [detailTarget, setDetailTarget] = useState<Guest | null>(null)
 
   const [copiedId, setCopiedId] = useState<number | null>(null)
+
+  // Dua singleton yang dibutuhkan tombol "Kirim Undangan": template pesannya
+  // (menu WhatsApp) dan nama mempelai + tanggal acara (menu Konten).
+  // Keduanya sudah punya endpoint admin sendiri, jadi pesan dirakit di klien
+  // dan TIDAK ada endpoint baru maupun pembacaan lintas modul di sisi Go
+  // (docs/plan/og-share-image-dinamis/PLAN.md D10).
+  const [waConfig, setWaConfig] = useState<WhatsAppConfig | null>(null)
+  const [invitationContent, setInvitationContent] = useState<InvitationContent | null>(null)
+
+  // Kegagalan kedua permintaan ini TIDAK BOLEH menggagalkan daftar tamu -
+  // ditangkap terpisah dari listGuests, dan akibatnya hanya tombol Kirim
+  // Undangan yang nonaktif, bukan halaman error.
+  useEffect(() => {
+    let cancelled = false
+    getConfig()
+      .then((c) => !cancelled && setWaConfig(c))
+      .catch(() => !cancelled && setWaConfig(null))
+    getContent()
+      .then((c) => !cancelled && setInvitationContent(c))
+      .catch(() => !cancelled && setInvitationContent(null))
+    return () => {
+      cancelled = true
+    }
+  }, [])
 
   // Debounce pencarian
   const [debouncedSearch, setDebouncedSearch] = useState('')
@@ -167,11 +200,46 @@ export default function GuestsPage() {
     }
   }
 
+  /** SATU-SATUNYA tempat format link undangan disusun. "Salin link" dan
+   * "Kirim Undangan" WAJIB memakai fungsi yang sama - dua format berbeda
+   * untuk hal yang sama adalah bug yang menunggu terjadi.
+   * Token tidak perlu dijaga kosong: kolomnya VARCHAR(64) NOT NULL UNIQUE dan
+   * SELALU dibuat server-side oleh generateToken() saat tamu dibuat. */
+  function invitationLink(guest: Guest) {
+    return `${window.location.origin}/?guest=${guest.token}`
+  }
+
   function copyLink(guest: Guest) {
-    const url = `${window.location.origin}/?guest=${guest.token}`
-    void navigator.clipboard.writeText(url)
+    void navigator.clipboard.writeText(invitationLink(guest))
     setCopiedId(guest.id)
     setTimeout(() => setCopiedId(null), 2000)
+  }
+
+  /** URL wa.me siap pakai untuk satu tamu, atau `null` bila undangan belum
+   * bisa dikirim. `null` -> tombol dirender NON-ANCHOR & disabled (K7). */
+  function waInviteUrl(guest: Guest): string | null {
+    const phone = normalizePhoneForWa(guest.phone)
+    if (!phone) return null
+    if (!waConfig || !invitationContent) return null
+    if (waConfig.invitationTemplate.trim() === '') return null
+
+    const text = applyInvitationTemplate(waConfig.invitationTemplate, {
+      nama: guest.name,
+      mempelai: `${invitationContent.brideName} & ${invitationContent.groomName}`,
+      // weddingDateLabel apa adanya - JANGAN memformat ulang weddingDateRaw di
+      // klien, supaya tanggalnya identik dengan yang dipakai jalur QR.
+      tanggal: invitationContent.weddingDateLabel,
+      link: invitationLink(guest),
+    })
+    return buildWaMeUrl(phone, text)
+  }
+
+  /** Alasan tombol nonaktif, ditampilkan sebagai title supaya admin tahu apa
+   * yang harus diperbaiki alih-alih menghadapi tombol mati tanpa penjelasan. */
+  function waDisabledReason(guest: Guest): string {
+    if (!normalizePhoneForWa(guest.phone)) return 'Nomor HP tamu belum diisi.'
+    if (!waConfig || !invitationContent) return 'Gagal memuat template/konten undangan. Muat ulang halaman.'
+    return 'Template Pesan Undangan belum diisi di menu WhatsApp.'
   }
 
   const hasFilter = debouncedSearch !== '' || invitationTypeFilter !== '' || souvenirTypeFilter !== ''
@@ -339,6 +407,48 @@ export default function GuestsPage() {
                             </svg>
                             {copiedId === guest.id ? 'Tersalin!' : 'Salin link'}
                           </Button>
+                          {/* Kirim Undangan lewat wa.me - membuka WhatsApp
+                              dengan pesan sudah terisi. Ini BUKAN modul
+                              WhatsApp (whatsmeow) yang mengirim QR otomatis:
+                              tidak ada request ke backend, tidak ada log, dan
+                              sakelar "pengiriman otomatis" tidak mengaturnya
+                              (D12). Pengirimannya juga tidak dilacak (K6) -
+                              wa.me secara desain tidak bisa melaporkan apa pun
+                              kembali ke aplikasi.
+
+                              Keadaan bisa-kirim dirender <a>, bukan
+                              window.open di handler klik, supaya tidak
+                              diblokir popup blocker dan admin bisa
+                              Ctrl/Cmd-klik. Keadaan nonaktif dirender
+                              <Button disabled> - <a> yang "di-disable" lewat
+                              atribut tetap bisa diklik. */}
+                          {(() => {
+                            const url = waInviteUrl(guest)
+                            return url ? (
+                              <a
+                                href={url}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                title={`Kirim undangan ke ${guest.name} lewat WhatsApp`}
+                                className="inline-flex items-center h-8 px-2.5 rounded-lg text-xs font-semibold whitespace-nowrap border border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 transition-colors shadow-2xs"
+                              >
+                                <svg className="w-3.5 h-3.5 mr-1 shrink-0" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                                  <path d="M12.04 2C6.58 2 2.13 6.45 2.13 11.91c0 1.75.46 3.45 1.32 4.95L2 22l5.25-1.38a9.9 9.9 0 004.79 1.22h.01c5.46 0 9.91-4.45 9.91-9.91 0-2.65-1.03-5.14-2.9-7.01A9.82 9.82 0 0012.04 2zm5.8 14.13c-.24.68-1.42 1.31-1.96 1.36-.5.05-1.14.07-1.84-.12-.42-.13-.97-.31-1.67-.61-2.94-1.27-4.86-4.23-5.01-4.43-.15-.2-1.2-1.59-1.2-3.03s.76-2.15 1.03-2.44c.27-.3.59-.37.79-.37.2 0 .39 0 .57.01.18.01.42-.07.66.5.24.58.83 2.01.9 2.16.07.15.12.32.02.52-.1.2-.15.32-.29.5-.15.17-.31.39-.44.52-.15.15-.3.31-.13.6.17.3.76 1.25 1.63 2.03 1.12 1 2.06 1.31 2.36 1.46.3.15.47.12.64-.07.17-.2.74-.86.94-1.16.2-.3.39-.25.66-.15.27.1 1.7.8 1.99.95.29.15.48.22.55.35.07.12.07.72-.17 1.4z" />
+                                </svg>
+                                Kirim Undangan
+                              </a>
+                            ) : (
+                              <Button
+                                variant="secondary"
+                                size="sm"
+                                disabled
+                                title={waDisabledReason(guest)}
+                                className="h-8 px-2.5 text-xs whitespace-nowrap"
+                              >
+                                Kirim Undangan
+                              </Button>
+                            )
+                          })()}
                           <Button
                             variant="ghost"
                             size="sm"

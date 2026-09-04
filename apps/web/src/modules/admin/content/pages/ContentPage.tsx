@@ -59,6 +59,11 @@ const CHECKERBOARD_STYLE: React.CSSProperties = {
   backgroundColor: '#ffffff',
 }
 
+/** Nilai `accept` bawaan - seluruh format yang diterima pipeline unggah.
+ * Field yang butuh lebih sempit (mis. Gambar Preview Link, yang hasilnya
+ * harus pasti dirender crawler WhatsApp) mengoper prop `accept` sendiri. */
+const DEFAULT_PHOTO_ACCEPT = 'image/png,image/jpeg,image/gif,image/webp,.png,.jpg,.jpeg,.gif,.webp'
+
 function PhotoField({
   label,
   value,
@@ -66,6 +71,7 @@ function PhotoField({
   onUploadingChange,
   maxDim,
   format,
+  accept = DEFAULT_PHOTO_ACCEPT,
 }: {
   label: string
   value: string
@@ -73,6 +79,10 @@ function PhotoField({
   onUploadingChange?: (b: boolean) => void
   maxDim?: number
   format?: ImageOutputFormat
+  /** Penyempit dialog berkas. CATATAN: ini hanya PETUNJUK dialog, bukan
+   * penegakan - user tetap bisa memilih "All files". Penegakan sebenarnya
+   * ada di prepareImageForUpload (docs/plan/og-share-image-dinamis D9). */
+  accept?: string
 }) {
   const [uploading, setUploading] = useState(false)
   const toast = useToast()
@@ -121,7 +131,7 @@ function PhotoField({
           </div>
           <input
             type="file"
-            accept="image/png,image/jpeg,image/gif,image/webp,.png,.jpg,.jpeg,.gif,.webp"
+            accept={accept}
             disabled={uploading}
             className="sr-only"
             onChange={async (e) => {
@@ -508,7 +518,33 @@ export default function ContentPage() {
                   <PhotoField label="Logo" value={form.coverLogoUrl} onChange={(v) => set('coverLogoUrl', v)} onUploadingChange={handlePhotoUploading} maxDim={640} format="lossless" />
                   <PhotoField label="Gambar Cover (Desktop)" value={form.coverImageDesktopUrl} onChange={(v) => set('coverImageDesktopUrl', v)} onUploadingChange={handlePhotoUploading} />
                   <PhotoField label="Gambar Cover (Mobile)" value={form.coverImageMobileUrl} onChange={(v) => set('coverImageMobileUrl', v)} onUploadingChange={handlePhotoUploading} />
+                  {/* Gambar preview link WhatsApp/Facebook - docs/plan/
+                      og-share-image-dinamis/PLAN.md T14.
+                      - Rasio yang dianjurkan 1200x630 LANDSCAPE (K1): crawler
+                        memakai summary_large_image (~1,91:1), sedangkan semua
+                        aset cover/foto mempelai yang ada portrait.
+                      - format="jpeg" (K3) menjamin hasilnya PNG/JPEG yang
+                        pasti dirender crawler WA, bukan WebP, dan ukurannya
+                        tetap kecil supaya preview tidak diam-diam gagal muncul.
+                      - accept dipersempit (D9) karena WebP/GIF tidak dirender
+                        crawler WA; penegakan sebenarnya tetap di pipeline.
+                      - Dibiarkan kosong = preview jatuh ke Gambar Cover yang
+                        PORTRAIT, jadi akan terpotong (K4). */}
+                  <PhotoField
+                    label="Gambar Preview Link (WhatsApp)"
+                    value={form.shareImageUrl}
+                    onChange={(v) => set('shareImageUrl', v)}
+                    onUploadingChange={handlePhotoUploading}
+                    maxDim={1200}
+                    format="jpeg"
+                    accept="image/png,image/jpeg,.png,.jpg,.jpeg"
+                  />
                 </div>
+                <p className="mt-4 text-xs text-slate-500">
+                  Gambar Preview Link adalah yang muncul saat link undangan dibagikan di WhatsApp. Ukuran
+                  terbaik <strong>1200&times;630 piksel (landscape)</strong>. Bila dibiarkan kosong, sistem
+                  memakai Gambar Cover (Desktop) yang berorientasi potret sehingga tampil terpotong.
+                </p>
               </CardBody>
             </Card>
           )}

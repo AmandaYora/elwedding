@@ -63,6 +63,11 @@ func main() {
 		JWTSecret:       cfg.JWTSecret,
 		PublicDir:       cfg.PublicDir,
 		Storage:         storageClient,
+		// invitationInfo yang sama yang dipakai guest.New di atas - router
+		// memakainya untuk menyuntikkan meta Open Graph ke index.html
+		// (docs/plan/og-share-image-dinamis/PLAN.md T8), lewat contracts/,
+		// bukan internal modul content.
+		InvitationInfo: invitationInfo,
 	})
 
 	log.Printf("api listening on :%s (env=%s)", cfg.AppPort, cfg.AppEnv)

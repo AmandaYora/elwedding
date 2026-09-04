@@ -1,12 +1,16 @@
 package router
 
 import (
+	"context"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
+
+	contentContracts "undangan-ariana-adrian/internal/modules/content/contracts"
 )
 
 // Menguji keputusan #17/F17/F20 (PLAN.md): SPA fallback HANYA untuk GET.
@@ -20,7 +24,7 @@ func TestSpaFallback_NonGetAlwaysJSON404(t *testing.T) {
 	mustWriteFile(t, filepath.Join(dir, "index.html"), "<html>undangan</html>")
 	mustWriteFile(t, filepath.Join(dir, "admin.html"), "<html>admin</html>")
 
-	handler := spaFallback(dir)
+	handler := spaFallback(dir, nil)
 
 	for _, method := range []string{http.MethodPost, http.MethodPut, http.MethodDelete, http.MethodPatch} {
 		req := httptest.NewRequest(method, "/", nil)
@@ -42,7 +46,7 @@ func TestSpaFallback_GetRootServesIndexHtml(t *testing.T) {
 	mustWriteFile(t, filepath.Join(dir, "index.html"), "<html>undangan</html>")
 	mustWriteFile(t, filepath.Join(dir, "admin.html"), "<html>admin</html>")
 
-	handler := spaFallback(dir)
+	handler := spaFallback(dir, nil)
 	req := httptest.NewRequest(http.MethodGet, "/some/spa/route", nil)
 	rec := httptest.NewRecorder()
 	handler.ServeHTTP(rec, req)
@@ -57,7 +61,7 @@ func TestSpaFallback_GetAdminServesAdminHtml(t *testing.T) {
 	mustWriteFile(t, filepath.Join(dir, "index.html"), "<html>undangan</html>")
 	mustWriteFile(t, filepath.Join(dir, "admin.html"), "<html>admin</html>")
 
-	handler := spaFallback(dir)
+	handler := spaFallback(dir, nil)
 	req := httptest.NewRequest(http.MethodGet, "/admin/guests", nil)
 	rec := httptest.NewRecorder()
 	handler.ServeHTTP(rec, req)
@@ -77,7 +81,7 @@ func TestSpaFallback_GetAdminServesAdminHtml(t *testing.T) {
 // kondisi dev), bukan lewat `router.New`, supaya tidak butuh dependency
 // modul lain untuk mem-build `Deps`.
 func TestSpaFallback_EmptyPublicDir_NonGetStillJSON404(t *testing.T) {
-	handler := spaFallback("") // PUBLIC_DIR="" - kondisi dev sungguhan
+	handler := spaFallback("", nil) // PUBLIC_DIR="" - kondisi dev sungguhan
 
 	req := httptest.NewRequest(http.MethodPost, "/", nil)
 	rec := httptest.NewRecorder()
@@ -92,7 +96,7 @@ func TestSpaFallback_EmptyPublicDir_NonGetStillJSON404(t *testing.T) {
 }
 
 func TestSpaFallback_EmptyPublicDir_GetAlsoJSON404(t *testing.T) {
-	handler := spaFallback("")
+	handler := spaFallback("", nil)
 
 	req := httptest.NewRequest(http.MethodGet, "/", nil)
 	rec := httptest.NewRecorder()
@@ -118,7 +122,7 @@ func TestSpaFallback_EntryHtml_TidakBolehDicacheTanpaRevalidasi(t *testing.T) {
 	mustWriteFile(t, filepath.Join(dir, "index.html"), "<html>undangan</html>")
 	mustWriteFile(t, filepath.Join(dir, "admin.html"), "<html>admin</html>")
 
-	handler := spaFallback(dir)
+	handler := spaFallback(dir, nil)
 
 	for _, path := range []string{"/", "/admin", "/admin/guests"} {
 		req := httptest.NewRequest(http.MethodGet, path, nil)
@@ -142,7 +146,7 @@ func TestStatic_BundleViteHashed_Immutable(t *testing.T) {
 	mustWriteFile(t, filepath.Join(dir, "assets", "index-abc123.js"), "console.log(1)")
 	mustWriteFile(t, filepath.Join(dir, "assets", "index-abc123.css"), "body{}")
 
-	handler := spaFallback(dir)
+	handler := spaFallback(dir, nil)
 
 	for _, path := range []string{"/assets/index-abc123.js", "/assets/index-abc123.css"} {
 		req := httptest.NewRequest(http.MethodGet, path, nil)
@@ -179,7 +183,7 @@ func TestStatic_AsetTemplate_MaxAge30Hari_TanpaImmutable(t *testing.T) {
 	}
 	mustWriteFile(t, filepath.Join(dir, "assets", "css", "00f3b7dc.css"), "body{}")
 
-	handler := spaFallback(dir)
+	handler := spaFallback(dir, nil)
 
 	cases := []string{
 		"/media/template/arsya/Orn-31.webp",
@@ -210,7 +214,7 @@ func TestRobotsTxt_BukanHTML(t *testing.T) {
 	mustWriteFile(t, filepath.Join(dir, "admin.html"), "<html>admin</html>")
 	mustWriteFile(t, filepath.Join(dir, "robots.txt"), "User-agent: *\nAllow: /\n")
 
-	handler := spaFallback(dir)
+	handler := spaFallback(dir, nil)
 	req := httptest.NewRequest(http.MethodGet, "/robots.txt", nil)
 	rec := httptest.NewRecorder()
 	handler.ServeHTTP(rec, req)
@@ -232,7 +236,7 @@ func TestEntryHTML_TetapNoCache(t *testing.T) {
 	mustWriteFile(t, filepath.Join(dir, "index.html"), "<html>undangan</html>")
 	mustWriteFile(t, filepath.Join(dir, "admin.html"), "<html>admin</html>")
 
-	handler := spaFallback(dir)
+	handler := spaFallback(dir, nil)
 
 	for _, path := range []string{"/", "/admin"} {
 		req := httptest.NewRequest(http.MethodGet, path, nil)
@@ -256,5 +260,154 @@ func mustWriteFile(t *testing.T, path, content string) {
 	}
 	if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
 		t.Fatalf("write %s: %v", path, err)
+	}
+}
+
+// --- injeksi meta Open Graph (docs/plan/og-share-image-dinamis/PLAN.md T7) ---
+
+// stubShareInfoProvider memenuhi contentContracts.InvitationInfoProvider tanpa
+// DB. GetQRInfo tidak dipakai jalur spaFallback, jadi cukup dikembalikan
+// kosong - yang diuji di sini hanya jalur GetShareInfo.
+type stubShareInfoProvider struct {
+	info contentContracts.ShareInfo
+	err  error
+}
+
+func (s stubShareInfoProvider) GetQRInfo(context.Context) (contentContracts.QRInfo, error) {
+	return contentContracts.QRInfo{}, nil
+}
+
+func (s stubShareInfoProvider) GetShareInfo(context.Context) (contentContracts.ShareInfo, error) {
+	return s.info, s.err
+}
+
+const indexWithMarkers = `<html><head>
+<!--OG_META_START-->
+    <meta property="og:title" content="Undangan Pernikahan" />
+    <meta property="og:image" content="https://elwedding.elcodelabs.com/media/template/arsya/frame-cover.png" />
+<!--OG_META_END-->
+</head><body>undangan</body></html>`
+
+func TestSpaFallback_InjeksiOgMetaDariProvider(t *testing.T) {
+	dir := t.TempDir()
+	mustWriteFile(t, filepath.Join(dir, "index.html"), indexWithMarkers)
+	mustWriteFile(t, filepath.Join(dir, "admin.html"), "<html>admin</html>")
+
+	provider := stubShareInfoProvider{info: contentContracts.ShareInfo{
+		BrideName:        "Ariana",
+		GroomName:        "Adrian",
+		WeddingDateLabel: "Sabtu, 1 Januari 2027",
+		ShareImageUrl:    "/uploads/images/share.jpg",
+		CoverImageUrl:    "/uploads/images/cover.jpg",
+	}}
+
+	handler := spaFallback(dir, provider)
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	req.Host = "elwedding.elcodelabs.com"
+	rec := httptest.NewRecorder()
+	handler.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, mau 200", rec.Code)
+	}
+	body := rec.Body.String()
+
+	// og:image WAJIB absolut dan berskema https (D5) - crawler WhatsApp
+	// tidak menyelesaikan path relatif.
+	if !strings.Contains(body, `content="https://elwedding.elcodelabs.com/uploads/images/share.jpg"`) {
+		t.Errorf("og:image hasil pilihan tidak tersuntik\n%s", body)
+	}
+	// K2: judul memakai nama pasangan, bukan string generik statis.
+	if !strings.Contains(body, "Ariana &amp; Adrian") {
+		t.Errorf("og:title nama pasangan tidak tersuntik\n%s", body)
+	}
+	if strings.Contains(body, "frame-cover.png") {
+		t.Error("nilai statis frame-cover.png masih tersaji, seharusnya tertimpa")
+	}
+	// Isi halaman di luar marker tidak boleh ikut termakan.
+	if !strings.Contains(body, "<body>undangan</body>") {
+		t.Error("badan HTML rusak setelah injeksi")
+	}
+	if ct := rec.Header().Get("Content-Type"); !strings.HasPrefix(ct, "text/html") {
+		t.Errorf("Content-Type = %q, mau text/html", ct)
+	}
+	// Header entry HTML yang sudah ada WAJIB tetap berlaku di jalur injeksi.
+	if cc := rec.Header().Get("Cache-Control"); !strings.Contains(cc, "no-cache") {
+		t.Errorf("Cache-Control = %q, harus tetap no-cache", cc)
+	}
+	// Validator berbasis mtime berkas TIDAK boleh dipasang - isinya kini
+	// bergantung DB, bukan berkas, jadi ETag/Last-Modified akan menyajikan
+	// preview basi setelah admin mengganti gambar.
+	if v := rec.Header().Get("Last-Modified"); v != "" {
+		t.Errorf("Last-Modified = %q, harus kosong pada HTML hasil injeksi", v)
+	}
+	if v := rec.Header().Get("ETag"); v != "" {
+		t.Errorf("ETag = %q, harus kosong pada HTML hasil injeksi", v)
+	}
+}
+
+// Jalur gagal: DB mati -> HTML statis disajikan apa adanya, BUKAN 500.
+// Halaman undangan tidak boleh mati hanya karena preview tidak bisa
+// dipersonalisasi.
+func TestSpaFallback_ProviderErrorSajikanHtmlStatis(t *testing.T) {
+	dir := t.TempDir()
+	mustWriteFile(t, filepath.Join(dir, "index.html"), indexWithMarkers)
+	mustWriteFile(t, filepath.Join(dir, "admin.html"), "<html>admin</html>")
+
+	handler := spaFallback(dir, stubShareInfoProvider{err: errors.New("db mati")})
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	req.Host = "elwedding.elcodelabs.com"
+	rec := httptest.NewRecorder()
+	handler.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, mau 200 (statis), bukan error", rec.Code)
+	}
+	if rec.Body.String() != indexWithMarkers {
+		t.Errorf("body harus identik dengan berkas statis, dapat:\n%s", rec.Body.String())
+	}
+}
+
+// admin.html TIDAK PERNAH di-inject, walaupun provider tersedia - dasbor tidak
+// pernah dibagikan sebagai link preview.
+func TestSpaFallback_AdminHtmlTidakPernahDiinject(t *testing.T) {
+	dir := t.TempDir()
+	adminHTML := "<html><head>" + `<!--OG_META_START--><!--OG_META_END-->` + "</head>admin</html>"
+	mustWriteFile(t, filepath.Join(dir, "index.html"), indexWithMarkers)
+	mustWriteFile(t, filepath.Join(dir, "admin.html"), adminHTML)
+
+	provider := stubShareInfoProvider{info: contentContracts.ShareInfo{
+		BrideName: "Ariana", GroomName: "Adrian", ShareImageUrl: "/uploads/images/share.jpg",
+	}}
+	handler := spaFallback(dir, provider)
+	req := httptest.NewRequest(http.MethodGet, "/admin/guests", nil)
+	req.Host = "elwedding.elcodelabs.com"
+	rec := httptest.NewRecorder()
+	handler.ServeHTTP(rec, req)
+
+	if rec.Body.String() != adminHTML {
+		t.Errorf("admin.html ikut di-inject:\n%s", rec.Body.String())
+	}
+}
+
+// index.html TANPA marker -> disajikan apa adanya. Ini yang melindungi build
+// lama / berkas pihak ketiga dari HTML yang rusak setengah jalan.
+func TestSpaFallback_TanpaMarkerSajikanStatis(t *testing.T) {
+	dir := t.TempDir()
+	plain := "<html><head><meta property=\"og:title\" content=\"statis\" /></head></html>"
+	mustWriteFile(t, filepath.Join(dir, "index.html"), plain)
+	mustWriteFile(t, filepath.Join(dir, "admin.html"), "<html>admin</html>")
+
+	provider := stubShareInfoProvider{info: contentContracts.ShareInfo{
+		BrideName: "Ariana", GroomName: "Adrian", ShareImageUrl: "/uploads/images/share.jpg",
+	}}
+	handler := spaFallback(dir, provider)
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	req.Host = "elwedding.elcodelabs.com"
+	rec := httptest.NewRecorder()
+	handler.ServeHTTP(rec, req)
+
+	if rec.Body.String() != plain {
+		t.Errorf("HTML tanpa marker harus utuh, dapat:\n%s", rec.Body.String())
 	}
 }

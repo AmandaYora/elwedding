@@ -46,7 +46,7 @@ func (q *Queries) GetSendLogByID(ctx context.Context, id uint64) (WhatsappSendLo
 }
 
 const getWhatsAppConfig = `-- name: GetWhatsAppConfig :one
-SELECT id, message_template, is_enabled, updated_at FROM whatsapp_config WHERE id = 1 LIMIT 1
+SELECT id, message_template, is_enabled, updated_at, invitation_template FROM whatsapp_config WHERE id = 1 LIMIT 1
 `
 
 func (q *Queries) GetWhatsAppConfig(ctx context.Context) (WhatsappConfig, error) {
@@ -57,6 +57,7 @@ func (q *Queries) GetWhatsAppConfig(ctx context.Context) (WhatsappConfig, error)
 		&i.MessageTemplate,
 		&i.IsEnabled,
 		&i.UpdatedAt,
+		&i.InvitationTemplate,
 	)
 	return i, err
 }
@@ -161,15 +162,16 @@ func (q *Queries) UpdateSendLogStatus(ctx context.Context, arg UpdateSendLogStat
 }
 
 const updateWhatsAppConfig = `-- name: UpdateWhatsAppConfig :exec
-UPDATE whatsapp_config SET message_template = ?, is_enabled = ? WHERE id = 1
+UPDATE whatsapp_config SET message_template = ?, invitation_template = ?, is_enabled = ? WHERE id = 1
 `
 
 type UpdateWhatsAppConfigParams struct {
-	MessageTemplate string
-	IsEnabled       bool
+	MessageTemplate    string
+	InvitationTemplate string
+	IsEnabled          bool
 }
 
 func (q *Queries) UpdateWhatsAppConfig(ctx context.Context, arg UpdateWhatsAppConfigParams) error {
-	_, err := q.db.ExecContext(ctx, updateWhatsAppConfig, arg.MessageTemplate, arg.IsEnabled)
+	_, err := q.db.ExecContext(ctx, updateWhatsAppConfig, arg.MessageTemplate, arg.InvitationTemplate, arg.IsEnabled)
 	return err
 }

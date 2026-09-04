@@ -5,7 +5,7 @@
  * admin-content-png-lossless-galeri-tajam/PLAN.md (keputusan K1/K2/D1-D3).
  * Tanpa dependency baru, hanya canvas & createImageBitmap bawaan browser.
  *
- * Output ditentukan PER-FIELD lewat parameter `format` (lossy | lossless),
+ * Output ditentukan PER-FIELD lewat parameter `format` (lossy | lossless | jpeg),
  * bukan ditebak dari isi gambar. PNG/JPEG pada format "lossy" dikonversi ke
  * WebP lewat canvas (fallback JPEG + latar putih bila browser tak punya
  * encoder WebP). Pada format "lossless" selalu keluar PNG TANPA flatten latar
@@ -60,8 +60,12 @@ interface EncodedImage {
 /** "lossy": dikonversi ke WebP (fallback JPEG+latar putih) - dipakai field
  * foto. "lossless": selalu PNG tanpa flatten latar - WAJIB untuk field yang
  * butuh transparansi (docs/plan/admin-content-png-lossless-galeri-tajam/PLAN.md
- * K1). Bukan heuristik dari isi gambar - field pemanggil yang menentukan. */
-export type ImageOutputFormat = 'lossy' | 'lossless'
+ * K1). "jpeg": SELALU JPEG apa pun dukungan WebP browser - dipakai field
+ * Gambar Preview Link, karena crawler WhatsApp tidak merender WebP dan PNG
+ * fotografis 1200x630 bisa 1-2,5 MB sehingga preview berisiko diam-diam tidak
+ * muncul (docs/plan/og-share-image-dinamis/PLAN.md K3). Bukan heuristik dari
+ * isi gambar - field pemanggil yang menentukan. */
+export type ImageOutputFormat = 'lossy' | 'lossless' | 'jpeg'
 
 export interface EncodeTarget {
   mime: string
@@ -133,6 +137,12 @@ export function encodeTargetFor(format: ImageOutputFormat, canWebp: boolean, qua
   if (format === 'lossless') {
     return { mime: 'image/png', quality: undefined, background: undefined }
   }
+  // "jpeg" SENGAJA mengabaikan canWebp: keandalan preview WhatsApp adalah
+  // syaratnya, bukan hemat byte (K3). Latar putih benar di sini - JPEG memang
+  // tidak mendukung alpha, jadi tanpa flatten area transparan jadi hitam.
+  if (format === 'jpeg') {
+    return { mime: 'image/jpeg', quality: 0.85, background: '#ffffff' }
+  }
   if (canWebp) {
     return { mime: 'image/webp', quality, background: undefined }
   }
@@ -167,6 +177,12 @@ export function hasAlphaChannel(pixels: Uint8ClampedArray): boolean {
 export function retryPlanFor(format: ImageOutputFormat, maxDim: number, quality: number): RetryPlan {
   if (format === 'lossless') {
     return { maxDim: Math.max(1, Math.round(maxDim / 2)), quality }
+  }
+  // Math.min, BUKAN 1280 tetap seperti cabang lossy di bawah: field preview
+  // memakai maxDim 1200, dan mengembalikan 1280 justru MEMPERBESAR gambar
+  // pada percobaan yang seharusnya mengecilkannya.
+  if (format === 'jpeg') {
+    return { maxDim: Math.min(maxDim, 1280), quality: Math.max(0.6, quality - 0.12) }
   }
   return { maxDim: 1280, quality: Math.max(0.6, quality - 0.12) }
 }
@@ -284,8 +300,10 @@ async function encodeAttempt(
  * mendukung encoder WebP), "lossless" -> PNG tanpa flatten latar apa pun -
  * pakai ini untuk field yang butuh transparansi (docs/plan/
  * admin-content-png-lossless-galeri-tajam/PLAN.md K1/K2). GIF/WebP diteruskan
- * apa adanya TANPA canvas pada KEDUA format, supaya animasi GIF tidak mati dan
- * WebP tidak rugi generasi (D1).
+ * apa adanya TANPA canvas pada KEDUA format itu, supaya animasi GIF tidak mati
+ * dan WebP tidak rugi generasi (D1). "jpeg" -> SELALU JPEG, dan justru
+ * MENOLAK sumber GIF/WebP alih-alih meneruskannya (D9) - dipakai field Gambar
+ * Preview Link, yang hasilnya harus pasti dirender crawler WhatsApp.
  *
  * Melempar ImageCompressError (pesan berbahasa Indonesia) bila format tidak
  * didukung, berkas terlalu besar, atau (untuk jalur konversi) masih di atas
@@ -298,6 +316,19 @@ export async function prepareImageForUpload(
   const sourceType = effectiveSourceType(file)
   if (!sourceType) {
     throw new ImageCompressError('Format tidak didukung. Pilih PNG, JPG, JPEG, GIF, atau WebP.')
+  }
+
+  // Penjagaan D9: `accept` pada <input type="file"> hanyalah filter dialog,
+  // bukan penegakan - user bisa memilih "All files". Tanpa cek ini sebuah
+  // .webp menempuh jalur passthrough di bawah dan tersimpan tetap .webp,
+  // sehingga preview WhatsApp rusak lagi (crawler WA tidak merender WebP).
+  // SENGAJA di sini, sebelum blok passthrough, dan HANYA untuk format
+  // 'jpeg' - perilaku passthrough untuk lossy/lossless tidak boleh berubah,
+  // itu yang menjaga animasi GIF tetap hidup.
+  if (format === 'jpeg' && PASSTHROUGH_TYPES.includes(sourceType)) {
+    throw new ImageCompressError(
+      'WhatsApp tidak bisa merender WebP dan GIF pada preview link, jadi gambar preview harus PNG atau JPG.',
+    )
   }
 
   if (PASSTHROUGH_TYPES.includes(sourceType)) {

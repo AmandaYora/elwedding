@@ -263,23 +263,55 @@ export default function WhatsAppPage() {
             <ErrorState message="Gagal memuat template pesan." onRetry={() => setConfigReloadToken((t) => t + 1)} />
           )}
           {!configLoading && !configError && config && (
-            <div className="flex flex-col gap-4">
-              <div className="flex flex-col gap-1.5">
-                <Textarea
-                  label="Isi pesan"
-                  value={config.messageTemplate}
-                  onChange={(e) => setConfig((c) => (c ? { ...c, messageTemplate: e.target.value } : c))}
-                  rows={5}
-                  placeholder="Halo {nama}! Terima kasih telah mengonfirmasi kehadiran..."
+            <div className="flex flex-col gap-8">
+              {/* --- Bagian 1: QR Code (jalur otomatis lewat whatsmeow) --- */}
+              <div className="flex flex-col gap-4">
+                <div className="flex flex-col gap-1.5">
+                  <Textarea
+                    label="Template Pesan QR Code"
+                    value={config.messageTemplate}
+                    onChange={(e) => setConfig((c) => (c ? { ...c, messageTemplate: e.target.value } : c))}
+                    rows={5}
+                    placeholder="Halo {nama}! Terima kasih telah mengonfirmasi kehadiran..."
+                  />
+                  <p className="text-xs text-slate-500">Placeholder tersedia: {'{nama}'}, {'{jumlah}'}, {'{mempelai}'}, {'{tanggal}'}</p>
+                  <p className="text-xs text-slate-500">
+                    Dipakai untuk pengiriman QR code secara otomatis lewat akun WhatsApp yang tertaut, sesaat
+                    setelah tamu mengonfirmasi kehadiran (RSVP).
+                  </p>
+                </div>
+                {/* Switch ini SENGAJA berada di dalam bagian QR dan deskripsinya
+                    tidak diubah (docs/plan/og-share-image-dinamis/PLAN.md D12):
+                    ia hanya menghentikan pengiriman QR otomatis. Jangan
+                    memindahkannya ke luar sebagai toggle bersama - itu akan
+                    menyiratkan ia juga mengatur tombol "Kirim Undangan", dan
+                    admin yang mematikan auto-send QR akan kehilangan tombol itu
+                    tanpa penjelasan apa pun. */}
+                <Switch
+                  checked={config.isEnabled}
+                  onChange={(checked) => setConfig((c) => (c ? { ...c, isEnabled: checked } : c))}
+                  label="Aktifkan pengiriman otomatis"
+                  description="Matikan untuk menghentikan sementara pengiriman QR ke WhatsApp tanpa memutus tautan akun."
                 />
-                <p className="text-xs text-slate-500">Placeholder tersedia: {'{nama}'}, {'{jumlah}'}, {'{mempelai}'}, {'{tanggal}'}</p>
               </div>
-              <Switch
-                checked={config.isEnabled}
-                onChange={(checked) => setConfig((c) => (c ? { ...c, isEnabled: checked } : c))}
-                label="Aktifkan pengiriman otomatis"
-                description="Matikan untuk menghentikan sementara pengiriman QR ke WhatsApp tanpa memutus tautan akun."
-              />
+
+              {/* --- Bagian 2: Undangan (manual per tamu lewat wa.me) --- */}
+              <div className="flex flex-col gap-1.5 pt-6 border-t border-slate-100">
+                <Textarea
+                  label="Template Pesan Undangan"
+                  value={config.invitationTemplate}
+                  onChange={(e) => setConfig((c) => (c ? { ...c, invitationTemplate: e.target.value } : c))}
+                  rows={5}
+                  placeholder="Halo {nama}, kami mengundang Anda ke pernikahan {mempelai} pada {tanggal}..."
+                />
+                <p className="text-xs text-slate-500">Placeholder tersedia: {'{nama}'}, {'{mempelai}'}, {'{tanggal}'}, {'{link}'}</p>
+                <p className="text-xs text-slate-500">
+                  Dipakai tombol &ldquo;Kirim Undangan&rdquo; di menu Tamu, yang membuka WhatsApp biasa dengan
+                  pesan sudah terisi. Pengiriman dilakukan manual per tamu dan tidak dipengaruhi sakelar
+                  pengiriman otomatis di atas. Tidak ada {'{jumlah}'} di sini karena saat undangan dikirim tamu
+                  belum mengonfirmasi kehadiran.
+                </p>
+              </div>
             </div>
           )}
         </CardBody>

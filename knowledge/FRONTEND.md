@@ -16,15 +16,30 @@
   (lihat F4 di PLAN.md, kasus nyata `footnote` yang sempat terlewat).
 - Jangan menambah props ke `Cover.tsx` untuk gambar `#cover-main` - isinya
   sengaja ditimpa jQuery (`window.COVERS`, lihat `useLegacyBootstrap.ts`).
-- **Meta Open Graph di `index.html` WAJIB URL absolut + PNG/JPEG** (docs/plan/
-  revisi-uat-logo-og-nama-tamu-dresscode/PLAN.md R2). Crawler WhatsApp/Facebook
-  **tidak menyelesaikan path relatif** dan **tidak merender WebP** - dua-duanya
-  membuat preview link tampil hitam/kosong, dan itu bug nyata yang sudah
-  terjadi. Jangan "mengoptimalkan" `og:image` PNG kembali ke `.webp`.
-  Origin **di-hardcode**, bukan lewat `%VITE_*%`: kalau env lupa diisi saat
-  build, nilainya tertinggal sebagai teks mentah dan preview rusak lagi tanpa
-  peringatan. Dan tidak bisa ditambal lewat JavaScript - crawler WA tidak
-  menjalankan JS, jadi nilainya harus sudah absolut di HTML statis.
+- **Meta Open Graph di `index.html` DITIMPA SERVER-SIDE - menyuntingnya di
+  sini saja TIDAK mengubah preview produksi** (docs/plan/og-share-image-dinamis/
+  PLAN.md D1/T9; menggantikan catatan lama dari revisi-uat-logo-og-nama-tamu-
+  dresscode/PLAN.md R2 yang menyatakan nilainya murni statis). Blok `og:*` &
+  `twitter:*` dibungkus marker `<!--OG_META_START-->` / `<!--OG_META_END-->`,
+  dan `spaFallback` di `apps/api/internal/router` mengganti isi di antaranya
+  dengan nama mempelai + gambar preview dari database sebelum HTML dikirim.
+  Untuk mengubah preview, pakai menu admin **Konten > Cover > "Gambar Preview
+  Link"**, bukan menyunting HTML.
+  Nilai statis di dalam marker **tetap harus dipelihara** - itulah yang
+  disajikan saat DB gagal dibaca, saat tidak ada gambar yang layak, dan di dev.
+  Karena itu aturan lamanya tetap berlaku penuh untuk nilai statis tersebut:
+  **WAJIB URL absolut + PNG/JPEG**. Crawler WhatsApp/Facebook **tidak
+  menyelesaikan path relatif** dan **tidak merender WebP** - dua-duanya membuat
+  preview link tampil hitam/kosong, dan itu bug nyata yang sudah terjadi.
+  Jangan "mengoptimalkan" `og:image` PNG kembali ke `.webp`.
+  Origin nilai statis **di-hardcode**, bukan lewat `%VITE_*%`: kalau env lupa
+  diisi saat build, nilainya tertinggal sebagai teks mentah dan preview rusak
+  lagi tanpa peringatan. (Nilai hasil injeksi memakai origin dari `Host`
+  request, bukan hardcode - lihat `knowledge/BACKEND.md`.)
+  Dan tidak bisa ditambal lewat JavaScript - crawler WA tidak menjalankan JS,
+  jadi nilainya harus sudah benar di byte HTML yang dikirim server.
+  **JANGAN menghapus kedua marker**: tanpa keduanya injeksi mati diam-diam dan
+  preview kembali ke frame template.
 - **Nama tamu di `TopCover`** memakai `useGuestSession()` yang dipanggil
   **langsung di komponen** (pola sama seperti `RsvpConfirmation`), bukan
   dialirkan sebagai prop lewat `SectionRegistry`/`App.tsx`. Hook-nya
@@ -71,7 +86,15 @@
   dari isi gambar: `"lossy"` (default) mengonversi PNG/JPEG ke WebP lewat
   canvas (fallback JPEG bila browser tak punya encoder WebP, dideteksi via
   probe `canEncodeWebp`, bukan ditebak dari hasil `toBlob`); `"lossless"`
-  selalu keluar PNG **tanpa flatten latar apa pun**. Field yang butuh
+  selalu keluar PNG **tanpa flatten latar apa pun**; `"jpeg"` **selalu** JPEG
+  (quality 0.85 + flatten `#ffffff`) **apa pun dukungan WebP browser** -
+  dipakai field "Gambar Preview Link" karena crawler WhatsApp tidak merender
+  WebP dan PNG fotografis 1200x630 bisa 1-2,5 MB sehingga preview berisiko
+  diam-diam tidak muncul (docs/plan/og-share-image-dinamis/PLAN.md K3/D9).
+  `"jpeg"` adalah **satu-satunya** format yang **MENOLAK** sumber GIF/WebP
+  alih-alih meneruskannya lewat passthrough - `accept` pada `<input>` cuma
+  filter dialog, bukan penegakan, jadi penolakannya harus di pipeline.
+  Field yang butuh
   transparansi (mis. Logo di `ContentPage.tsx`) HARUS memakai `"lossless"` -
   memakai `"lossy"` di situ berisiko latar transparan dibakar putih kalau
   browser jatuh ke fallback JPEG (JPEG tidak mendukung alpha; bug nyata

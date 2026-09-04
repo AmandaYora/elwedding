@@ -8,7 +8,16 @@ export interface WhatsAppStatus {
 }
 
 export interface WhatsAppConfig {
+  /** Template pesan QR otomatis (dikirim modul whatsapp/whatsmeow sesudah
+   * tamu RSVP). Placeholder: {nama}, {jumlah}, {mempelai}, {tanggal}. */
   messageTemplate: string
+  /** Template pesan undangan untuk tombol "Kirim Undangan" per tamu, yang
+   * murni klien lewat wa.me. Placeholder: {nama}, {mempelai}, {tanggal},
+   * {link} - TANPA {jumlah}, karena saat undangan dikirim tamu belum RSVP
+   * (docs/plan/og-share-image-dinamis/PLAN.md K5). */
+  invitationTemplate: string
+  /** HANYA mengatur pengiriman QR otomatis - BUKAN tombol Kirim Undangan
+   * (D12). */
   isEnabled: boolean
 }
 

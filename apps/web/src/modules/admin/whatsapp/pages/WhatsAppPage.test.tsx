@@ -35,7 +35,11 @@ afterEach(() => {
 // wajib di-mock di setiap test supaya kartu lain tidak crash menunggu
 // promise yang tidak pernah di-resolve.
 function mockHappyConfigAndLogs() {
-  mockedGetConfig.mockResolvedValue({ messageTemplate: 'Halo {nama}', isEnabled: true })
+  mockedGetConfig.mockResolvedValue({
+    messageTemplate: 'Halo {nama}',
+    invitationTemplate: 'Undangan untuk {nama}: {link}',
+    isEnabled: true,
+  })
   mockedListLogs.mockResolvedValue({ data: [], meta: { page: 1, limit: 10, total: 0, totalPages: 1 } })
 }
 

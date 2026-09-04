@@ -9,9 +9,24 @@ type WhatsAppStatusDTO struct {
 	PairingError string `json:"pairingError"`
 }
 
+// WhatsAppConfigDTO dipakai KEDUA arah - GetConfig mengembalikannya dan
+// UpdateConfig menerimanya sebagai input - jadi cukup satu struct, beda dari
+// modul content yang punya DTO baca & input tulis terpisah. Konsekuensinya:
+// setiap field baru WAJIB dipetakan di dua tempat pada service.go (baca DAN
+// tulis); melewatkan salah satunya membuat field hilang senyap di satu arah.
 type WhatsAppConfigDTO struct {
+	// MessageTemplate: jalur QR otomatis lewat whatsmeow (applyTemplate).
 	MessageTemplate string `json:"messageTemplate"`
-	IsEnabled       bool   `json:"isEnabled"`
+	// InvitationTemplate: tombol "Kirim Undangan" per tamu, yang murni klien
+	// lewat wa.me dan TIDAK menyentuh modul whatsapp (docs/plan/
+	// og-share-image-dinamis/PLAN.md D10/D11). Placeholder-nya {nama},
+	// {mempelai}, {tanggal}, {link} - TANPA {jumlah} (K5), karena saat
+	// undangan dikirim tamu belum RSVP.
+	InvitationTemplate string `json:"invitationTemplate"`
+	// IsEnabled HANYA mengatur jalur QR otomatis (D12). Tombol Kirim
+	// Undangan sengaja TIDAK ikut toggle ini - kalau disamakan, mematikan
+	// auto-send QR akan diam-diam melumpuhkan tombolnya tanpa penjelasan.
+	IsEnabled bool `json:"isEnabled"`
 }
 
 type SendLogDTO struct {

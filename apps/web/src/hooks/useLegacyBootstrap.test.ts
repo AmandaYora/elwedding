@@ -13,7 +13,7 @@ const data: InvitationData = {
     videoGalleryTitle: '', videoGalleryYoutubeUrl: '', videoGalleryCaption: '',
     liveStreamingTitle: '', liveStreamingYoutubeUrl: '',
     instagramFilterTitle: '', instagramFilterCaption: '', instagramFilterPreviewPhotoUrl: '', instagramFilterLink: '',
-    weddingGiftDescription: '', dresscodeTitle: '', dresscodeDescription: '', dresscodeNote: '', dresscodeImageUrl: '',
+    weddingGiftDescription: '', dresscodeTitle: '', dresscodeDescription: '', dresscodeNote: '', dresscodeImageUrl: '', shareImageUrl: '',
   },
   sections: [
     { key: 'opening_cover', order: 1 },

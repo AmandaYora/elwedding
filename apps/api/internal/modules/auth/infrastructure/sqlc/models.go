@@ -345,6 +345,7 @@ type InvitationContent struct {
 	DresscodeNote                  sql.NullString
 	UpdatedAt                      time.Time
 	DresscodeImageUrl              string
+	ShareImageUrl                  string
 }
 
 type LoveStoryChapter struct {
@@ -380,10 +381,11 @@ type WeddingGiftBank struct {
 }
 
 type WhatsappConfig struct {
-	ID              uint64
-	MessageTemplate string
-	IsEnabled       bool
-	UpdatedAt       time.Time
+	ID                 uint64
+	MessageTemplate    string
+	IsEnabled          bool
+	UpdatedAt          time.Time
+	InvitationTemplate string
 }
 
 type WhatsappSendLog struct {

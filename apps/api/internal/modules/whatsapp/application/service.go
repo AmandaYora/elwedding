@@ -140,13 +140,20 @@ func (s *Service) GetConfig(ctx context.Context) (WhatsAppConfigDTO, error) {
 	if err != nil {
 		return WhatsAppConfigDTO{}, err
 	}
-	return WhatsAppConfigDTO{MessageTemplate: row.MessageTemplate, IsEnabled: row.IsEnabled}, nil
+	return WhatsAppConfigDTO{
+		MessageTemplate:    row.MessageTemplate,
+		InvitationTemplate: row.InvitationTemplate,
+		IsEnabled:          row.IsEnabled,
+	}, nil
 }
 
 func (s *Service) UpdateConfig(ctx context.Context, in WhatsAppConfigDTO) error {
+	// Template undangan kosong adalah keadaan SAH - tidak ada validasi wajib
+	// di sini; tombol Kirim Undangan yang menonaktifkan diri (T24).
 	return s.repo.UpdateConfig(ctx, sqlc.UpdateWhatsAppConfigParams{
-		MessageTemplate: in.MessageTemplate,
-		IsEnabled:       in.IsEnabled,
+		MessageTemplate:    in.MessageTemplate,
+		InvitationTemplate: in.InvitationTemplate,
+		IsEnabled:          in.IsEnabled,
 	})
 }
 

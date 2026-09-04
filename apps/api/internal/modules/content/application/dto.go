@@ -52,6 +52,11 @@ type InvitationContentDTO struct {
 	DresscodeNote        string `json:"dresscodeNote"`
 	DresscodeImageUrl    string `json:"dresscodeImageUrl"`
 
+	// ShareImageUrl: gambar khusus preview link WhatsApp/Facebook (og:image),
+	// landscape ~1200x630. '' berarti belum diunggah - router jatuh ke
+	// CoverImageDesktopUrl, lalu ke tag statis index.html (K4).
+	ShareImageUrl string `json:"shareImageUrl"`
+
 	// WeddingDateRaw dipakai HANYA untuk mengisi ulang form admin (input
 	// datetime-local butuh nilai lokal, bukan epoch). Tidak dipakai countdown.
 	WeddingDateRaw string `json:"weddingDateRaw"`
@@ -104,6 +109,8 @@ type UpdateInvitationContentInput struct {
 	DresscodeDescription string `json:"dresscodeDescription"`
 	DresscodeNote        string `json:"dresscodeNote"`
 	DresscodeImageUrl    string `json:"dresscodeImageUrl"`
+
+	ShareImageUrl string `json:"shareImageUrl"`
 }
 
 type AgendaEventDTO struct {

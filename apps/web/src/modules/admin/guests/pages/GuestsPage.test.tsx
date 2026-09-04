@@ -1,6 +1,8 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import GuestsPage from './GuestsPage'
 import { listGuests, deleteGuest } from '@/modules/admin/guests/services/guests.service'
+import { getConfig } from '@/modules/admin/whatsapp/services/whatsapp.service'
+import { getContent } from '@/modules/admin/content/services/content.service'
 import { ToastProvider } from '@/shared/components/toast/ToastProvider'
 
 function renderPage() {
@@ -18,8 +20,20 @@ vi.mock('@/modules/admin/guests/services/guests.service', () => ({
   deleteGuest: vi.fn(),
 }))
 
+// Tombol "Kirim Undangan" memuat dua singleton di samping daftar tamu
+// (docs/plan/og-share-image-dinamis/PLAN.md T24). Keduanya di-mock supaya
+// test tidak menembus httpClient.
+vi.mock('@/modules/admin/whatsapp/services/whatsapp.service', () => ({
+  getConfig: vi.fn(),
+}))
+vi.mock('@/modules/admin/content/services/content.service', () => ({
+  getContent: vi.fn(),
+}))
+
 const mockedList = vi.mocked(listGuests)
 const mockedDelete = vi.mocked(deleteGuest)
+const mockedGetConfig = vi.mocked(getConfig)
+const mockedGetContent = vi.mocked(getContent)
 
 const sampleGuest = {
   id: 1,
@@ -40,9 +54,29 @@ const sampleGuest = {
   isExpectedAttending: true,
 }
 
+const sampleConfig = {
+  messageTemplate: 'Halo {nama}, {jumlah} orang',
+  invitationTemplate: 'Halo {nama}, undangan {mempelai} pada {tanggal}: {link}',
+  isEnabled: true,
+}
+
+const sampleContent = {
+  brideName: 'Ariana',
+  groomName: 'Adrian',
+  weddingDateLabel: 'Sabtu, 16 Mei 2026',
+} as unknown as Awaited<ReturnType<typeof getContent>>
+
+beforeEach(() => {
+  // Default "jalan normal" - test yang menguji jalur gagal menimpanya sendiri.
+  mockedGetConfig.mockResolvedValue(sampleConfig)
+  mockedGetContent.mockResolvedValue(sampleContent)
+})
+
 afterEach(() => {
   mockedList.mockReset()
   mockedDelete.mockReset()
+  mockedGetConfig.mockReset()
+  mockedGetContent.mockReset()
 })
 
 test('daftar kosong -> EmptyState', async () => {
@@ -134,4 +168,70 @@ test('ubah filter jenis undangan -> listGuests dipanggil dengan invitationType t
   await waitFor(() =>
     expect(mockedList).toHaveBeenCalledWith({ page: 1, status: '', q: '', invitationType: 'physical', souvenirType: '', respondedOnly: false }),
   )
+})
+
+// --- tombol "Kirim Undangan" (docs/plan/og-share-image-dinamis/PLAN.md T24) ---
+
+test('tamu ber-nomor -> tombol Kirim Undangan berupa <a> wa.me dengan pesan terisi', async () => {
+  mockedList.mockResolvedValue({ data: [sampleGuest], meta: { page: 1, limit: 20, total: 1, totalPages: 1 } })
+
+  renderPage()
+
+  const link = await screen.findByRole('link', { name: /Kirim Undangan/ })
+  const href = link.getAttribute('href') as string
+
+  // 0812345678 -> 62812345678 (aturan cermin normalizePhone Go).
+  expect(href.startsWith('https://wa.me/62812345678?text=')).toBe(true)
+  // Anchor WAJIB aman dibuka di tab baru.
+  expect(link).toHaveAttribute('target', '_blank')
+  expect(link).toHaveAttribute('rel', 'noopener noreferrer')
+
+  // Pesannya utuh setelah didecode - bukti encodeURIComponent bekerja pada
+  // '?' & '&' yang justru datang dari URL undangan itu sendiri.
+  const text = decodeURIComponent(href.slice(href.indexOf('?text=') + '?text='.length))
+  expect(text).toContain('Halo Budi Santoso')
+  expect(text).toContain('Ariana & Adrian')
+  expect(text).toContain('Sabtu, 16 Mei 2026')
+  expect(text).toContain('/?guest=abc123')
+})
+
+// K7: tamu tanpa nomor -> tombol NONAKTIF, dan WAJIB non-anchor. <a> yang
+// "di-disable" lewat atribut tetap bisa diklik.
+test('tamu tanpa nomor HP -> tombol nonaktif non-anchor dengan title yang menjelaskan', async () => {
+  mockedList.mockResolvedValue({
+    data: [{ ...sampleGuest, phone: '' }],
+    meta: { page: 1, limit: 20, total: 1, totalPages: 1 },
+  })
+
+  renderPage()
+
+  const btn = await screen.findByRole('button', { name: /Kirim Undangan/ })
+  expect(btn).toBeDisabled()
+  expect(btn).toHaveAttribute('title', expect.stringContaining('Nomor HP'))
+  expect(screen.queryByRole('link', { name: /Kirim Undangan/ })).not.toBeInTheDocument()
+})
+
+// Jalur gagal: daftar tamu TETAP tampil normal, hanya tombolnya nonaktif -
+// bukan halaman error.
+test('config WhatsApp gagal dimuat -> daftar tamu tetap tampil, tombol nonaktif', async () => {
+  mockedList.mockResolvedValue({ data: [sampleGuest], meta: { page: 1, limit: 20, total: 1, totalPages: 1 } })
+  mockedGetConfig.mockRejectedValue(new Error('500'))
+
+  renderPage()
+
+  expect(await screen.findByText('Budi Santoso')).toBeInTheDocument()
+  const btn = await screen.findByRole('button', { name: /Kirim Undangan/ })
+  expect(btn).toBeDisabled()
+  expect(screen.queryByRole('link', { name: /Kirim Undangan/ })).not.toBeInTheDocument()
+})
+
+test('template undangan kosong -> tombol nonaktif dengan title yang menyebut template', async () => {
+  mockedList.mockResolvedValue({ data: [sampleGuest], meta: { page: 1, limit: 20, total: 1, totalPages: 1 } })
+  mockedGetConfig.mockResolvedValue({ ...sampleConfig, invitationTemplate: '   ' })
+
+  renderPage()
+
+  const btn = await screen.findByRole('button', { name: /Kirim Undangan/ })
+  expect(btn).toBeDisabled()
+  expect(btn).toHaveAttribute('title', expect.stringContaining('Template'))
 })

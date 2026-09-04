@@ -15,6 +15,12 @@ import (
 	"time"
 
 	authPresentation "undangan-ariana-adrian/internal/modules/auth/presentation"
+	// contracts/ adalah permukaan PUBLIK modul content - satu-satunya yang
+	// boleh diimpor modul lain (.claude/rules/backend-modular-monolith.md).
+	// Internal content (application/infrastructure/domain) tetap terlarang;
+	// lihat juga contentTypeByExt di bawah yang sengaja disalin, bukan
+	// diimpor, karena tidak ada di contracts.
+	contentContracts "undangan-ariana-adrian/internal/modules/content/contracts"
 	contentPresentation "undangan-ariana-adrian/internal/modules/content/presentation"
 	guestPresentation "undangan-ariana-adrian/internal/modules/guest/presentation"
 	whatsappPresentation "undangan-ariana-adrian/internal/modules/whatsapp/presentation"
@@ -31,6 +37,9 @@ type Deps struct {
 	JWTSecret       string
 	PublicDir       string
 	Storage         *storage.Client
+	// InvitationInfo BOLEH nil (D6): bila nil, index.html disajikan apa
+	// adanya tanpa injeksi meta OG. Itu jalur dev & jalur aman produksi.
+	InvitationInfo contentContracts.InvitationInfoProvider
 }
 
 // contentTypeByExt: salinan kecil khusus paket router, BUKAN impor dari
@@ -182,12 +191,13 @@ func New(d Deps) http.Handler {
 	// `http.ServeMux` (`text/plain`, BUKAN JSON) - persis mitigasi F17 yang
 	// seharusnya dicegah. `spaFallback` sendiri yang memutuskan per
 	// request apakah PublicDir valid untuk disajikan sebagai file statis.
-	mux.Handle("/", spaFallback(d.PublicDir))
+	mux.Handle("/", spaFallback(d.PublicDir, d.InvitationInfo))
 
 	return mux
 }
 
-func spaFallback(publicDir string) http.Handler {
+// spaFallback menyajikan entry HTML SPA. `info` boleh nil - lihat Deps.
+func spaFallback(publicDir string, info contentContracts.InvitationInfoProvider) http.Handler {
 	fileServer := http.FileServer(http.Dir(publicDir))
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		// Keputusan #17 (F17/F20 PLAN.md): non-GET ke path tak dikenal
@@ -240,8 +250,71 @@ func spaFallback(publicDir string) http.Handler {
 		// revalidasi lewat If-Modified-Since - request tetap ringan (304)
 		// kalau memang belum berubah.
 		w.Header().Set("Cache-Control", "no-cache, must-revalidate")
-		http.ServeFile(w, r, filepath.Join(publicDir, entry))
+
+		entryPath := filepath.Join(publicDir, entry)
+
+		// Injeksi meta Open Graph dinamis - docs/plan/og-share-image-dinamis
+		// PLAN.md D1/T6. Ini SATU-SATUNYA tempat nilainya bisa benar: crawler
+		// WhatsApp/Facebook tidak menjalankan JavaScript, jadi menambal
+		// <meta> dari React tidak akan pernah terbaca, sedangkan nilainya
+		// ada di DB dan index.html statis.
+		//
+		// Hanya index.html (undangan tamu) - admin.html tidak pernah
+		// di-inject; dasbor tidak pernah dibagikan sebagai link preview.
+		//
+		// SETIAP kegagalan jatuh ke http.ServeFile statis di bawah, tidak
+		// pernah error: DB mati, berkas gagal dibaca, marker hilang, atau
+		// tidak ada nilai yang layak. Halaman undangan tidak boleh mati
+		// hanya karena preview tidak bisa dipersonalisasi.
+		if entry == "index.html" && info != nil {
+			if injected, ok := renderIndexWithOgMeta(r, entryPath, info); ok {
+				w.Header().Set("Content-Type", "text/html; charset=utf-8")
+				// SENGAJA tanpa Last-Modified/ETag dari mtime berkas: isinya
+				// kini bergantung DB, jadi validator berbasis berkas akan
+				// menyajikan preview basi setelah admin mengganti gambar
+				// (itulah yang dilakukan http.ServeFile, dan alasan jalur ini
+				// menulis byte-nya sendiri).
+				_, _ = w.Write(injected)
+				return
+			}
+		}
+
+		http.ServeFile(w, r, entryPath)
 	})
+}
+
+// renderIndexWithOgMeta membaca index.html lalu menyuntikkan meta OG dari DB.
+// ok=false berarti "pakai jalur statis" - dipakai untuk SEMUA kegagalan,
+// termasuk saat hasil injeksi tidak berbeda dari berkas aslinya.
+func renderIndexWithOgMeta(r *http.Request, entryPath string, info contentContracts.InvitationInfoProvider) ([]byte, bool) {
+	shareInfo, err := info.GetShareInfo(r.Context())
+	if err != nil {
+		return nil, false
+	}
+
+	raw, err := os.ReadFile(entryPath)
+	if err != nil {
+		return nil, false
+	}
+	if !hasOgMarkers(raw) {
+		return nil, false
+	}
+
+	// Skema di-hardcode https + Host dari request (D5). Bukan tebakan:
+	// nginx repo ini meneruskan Host (infra/nginx/nginx.conf) tapi TIDAK
+	// menyetel X-Forwarded-Proto, dan r.TLS nil karena TLS diterminasi di
+	// nginx - jadi skema memang tidak bisa dibaca dari request.
+	origin := ""
+	if r.Host != "" {
+		origin = "https://" + r.Host
+	}
+
+	tags := buildOgTags(origin, shareInfo)
+	if tags == "" {
+		return nil, false
+	}
+
+	return injectOgMeta(raw, tags), true
 }
 
 func cacheControlForPath(path string) string {

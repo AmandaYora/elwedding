@@ -2,7 +2,7 @@
 SELECT * FROM whatsapp_config WHERE id = 1 LIMIT 1;
 
 -- name: UpdateWhatsAppConfig :exec
-UPDATE whatsapp_config SET message_template = ?, is_enabled = ? WHERE id = 1;
+UPDATE whatsapp_config SET message_template = ?, invitation_template = ?, is_enabled = ? WHERE id = 1;
 
 -- name: InsertSendLog :execlastid
 INSERT INTO whatsapp_send_logs (guest_id, guest_name, phone, qr_payload, couple_name, event_date_label, attending_count, status)
