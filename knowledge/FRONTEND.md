@@ -29,6 +29,18 @@
 - 5 resource list (agenda events, dst.) memakai `SimpleListEditor`
   generik (`modules/admin/content/components/`) - tambah resource baru
   lewat konfigurasi kolom, bukan menulis ulang tabel CRUD.
+- **Pipeline gambar admin** (`shared/lib/image-compress.ts`,
+  `prepareImageForUpload`) menerima PNG/JPG/JPEG/GIF/WebP lewat `accept`
+  di `ContentPage.tsx`/`SimpleListEditor.tsx` - format lain (HEIC/AVIF/BMP/SVG)
+  sengaja tidak bisa dipilih karena gagal di-decode `createImageBitmap`
+  (docs/plan/admin-content-image-format-pipeline/PLAN.md T5). PNG/JPEG
+  dikonversi ke WebP lewat canvas (fallback JPEG bila browser tak punya
+  encoder WebP, dideteksi via probe `canEncodeWebp`, bukan ditebak dari
+  hasil `toBlob`). **GIF dan WebP WAJIB diteruskan apa adanya, TANPA
+  createImageBitmap/canvas** - canvas hanya mengambil frame pertama dan
+  akan membunuh animasi GIF secara senyap (cover animasi dipakai produksi,
+  lihat `Cover.tsx` + `shared/lib/coverMedia.ts`). Jangan menambah format
+  baru ke jalur konversi tanpa memastikan dulu apakah formatnya beranimasi.
 
 ## Shared
 

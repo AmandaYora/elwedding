@@ -1,5 +1,5 @@
 import { httpClient } from '@/shared/services/http-client'
-import { compressImageToBase64 } from '@/shared/lib/image-compress'
+import { prepareImageForUpload } from '@/shared/lib/image-compress'
 import { uploadImageBase64 } from './content.service'
 
 vi.mock('@/shared/services/http-client', () => ({
@@ -7,11 +7,11 @@ vi.mock('@/shared/services/http-client', () => ({
 }))
 
 vi.mock('@/shared/lib/image-compress', () => ({
-  compressImageToBase64: vi.fn(),
+  prepareImageForUpload: vi.fn(),
 }))
 
 const mockedPost = vi.mocked(httpClient.post)
-const mockedCompress = vi.mocked(compressImageToBase64)
+const mockedCompress = vi.mocked(prepareImageForUpload)
 
 afterEach(() => {
   mockedPost.mockReset()

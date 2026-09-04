@@ -82,7 +82,7 @@ function PhotoField({ label, value, onChange, onUploadingChange }: { label: stri
           </div>
           <input
             type="file"
-            accept="image/*"
+            accept="image/png,image/jpeg,image/gif,image/webp,.png,.jpg,.jpeg,.gif,.webp"
             disabled={uploading}
             className="sr-only"
             onChange={async (e) => {

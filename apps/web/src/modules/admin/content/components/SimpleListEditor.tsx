@@ -276,7 +276,7 @@ export default function SimpleListEditor<T extends { id: number; sortOrder: numb
                       </div>
                       <input
                         type="file"
-                        accept="image/*"
+                        accept="image/png,image/jpeg,image/gif,image/webp,.png,.jpg,.jpeg,.gif,.webp"
                         disabled={!!uploading[String(col.key)]}
                         className="sr-only"
                         onChange={(e) => void handlePhotoUpload(col, e.target.files?.[0])}

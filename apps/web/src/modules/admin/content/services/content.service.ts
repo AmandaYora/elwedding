@@ -1,5 +1,5 @@
 import { httpClient } from '@/shared/services/http-client'
-import { compressImageToBase64 } from '@/shared/lib/image-compress'
+import { prepareImageForUpload } from '@/shared/lib/image-compress'
 import type { InvitationContent } from '@/types/api'
 
 // Payload PATCH memakai weddingDate (format datetime-local), BUKAN
@@ -37,7 +37,7 @@ export async function uploadAudioFile(file: File): Promise<string> {
  * di-override lebih panjang dari default 30s karena unggahan bisa menunggu
  * kompresi + pengiriman body base64 yang lebih besar dari file asli. */
 export async function uploadImageBase64(file: File, maxDim = 1920): Promise<string> {
-  const { base64, filename } = await compressImageToBase64(file, maxDim)
+  const { base64, filename } = await prepareImageForUpload(file, maxDim)
   const res = await httpClient.post<{ data: { url: string } }>(
     '/api/v1/admin/uploads/base64',
     { filename, data: base64 },
