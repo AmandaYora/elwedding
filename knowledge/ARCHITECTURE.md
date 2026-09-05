@@ -12,7 +12,7 @@
   mengimpor internal (`application`/`infrastructure`/`domain`) modul lain.
 - `apps/web` — satu paket Vite, **dua entry HTML terpisah**:
   - `index.html` (`src/main.tsx`) — undangan tamu. React 18.3.1 (BUKAN 19 —
-    lihat `decisions/0001-react-18.md`), tanpa Tailwind, sepenuhnya
+    lihat `decisions/ADR-0004-react-18.md`), tanpa Tailwind, sepenuhnya
     bergantung pada bundle jQuery legacy pihak ketiga
     (`public/assets/js/*`) untuk animasi/slider/countdown/musik.
   - `admin.html` (`src/admin-main.tsx`) — dashboard admin. React Router,

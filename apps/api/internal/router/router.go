@@ -124,6 +124,17 @@ func New(d Deps) http.Handler {
 	admin.HandleFunc("PUT /api/v1/admin/users/{id}", d.AuthHandler.UpdateUser)
 	admin.HandleFunc("DELETE /api/v1/admin/users/{id}", d.AuthHandler.DeleteUser)
 
+	// --- admin: group tamu (JWT) - docs/plan/guest-groups/PLAN.md T9 ---
+	// Didaftarkan di mux `admin`, yang seluruhnya dijaga RequireFullAdmin di
+	// bawah. JANGAN memindahkannya ke mux ROOT seperti checkin/* - itu justru
+	// membuka pengelolaan group untuk akun petugas gate (D10/§2.4). Petugas
+	// MELIHAT nama group di hasil scan (ikut di dalam respons check-in), bukan
+	// dengan memanggil endpoint ini.
+	admin.HandleFunc("GET /api/v1/admin/groups", d.GuestHandler.ListGroups)
+	admin.HandleFunc("POST /api/v1/admin/groups", d.GuestHandler.CreateGroup)
+	admin.HandleFunc("PUT /api/v1/admin/groups/{id}", d.GuestHandler.UpdateGroup)
+	admin.HandleFunc("DELETE /api/v1/admin/groups/{id}", d.GuestHandler.DeleteGroup)
+
 	// --- admin: whatsapp (JWT) - PLAN.md dashboard-wa-rsvp keputusan #4 ---
 	admin.HandleFunc("GET /api/v1/admin/whatsapp/status", d.WhatsAppHandler.GetStatus)
 	admin.HandleFunc("POST /api/v1/admin/whatsapp/pair/start", d.WhatsAppHandler.StartPairing)
@@ -133,7 +144,33 @@ func New(d Deps) http.Handler {
 	admin.HandleFunc("GET /api/v1/admin/whatsapp/logs", d.WhatsAppHandler.ListLogs)
 	admin.HandleFunc("POST /api/v1/admin/whatsapp/logs/{id}/resend", d.WhatsAppHandler.ResendLog)
 
-	mux.Handle("/api/v1/admin/", authmw.RequireAdmin(d.JWTSecret)(admin))
+	// --- admin: check-in di gate (docs/plan/scan-checkin-gate/PLAN.md T9/D6) ---
+	// Didaftarkan langsung di mux ROOT sebagai pola SPESIFIK, bukan lewat mux
+	// `admin` di atas, dan itu yang membuat kelimanya lolos ke petugas gate:
+	// Go 1.22+ ServeMux memilih pola paling spesifik, sehingga
+	// "POST /api/v1/admin/checkin/scan" menang atas prefix "/api/v1/admin/"
+	// yang dijaga RequireFullAdmin di bawah. Mekanismenya sama persis dengan
+	// GET /guests/summary vs PUT /guests/{id} (lihat komentar di atas).
+	//
+	// JANGAN "dirapikan" dengan memindahkannya ke dalam mux `admin` atau
+	// menukar urutannya - akun petugas akan langsung kehilangan menu Scan.
+	// Literal "checkin/scan", "checkin/search", "checkin/arrivals" &
+	// "checkin/summary" juga menang atas "checkin/{id}".
+	//
+	// Penjaganya RequireAdmin (petugas MAUPUN admin penuh boleh), bukan
+	// RequireFullAdmin.
+	scanAuth := authmw.RequireAdmin(d.JWTSecret)
+	mux.Handle("POST /api/v1/admin/checkin/scan", scanAuth(http.HandlerFunc(d.GuestHandler.CheckinByQR)))
+	mux.Handle("GET /api/v1/admin/checkin/search", scanAuth(http.HandlerFunc(d.GuestHandler.SearchForCheckin)))
+	mux.Handle("GET /api/v1/admin/checkin/arrivals", scanAuth(http.HandlerFunc(d.GuestHandler.ListArrivals)))
+	mux.Handle("GET /api/v1/admin/checkin/summary", scanAuth(http.HandlerFunc(d.GuestHandler.GetCheckinSummary)))
+	mux.Handle("POST /api/v1/admin/checkin/{id}", scanAuth(http.HandlerFunc(d.GuestHandler.CheckinByID)))
+
+	// Seluruh sisa /api/v1/admin/ kini butuh admin PENUH (T9/D7): akun
+	// petugas hanya boleh memindai, tidak boleh mengubah konten atau
+	// menghapus tamu (K2). Ini penegakan yang sebenarnya - penyaringan menu
+	// di frontend murni kosmetik.
+	mux.Handle("/api/v1/admin/", authmw.RequireFullAdmin(d.JWTSecret)(admin))
 
 	// --- foto/musik yang diunggah admin (keputusan #12, dipindah ke object
 	// storage S3 - docs/plan/content-uploads-object-storage/PLAN.md) ---

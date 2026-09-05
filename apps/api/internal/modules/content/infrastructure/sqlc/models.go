@@ -11,6 +11,48 @@ import (
 	"time"
 )
 
+type AdminUsersRole string
+
+const (
+	AdminUsersRoleAdmin   AdminUsersRole = "admin"
+	AdminUsersRoleScanner AdminUsersRole = "scanner"
+)
+
+func (e *AdminUsersRole) Scan(src interface{}) error {
+	switch s := src.(type) {
+	case []byte:
+		*e = AdminUsersRole(s)
+	case string:
+		*e = AdminUsersRole(s)
+	default:
+		return fmt.Errorf("unsupported scan type for AdminUsersRole: %T", src)
+	}
+	return nil
+}
+
+type NullAdminUsersRole struct {
+	AdminUsersRole AdminUsersRole
+	Valid          bool // Valid is true if AdminUsersRole is not NULL
+}
+
+// Scan implements the Scanner interface.
+func (ns *NullAdminUsersRole) Scan(value interface{}) error {
+	if value == nil {
+		ns.AdminUsersRole, ns.Valid = "", false
+		return nil
+	}
+	ns.Valid = true
+	return ns.AdminUsersRole.Scan(value)
+}
+
+// Value implements the driver Valuer interface.
+func (ns NullAdminUsersRole) Value() (driver.Value, error) {
+	if !ns.Valid {
+		return nil, nil
+	}
+	return string(ns.AdminUsersRole), nil
+}
+
 type GuestsGender string
 
 const (
@@ -271,6 +313,7 @@ type AdminUser struct {
 	Username     string
 	PasswordHash string
 	CreatedAt    time.Time
+	Role         AdminUsersRole
 }
 
 type AgendaEvent struct {
@@ -309,6 +352,16 @@ type Guest struct {
 	Notes               sql.NullString
 	AttendingCount      uint8
 	IsExpectedAttending bool
+	CheckedInAt         sql.NullTime
+	GroupID             sql.NullInt64
+}
+
+type GuestGroup struct {
+	ID          uint64
+	Name        string
+	Description string
+	CreatedAt   time.Time
+	UpdatedAt   time.Time
 }
 
 type InvitationContent struct {

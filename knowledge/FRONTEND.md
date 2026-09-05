@@ -5,7 +5,7 @@
 
 ## Undangan tamu (`index.html` / `src/main.tsx`, `src/App.tsx`, `src/components/*`)
 
-- React 18.3.1 (lihat `decisions/0001-react-18.md` untuk alasan tidak 19).
+- React 18.3.1 (lihat `decisions/ADR-0004-react-18.md` untuk alasan tidak 19).
 - Kode dipindah **apa adanya** dari project pre-monorepo - jangan
   restrukturisasi ke pola `modules/` demi konsistensi; itu berisiko
   meregresi interop jQuery yang sudah terverifikasi (`apps/web/README.md`).
@@ -56,6 +56,19 @@
   dari `dresscodeTitle`/`dresscodeDescription`/`dresscodeNote`. Selektor
   `.dress-color-item`/`--bg-color` di `4e66ef9e.css` jadi tidak terpakai tapi
   **sengaja tidak dihapus** - berkas itu aset template ter-minify bersama.
+- **Isi QR tamu adalah `ELW1:<token>`, bukan teks undangan** (docs/plan/
+  scan-checkin-gate/PLAN.md T18/D10). `composeLocalQrPayload` di
+  `RsvpConfirmation.tsx` mengembalikan `ELW1:${session.token}` bila token ada.
+  Prefiks itu **kembar lintas bahasa** dengan `checkinCodePrefix` di
+  `apps/api/internal/modules/guest/application/service.go` - browser tidak bisa
+  memanggil konstanta Go, jadi duplikasinya tidak terhindarkan dan keduanya
+  sudah diberi komentar saling merujuk (pola sama seperti `normalizePhone` vs
+  `normalizePhoneForWa`). Mengubah salah satu saja memutus rantai antara QR
+  yang diterbitkan dan pemindai di gate.
+  **Tanpa token** (mode pratinjau, `/` tanpa `?guest=`) fungsi ini sengaja
+  mengembalikan teks lama apa adanya: QR itu memang tidak mewakili tamu mana
+  pun dan pemindai akan menolaknya dengan pesan yang benar - konsisten dengan
+  perilaku yang sudah ada, karena RSVP-nya juga tidak tersimpan.
 - **Form "Fill the form below" di section Wedding Gift sudah dihapus** dan
   jangan dikembalikan: itu kode mati sisa template PHP (`action="#"`,
   `post=sendGift`) dan **tidak ada endpoint** gift submission di backend.
@@ -68,7 +81,94 @@
 `src/modules/admin/*`, `src/app/routes/*`)
 
 - React Router (`basename="/admin"`), Zustand (`shared/stores/auth.store.ts`
-  - JWT di localStorage), Zod, Axios, Tailwind 4.
+  - JWT **dan peran** di localStorage), Zod, Axios, Tailwind 4.
+- **Dua peran akun** (docs/plan/scan-checkin-gate/PLAN.md T12/T13): respons
+  login membawa `role`, disimpan berdampingan dengan `token` di
+  `auth.store.ts`. Petugas (`scanner`) diarahkan ke `/scan` saat login,
+  `AdminLayout` hanya merender item nav miliknya, dan `ProtectedRoute`
+  mengalihkannya kembali ke `/scan` dari rute di luar jatahnya.
+  **Semua itu KOSMETIK.** Penegakan sebenarnya ada di `authmw.RequireFullAdmin`
+  di backend, yang membalas **403** untuk seluruh `/api/v1/admin/` selain
+  `/checkin/*` - lihat `BACKEND.md`. Jangan pernah menjadikan penyembunyian
+  menu sebagai satu-satunya pembatas.
+  Peran `null` (sesi lama yang ter-rehydrate dari localStorage sebelum field
+  ini ada) diperlakukan sebagai **admin penuh**, sama seperti klaim `role`
+  kosong di backend - `isScannerRole()` memusatkan aturan itu.
+- **Petugas punya DUA rute: `/scan` dan `/arrivals`.** Daftarnya terpusat di
+  `SCANNER_ALLOWED_PATHS` (`app/routes/route-paths.ts`) dan dipakai bersama
+  `ProtectedRoute` (pengalihan) serta `AdminLayout` (penyaringan menu) -
+  dulu aturannya ditulis dua kali, dan itu cara paling gampang menambah menu
+  yang muncul di sidebar tapi langsung memantul balik saat diklik. Tambah rute
+  petugas baru = tambah satu entri di sana, bukan di dua tempat.
+- **Menu Group (`/groups`, `modules/admin/groups/`) ADMIN-ONLY**
+  (docs/plan/guest-groups/PLAN.md). SENGAJA **tidak** masuk
+  `SCANNER_ALLOWED_PATHS`: petugas gate MELIHAT nama group di hasil scan, tapi
+  tidak mengelolanya - dan `RequireFullAdmin` tetap membalas 403 kalau
+  URL-nya dipaksa. CRUD-nya mengikuti struktur `UsersPage`, tanpa filter
+  maupun pencarian (jumlah group puluhan).
+  Kolom **"Jumlah tamu" wajib ada**: dialah yang menjelaskan kenapa sebuah
+  group tidak bisa dihapus, sebelum admin mencobanya. Pesan penolakan hapus
+  diambil **apa adanya dari respons backend** (`apiErrorMessage`) - jangan
+  menulis ulang kalimat "masih dipakai N tamu" di frontend; hanya server yang
+  punya hitungan segar.
+- **Form tamu MEWAJIBKAN group, dan `GuestsPage` wajib menangani dua alur
+  terputus yang lahir dari kewajiban itu** (guest-groups §2.5). Keduanya
+  menghasilkan dropdown group kosong tapi **sebabnya beda, jadi pesannya
+  beda**:
+  1. *Belum ada group sama sekali* (instalasi baru) -> panel amber + tautan ke
+     `/groups`. Tanpa ini menu Tamu **mati total**: form mewajibkan group
+     sementara dropdown-nya tidak punya satu pun pilihan.
+  2. *Daftar group gagal dimuat* -> panel rose + tombol "Coba lagi"; daftar
+     tamu di bawahnya TETAP terbaca.
+  Di kedua keadaan itu tombol "+ Tambah tamu" nonaktif dengan `title` yang
+  menyebut sebabnya. Jangan menyatukan kedua pesan.
+  Nama group di kolom tabel **dipetakan di frontend** dari `listAllGroups()`
+  yang dimuat sekali (D2) - backend sengaja hanya mengirim `groupId`, jadi
+  tidak ada JOIN maupun query per baris. `groupId` null = tamu lama yang belum
+  bergroup, ditampilkan sebagai "—". `listAllGroups()` memakai `limit: 100`
+  (`pagination.MaxLimit` di backend) - **batas yang diketahui**; menaikkan
+  angkanya sendirian tidak berefek, backend memotongnya kembali.
+- **Kartu hasil Scan menampilkan group sebagai baris teks** di bawah nama,
+  berdampingan dengan pihak & status RSVP - **bukan** kartu besar sejajar
+  "Jumlah orang"/"Souvenir". Kedua kartu itu dipilih karena mengubah tindakan
+  TANGAN petugas; group adalah konteks. `groupName` datang sudah ter-resolve
+  dari server (petugas tidak bisa memanggil `/api/v1/admin/groups`) dan boleh
+  kosong - kartu wajib tetap utuh saat itu terjadi.
+- **`/arrivals` ("Tamu Masuk")** menampilkan daftar tamu yang sudah tiba
+  (nama, pihak, souvenir, jam masuk - terbaru di atas, berpaginasi 20) plus
+  empat kartu ringkasan dan satu bilah progres yang memecah kedatangan per
+  pihak mempelai. Dua permintaannya (`listArrivals` + `getCheckinSummary`)
+  dijalankan **paralel lewat `Promise.all`**, bukan berurutan - perangkat gate
+  belum tentu bersinyal kencang.
+  Angka **"± N orang" wajib tetap diberi tanda perkiraan**: ia berasal dari
+  `attendingCount` yang dijanjikan tamu saat RSVP, bukan hitung kepala di
+  pintu. Menghapus tanda "±" atau catatan kecil di bawah bilah progres akan
+  mengubahnya jadi klaim yang tidak bisa dibuktikan.
+  Halaman ini **lazy** dan mendapat chunk sendiri (~7 kB) yang terpisah dari
+  `ScanPage` - membuka daftar tidak ikut menarik pustaka kamera 465 kB.
+- **Halaman Scan (`modules/admin/scan/`) BUTUH HTTPS.** `getUserMedia` hanya
+  tersedia di secure context, jadi menguji lewat IP LAN ber-`http://` **tidak
+  akan bisa membuka kamera** - pakai `localhost` (dianggap secure) atau
+  terowongan HTTPS. Produksi sudah HTTPS.
+  - Satu-satunya rute yang diimpor **lazy** (`React.lazy` + `Suspense`),
+    berbeda dari rute admin lain yang eager: `@zxing/browser` sekitar 465 kB
+    dan mayoritas pengguna tidak pernah membuka Scan. Terbukti terpisah jadi
+    chunk `ScanPage-*.js` sendiri di hasil `npm run build:web`.
+  - Stream kamera **wajib dihentikan saat unmount** - kamera yang menyala
+    terus menguras baterai perangkat gate sepanjang acara.
+  - **Empat keadaan harus terlihat berbeda**: berhasil check-in, sudah
+    check-in sebelumnya (dengan jamnya), QR/tamu ditolak, dan **permintaan
+    gagal terkirim**. Yang terakhir sengaja memakai warna **netral, bukan
+    merah**: karena mode online-only, gangguan sinyal adalah kegagalan yang
+    paling mungkin terjadi di gate, dan petugas harus tahu tamunya belum
+    tercatat lalu mengulang - bukan menyangka QR tamu itu palsu dan menahannya
+    di pintu. Membedakannya dilakukan dengan memeriksa **ada-tidaknya
+    `err.response`**, bukan status code.
+  - Pindaian berulang **diredam** (kode identik diabaikan beberapa detik):
+    kamera mengirim frame terus-menerus, jadi satu QR yang tertahan di depan
+    lensa akan menembak API puluhan kali per detik tanpa itu.
+  - Izin kamera ditolak **tidak boleh membuat halaman buntu** - pencarian nama
+    tetap jalan sebagai jalur cadangan petugas.
 - `globals.css` (Tailwind) HANYA diimpor dari `admin-main.tsx` - jangan
   pernah diimpor dari `main.tsx`/komponen undangan.
 - Endpoint singleton (`GET/PATCH /api/v1/admin/content`) memakai pola

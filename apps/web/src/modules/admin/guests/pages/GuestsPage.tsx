@@ -8,6 +8,8 @@ import {
   updateGuest,
 } from '@/modules/admin/guests/services/guests.service'
 import { guestSchema, type GuestFormValues } from '@/modules/admin/guests/schemas/guest.schema'
+import { listAllGroups, type GuestGroup } from '@/modules/admin/groups/services/groups.service'
+import { ROUTE_PATHS } from '@/app/routes/route-paths'
 // Mengimpor service milik modul admin LAIN bukan pelanggaran di sisi frontend -
 // aturan batas contracts/ yang ketat berlaku untuk apps/api/** saja
 // (.claude/rules/backend-modular-monolith.md). Preseden yang sudah ada:
@@ -48,6 +50,10 @@ const EMPTY_FORM: GuestInput = {
   address: '',
   notes: '',
   isExpectedAttending: true,
+  // 0 = belum dipilih; zod menolaknya lewat .positive() dan backend menolaknya
+  // lewat validateGroupID (D4). Sengaja TIDAK di-default ke group pertama:
+  // admin harus memilih secara sadar, bukan menerima tebakan.
+  groupId: 0,
 }
 
 type FormErrors = Partial<Record<keyof GuestFormValues, string>>
@@ -58,6 +64,7 @@ export default function GuestsPage() {
   const [page, setPage] = useState(1)
   const [invitationTypeFilter, setInvitationTypeFilter] = useState('')
   const [souvenirTypeFilter, setSouvenirTypeFilter] = useState('')
+  const [groupFilter, setGroupFilter] = useState('')
   const [search, setSearch] = useState('')
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(false)
@@ -85,6 +92,54 @@ export default function GuestsPage() {
   const [waConfig, setWaConfig] = useState<WhatsAppConfig | null>(null)
   const [invitationContent, setInvitationContent] = useState<InvitationContent | null>(null)
 
+  // Daftar group dimuat SEKALI dan dipakai tiga kali: pemetaan id->nama di
+  // kolom tabel, dropdown filter, dan Select di form (D2). Inilah yang membuat
+  // kolom Group tidak butuh JOIN maupun query per baris.
+  //
+  // groupsFailed DIBEDAKAN dari "daftar kosong" (§2.5): keduanya menghasilkan
+  // dropdown kosong tapi sebabnya beda, jadi pesannya pun harus beda.
+  const [groups, setGroups] = useState<GuestGroup[]>([])
+  const [groupsFailed, setGroupsFailed] = useState(false)
+  const [groupsLoading, setGroupsLoading] = useState(true)
+  const [groupsReloadToken, setGroupsReloadToken] = useState(0)
+
+  useEffect(() => {
+    let cancelled = false
+    // setGroupsLoading(true) SENGAJA tidak dipanggil di sini - keadaan awalnya
+    // sudah true, dan pemuatan ulang menyalakannya lewat retryGroups() di
+    // handler klik. setState sinkron di badan effect memicu render berantai
+    // (react-hooks/set-state-in-effect).
+    listAllGroups()
+      .then((list) => {
+        if (cancelled) return
+        setGroups(list)
+        setGroupsFailed(false)
+        setGroupsLoading(false)
+      })
+      .catch(() => {
+        if (cancelled) return
+        setGroups([])
+        setGroupsFailed(true)
+        setGroupsLoading(false)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [groupsReloadToken])
+
+  /** Muat ulang daftar group setelah gagal (2.5 butir 2). */
+  function retryGroups() {
+    setGroupsLoading(true)
+    setGroupsFailed(false)
+    setGroupsReloadToken((t) => t + 1)
+  }
+
+  const groupNameById = new Map(groups.map((g) => [g.id, g.name]))
+  // Tombol "+ Tambah tamu" dinonaktifkan selama group belum bisa dipilih -
+  // tanpa ini, instalasi baru (§2.5 butir 1) membuat menu Tamu MATI TOTAL:
+  // form mewajibkan group sementara dropdown-nya tidak punya satu pun pilihan.
+  const canAddGuest = !groupsLoading && !groupsFailed && groups.length > 0
+
   // Kegagalan kedua permintaan ini TIDAK BOLEH menggagalkan daftar tamu -
   // ditangkap terpisah dari listGuests, dan akibatnya hanya tombol Kirim
   // Undangan yang nonaktif, bukan halaman error.
@@ -110,7 +165,7 @@ export default function GuestsPage() {
 
   useEffect(() => {
     let cancelled = false
-    listGuests({ page, status: '', q: debouncedSearch, invitationType: invitationTypeFilter, souvenirType: souvenirTypeFilter, respondedOnly: false })
+    listGuests({ page, status: '', q: debouncedSearch, invitationType: invitationTypeFilter, souvenirType: souvenirTypeFilter, groupId: groupFilter, respondedOnly: false })
       .then((res) => {
         if (cancelled) return
         setGuests(res.data)
@@ -126,7 +181,7 @@ export default function GuestsPage() {
     return () => {
       cancelled = true
     }
-  }, [page, invitationTypeFilter, souvenirTypeFilter, debouncedSearch, reloadToken])
+  }, [page, invitationTypeFilter, souvenirTypeFilter, groupFilter, debouncedSearch, reloadToken])
 
   function openCreate() {
     setEditingId(null)
@@ -148,6 +203,10 @@ export default function GuestsPage() {
       address: guest.address,
       notes: guest.notes,
       isExpectedAttending: guest.isExpectedAttending,
+      // Tamu lama bergroup kosong (§2.6) -> 0, sehingga form MEWAJIBKAN admin
+      // memilih group sebelum bisa menyimpan. Itu memang perilaku yang
+      // diinginkan K2, bukan efek samping.
+      groupId: guest.groupId ?? 0,
     })
     setFormErrors({})
     setFormOpen(true)
@@ -242,7 +301,16 @@ export default function GuestsPage() {
     return 'Template Pesan Undangan belum diisi di menu WhatsApp.'
   }
 
-  const hasFilter = debouncedSearch !== '' || invitationTypeFilter !== '' || souvenirTypeFilter !== ''
+  /** Alasan tombol Tambah tamu mati, ditampilkan sebagai title - dua sebab
+   * 2.5 dibedakan di sini juga, bukan cuma di panel di atas. */
+  function addGuestDisabledReason(): string | undefined {
+    if (canAddGuest) return undefined
+    if (groupsLoading) return 'Sedang memuat daftar group...'
+    if (groupsFailed) return 'Daftar group gagal dimuat. Coba muat ulang.'
+    return 'Belum ada group. Buat minimal satu group lebih dulu.'
+  }
+
+  const hasFilter = debouncedSearch !== '' || invitationTypeFilter !== '' || souvenirTypeFilter !== '' || groupFilter !== ''
 
   return (
     <div className="flex flex-col gap-6">
@@ -250,7 +318,7 @@ export default function GuestsPage() {
         title="Tamu"
         description="Kelola master data tamu undangan & buat link undangan personal."
         action={
-          <Button onClick={openCreate} size="md" className="shadow-sm">
+          <Button onClick={openCreate} size="md" className="shadow-sm" disabled={!canAddGuest} title={addGuestDisabledReason()}>
             <svg className="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z" />
             </svg>
@@ -258,6 +326,43 @@ export default function GuestsPage() {
           </Button>
         }
       />
+
+      {/* 2.5 butir 1 - BELUM ADA GROUP SAMA SEKALI. Tanpa panel ini, admin di
+          instalasi baru menghadapi tombol mati tanpa penjelasan dan menu Tamu
+          praktis mati total sampai ia menebak sendiri harus ke menu Group. */}
+      {!groupsLoading && !groupsFailed && groups.length === 0 && (
+        <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3.5 flex flex-col sm:flex-row sm:items-center gap-3">
+          <div className="flex-1">
+            <p className="text-sm font-semibold text-amber-900">Belum ada group tamu</p>
+            <p className="text-sm text-amber-800 leading-relaxed mt-0.5">
+              Setiap tamu wajib masuk ke satu group, jadi buat minimal satu group dulu sebelum menambah tamu.
+            </p>
+          </div>
+          <a
+            href={`/admin${ROUTE_PATHS.groups}`}
+            className="inline-flex items-center justify-center h-9 px-3.5 rounded-lg text-sm font-semibold whitespace-nowrap border border-amber-300 bg-white text-amber-800 hover:bg-amber-100 transition-colors shadow-2xs"
+          >
+            Buat group
+          </a>
+        </div>
+      )}
+
+      {/* 2.5 butir 2 - DAFTAR GROUP GAGAL DIMUAT. Gejalanya identik dengan
+          panel di atas (dropdown kosong, tambah tamu mati) tapi sebabnya beda,
+          jadi pesannya pun beda. Dua sebab, dua pesan - jangan disamakan. */}
+      {!groupsLoading && groupsFailed && (
+        <div className="rounded-xl border border-rose-200 bg-rose-50 px-4 py-3.5 flex flex-col sm:flex-row sm:items-center gap-3">
+          <div className="flex-1">
+            <p className="text-sm font-semibold text-rose-900">Daftar group gagal dimuat</p>
+            <p className="text-sm text-rose-800 leading-relaxed mt-0.5">
+              Nama group tidak bisa ditampilkan dan tamu baru belum bisa ditambahkan. Daftar tamu di bawah tetap bisa dibaca.
+            </p>
+          </div>
+          <Button size="sm" variant="secondary" onClick={retryGroups} className="whitespace-nowrap">
+            Coba lagi
+          </Button>
+        </div>
+      )}
 
       {/* Main Table Card */}
       <Card className="shadow-sm">
@@ -311,6 +416,25 @@ export default function GuestsPage() {
                 ))}
               </Select>
             </div>
+            {/* Filter group mengikuti pola dua filter di atasnya (D3). Nilainya
+                string supaya "" berarti tanpa filter, sama seperti keduanya -
+                bukan number yang harus dibedakan dari 0. */}
+            <div className="w-full sm:w-44">
+              <Select
+                value={groupFilter}
+                onChange={(e) => {
+                  setPage(1)
+                  setGroupFilter(e.target.value)
+                }}
+              >
+                <option value="">Semua group</option>
+                {groups.map((g) => (
+                  <option key={g.id} value={String(g.id)}>
+                    {g.name}
+                  </option>
+                ))}
+              </Select>
+            </div>
           </div>
 
           <div className="text-xs text-slate-500 font-medium whitespace-nowrap">
@@ -318,7 +442,7 @@ export default function GuestsPage() {
           </div>
         </div>
 
-        {loading && <TableSkeleton rows={6} cols={5} />}
+        {loading && <TableSkeleton rows={6} cols={6} />}
 
         {!loading && error && <ErrorState message="Gagal memuat data tamu." onRetry={() => setReloadToken((t) => t + 1)} />}
 
@@ -326,7 +450,13 @@ export default function GuestsPage() {
           <EmptyState
             title={hasFilter ? 'Tidak ada tamu yang cocok' : 'Belum ada tamu'}
             description={hasFilter ? 'Coba ubah kata kunci atau filter.' : 'Tambahkan tamu pertama untuk mulai mengelola kehadiran.'}
-            action={!hasFilter ? <Button size="sm" onClick={openCreate}>+ Tambah tamu</Button> : undefined}
+            action={
+              !hasFilter ? (
+                <Button size="sm" onClick={openCreate} disabled={!canAddGuest} title={addGuestDisabledReason()}>
+                  + Tambah tamu
+                </Button>
+              ) : undefined
+            }
           />
         )}
 
@@ -336,6 +466,7 @@ export default function GuestsPage() {
               <Thead>
                 <Tr>
                   <Th>Nama</Th>
+                  <Th>Group</Th>
                   <Th>Pihak</Th>
                   <Th>Jenis undangan</Th>
                   <Th>Souvenir</Th>
@@ -367,6 +498,14 @@ export default function GuestsPage() {
                             <span className="text-xs text-slate-400">{guest.gender ? GENDER_LABEL[guest.gender] : 'Gender belum diisi'}</span>
                           </div>
                         </div>
+                      </Td>
+                      {/* Nama group dipetakan DI SINI dari daftar yang sudah
+                          dimuat sekali (D2) - 0 query tambahan per baris.
+                          null = tamu lama yang belum bergroup (2.6). */}
+                      <Td>
+                        <span className="text-sm text-slate-700">
+                          {guest.groupId !== null ? (groupNameById.get(guest.groupId) ?? '—') : '—'}
+                        </span>
                       </Td>
                       <Td>
                         <span
@@ -546,6 +685,23 @@ export default function GuestsPage() {
             {SIDE_OPTIONS.map((s) => (
               <option key={s} value={s}>
                 {SIDE_LABEL[s]}
+              </option>
+            ))}
+          </Select>
+          {/* Group WAJIB (D4). Opsi kosong dipertahankan sebagai placeholder
+              supaya "belum dipilih" adalah keadaan yang TERLIHAT, bukan group
+              pertama yang diam-diam terpilih. Tamu lama yang belum bergroup
+              (2.6) juga masuk ke keadaan ini saat disunting. */}
+          <Select
+            label="Group"
+            value={String(form.groupId)}
+            error={formErrors.groupId}
+            onChange={(e) => setForm((f) => ({ ...f, groupId: Number(e.target.value) }))}
+          >
+            <option value="0">Pilih group...</option>
+            {groups.map((g) => (
+              <option key={g.id} value={String(g.id)}>
+                {g.name}
               </option>
             ))}
           </Select>

@@ -13,7 +13,7 @@ export default function LoginPage() {
   const [fieldErrors, setFieldErrors] = useState<{ username?: string; password?: string }>({})
   const [formError, setFormError] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
-  const setToken = useAuthStore((s) => s.setToken)
+  const setSession = useAuthStore((s) => s.setSession)
   const navigate = useNavigate()
 
   async function handleSubmit(e: React.FormEvent) {
@@ -34,9 +34,11 @@ export default function LoginPage() {
 
     setSubmitting(true)
     try {
-      const token = await login(parsed.data.username, parsed.data.password)
-      setToken(token)
-      navigate(ROUTE_PATHS.dashboard, { replace: true })
+      const { token, role } = await login(parsed.data.username, parsed.data.password)
+      setSession(token, role)
+      // Petugas gate diarahkan langsung ke Scan - dashboard tidak bisa
+      // dibukanya (docs/plan/scan-checkin-gate T12/T13).
+      navigate(role === 'scanner' ? ROUTE_PATHS.scan : ROUTE_PATHS.dashboard, { replace: true })
     } catch {
       setFormError('Username atau password salah. Silakan periksa kembali.')
     } finally {

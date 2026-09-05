@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"strconv"
+	"strings"
 
 	"undangan-ariana-adrian/internal/modules/guest/application"
 	"undangan-ariana-adrian/internal/shared/pagination"
@@ -45,9 +46,13 @@ func (h *Handler) ListGuests(w http.ResponseWriter, r *http.Request) {
 	q := r.URL.Query().Get("q")
 	invitationType := r.URL.Query().Get("invitation_type")
 	souvenirType := r.URL.Query().Get("souvenir_type")
+	// group_id kosong = tanpa filter (docs/plan/guest-groups/PLAN.md T8) -
+	// diteruskan sebagai string apa adanya, parsing & penolakan nilai yang
+	// salah bentuk jadi urusan service (parseGroupIDFilter).
+	groupID := r.URL.Query().Get("group_id")
 	respondedOnly := r.URL.Query().Get("responded") == "true"
 
-	guests, total, err := h.service.List(r.Context(), status, q, invitationType, souvenirType, respondedOnly, p)
+	guests, total, err := h.service.List(r.Context(), status, q, invitationType, souvenirType, groupID, respondedOnly, p)
 	if err != nil {
 		writeServiceError(w, err)
 		return
@@ -107,6 +112,88 @@ func (h *Handler) DeleteGuest(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	response.OK(w, "Guest deleted successfully", nil)
+}
+
+// --- admin: check-in di gate (docs/plan/scan-checkin-gate/PLAN.md T8) ---
+// Ketiganya boleh diakses akun petugas MAUPUN admin penuh - lihat router.go,
+// yang mendaftarkannya di belakang RequireAdmin (bukan RequireFullAdmin).
+
+// CheckinByQR menangani POST /api/v1/admin/checkin/scan.
+func (h *Handler) CheckinByQR(w http.ResponseWriter, r *http.Request) {
+	var body struct {
+		Code string `json:"code"`
+	}
+	if !decodeJSON(w, r, &body) {
+		return
+	}
+	result, err := h.service.CheckinByCode(r.Context(), body.Code)
+	if err != nil {
+		writeServiceError(w, err)
+		return
+	}
+	response.OK(w, "Check-in processed successfully", result)
+}
+
+// CheckinByID menangani POST /api/v1/admin/checkin/{id} - check-in manual
+// setelah petugas memilih tamu dari hasil pencarian nama.
+func (h *Handler) CheckinByID(w http.ResponseWriter, r *http.Request) {
+	id, err := strconv.ParseUint(r.PathValue("id"), 10, 64)
+	if err != nil {
+		response.BadRequest(w, "Invalid id", nil)
+		return
+	}
+	result, err := h.service.CheckinByID(r.Context(), id)
+	if err != nil {
+		writeServiceError(w, err)
+		return
+	}
+	response.OK(w, "Check-in processed successfully", result)
+}
+
+// SearchForCheckin menangani GET /api/v1/admin/checkin/search?q=...
+//
+// Balas response.OK dengan array TANPA `meta` - ini bukan ListGuests yang
+// berpaginasi; hasilnya sudah dibatasi keras di service (api-standard.md
+// mewajibkan meta hanya untuk respons berpaginasi).
+func (h *Handler) SearchForCheckin(w http.ResponseWriter, r *http.Request) {
+	q := strings.TrimSpace(r.URL.Query().Get("q"))
+	// q kosong -> array kosong. JANGAN mengembalikan 20 tamu pertama secara
+	// acak begitu petugas menghapus ketikannya.
+	if q == "" {
+		response.OK(w, "Guests retrieved successfully", []application.CheckinSearchItemDTO{})
+		return
+	}
+	items, err := h.service.SearchForCheckin(r.Context(), q)
+	if err != nil {
+		writeServiceError(w, err)
+		return
+	}
+	response.OK(w, "Guests retrieved successfully", items)
+}
+
+// ListArrivals menangani GET /api/v1/admin/checkin/arrivals - menu
+// "Tamu Masuk". BERPAGINASI (pakai response.OKPaginated + meta), berbeda dari
+// SearchForCheckin yang dibatasi keras 20 tanpa meta: daftar ini diramban dan
+// tumbuh sepanjang acara.
+func (h *Handler) ListArrivals(w http.ResponseWriter, r *http.Request) {
+	p := pagination.Parse(r)
+	items, total, err := h.service.ListArrivals(r.Context(), p)
+	if err != nil {
+		writeServiceError(w, err)
+		return
+	}
+	response.OKPaginated(w, "Arrivals retrieved successfully", items, pagination.Meta(p, total))
+}
+
+// GetCheckinSummary menangani GET /api/v1/admin/checkin/summary - angka
+// kartu ringkasan gate.
+func (h *Handler) GetCheckinSummary(w http.ResponseWriter, r *http.Request) {
+	summary, err := h.service.CheckinSummary(r.Context())
+	if err != nil {
+		writeServiceError(w, err)
+		return
+	}
+	response.OK(w, "Check-in summary retrieved successfully", summary)
 }
 
 // --- publik: resolve token & update RSVP (PLAN.md §5.4) ---

@@ -10,12 +10,39 @@ import (
 	"database/sql"
 )
 
+const countCheckedInGuests = `-- name: CountCheckedInGuests :one
+SELECT COUNT(*) FROM guests WHERE checked_in_at IS NOT NULL
+`
+
+func (q *Queries) CountCheckedInGuests(ctx context.Context) (int64, error) {
+	row := q.db.QueryRowContext(ctx, countCheckedInGuests)
+	var count int64
+	err := row.Scan(&count)
+	return count, err
+}
+
+const countGuestsByGroupID = `-- name: CountGuestsByGroupID :one
+SELECT COUNT(*) FROM guests WHERE group_id = ?
+`
+
+// CountGuestsByGroupID adalah penjaga K4: dipanggil TEPAT SEBELUM menghapus
+// group supaya hitungannya sesegar mungkin, dan angkanya ikut disebut di
+// pesan penolakan ("masih dipakai N tamu"). Ber-index lewat
+// idx_guests_group_id (migration 000016).
+func (q *Queries) CountGuestsByGroupID(ctx context.Context, groupID sql.NullInt64) (int64, error) {
+	row := q.db.QueryRowContext(ctx, countGuestsByGroupID, groupID)
+	var count int64
+	err := row.Scan(&count)
+	return count, err
+}
+
 const countGuestsFiltered = `-- name: CountGuestsFiltered :one
 SELECT COUNT(*) FROM guests
 WHERE (? IS NULL OR rsvp_status = ?)
   AND (CAST(? AS UNSIGNED) = 0 OR rsvp_status != 'pending')
   AND (? IS NULL OR invitation_type = ?)
   AND (? IS NULL OR souvenir_type = ?)
+  AND (? IS NULL OR group_id = ?)
   AND (? IS NULL OR name LIKE ? OR phone LIKE ? OR email LIKE ?)
 `
 
@@ -24,6 +51,7 @@ type CountGuestsFilteredParams struct {
 	RespondedOnly  int64
 	InvitationType NullGuestsInvitationType
 	SouvenirType   NullGuestsSouvenirType
+	GroupID        sql.NullInt64
 	Q              sql.NullString
 }
 
@@ -36,6 +64,8 @@ func (q *Queries) CountGuestsFiltered(ctx context.Context, arg CountGuestsFilter
 		arg.InvitationType,
 		arg.SouvenirType,
 		arg.SouvenirType,
+		arg.GroupID,
+		arg.GroupID,
 		arg.Q,
 		arg.Q,
 		arg.Q,
@@ -65,6 +95,43 @@ func (q *Queries) CountGuestsGroupedByGender(ctx context.Context) ([]CountGuests
 	for rows.Next() {
 		var i CountGuestsGroupedByGenderRow
 		if err := rows.Scan(&i.Gender, &i.Total); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const countGuestsGroupedByGroup = `-- name: CountGuestsGroupedByGroup :many
+SELECT group_id, COUNT(*) AS total FROM guests WHERE group_id IS NOT NULL GROUP BY group_id
+`
+
+type CountGuestsGroupedByGroupRow struct {
+	GroupID sql.NullInt64
+	Total   int64
+}
+
+// CountGuestsGroupedByGroup mengisi kolom "Jumlah tamu" SELURUH baris di
+// halaman Group lewat SATU query - bukan satu COUNT per baris group (yang
+// itu N+1). Pola persis CountGuestsGroupedByStatus di atas.
+// WHERE group_id IS NOT NULL: tamu lama yang belum bergroup (K2/§2.6) tidak
+// punya baris hasil untuk dipetakan ke group mana pun.
+func (q *Queries) CountGuestsGroupedByGroup(ctx context.Context) ([]CountGuestsGroupedByGroupRow, error) {
+	rows, err := q.db.QueryContext(ctx, countGuestsGroupedByGroup)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []CountGuestsGroupedByGroupRow
+	for rows.Next() {
+		var i CountGuestsGroupedByGroupRow
+		if err := rows.Scan(&i.GroupID, &i.Total); err != nil {
 			return nil, err
 		}
 		items = append(items, i)
@@ -211,14 +278,15 @@ func (q *Queries) CountGuestsGroupedByStatus(ctx context.Context) ([]CountGuests
 }
 
 const createGuest = `-- name: CreateGuest :execlastid
-INSERT INTO guests (name, phone, side, token, rsvp_status, gender, invitation_type, souvenir_type, email, address, notes, is_expected_attending)
-VALUES (?, ?, ?, ?, 'pending', ?, ?, ?, ?, ?, ?, ?)
+INSERT INTO guests (name, phone, side, group_id, token, rsvp_status, gender, invitation_type, souvenir_type, email, address, notes, is_expected_attending)
+VALUES (?, ?, ?, ?, ?, 'pending', ?, ?, ?, ?, ?, ?, ?)
 `
 
 type CreateGuestParams struct {
 	Name                string
 	Phone               string
 	Side                GuestsSide
+	GroupID             sql.NullInt64
 	Token               string
 	Gender              NullGuestsGender
 	InvitationType      GuestsInvitationType
@@ -234,6 +302,7 @@ func (q *Queries) CreateGuest(ctx context.Context, arg CreateGuestParams) (int64
 		arg.Name,
 		arg.Phone,
 		arg.Side,
+		arg.GroupID,
 		arg.Token,
 		arg.Gender,
 		arg.InvitationType,
@@ -258,8 +327,48 @@ func (q *Queries) DeleteGuest(ctx context.Context, id uint64) error {
 	return err
 }
 
+const getCheckinSummary = `-- name: GetCheckinSummary :one
+SELECT
+  CAST(COALESCE(SUM(CASE WHEN checked_in_at IS NOT NULL AND side = 'groom' THEN 1 ELSE 0 END), 0) AS UNSIGNED) AS arrived_groom,
+  CAST(COALESCE(SUM(CASE WHEN checked_in_at IS NOT NULL AND side = 'bride' THEN 1 ELSE 0 END), 0) AS UNSIGNED) AS arrived_bride,
+  CAST(COALESCE(SUM(CASE WHEN checked_in_at IS NOT NULL THEN 1 ELSE 0 END), 0) AS UNSIGNED) AS arrived_total,
+  CAST(COALESCE(SUM(CASE WHEN checked_in_at IS NOT NULL THEN attending_count ELSE 0 END), 0) AS UNSIGNED) AS arrived_pax,
+  COUNT(*) AS total_guests
+FROM guests
+`
+
+type GetCheckinSummaryRow struct {
+	ArrivedGroom int64
+	ArrivedBride int64
+	ArrivedTotal int64
+	ArrivedPax   int64
+	TotalGuests  int64
+}
+
+// GetCheckinSummary menghasilkan SELURUH angka kartu ringkasan gate dalam
+// SATU kali scan tabel - bukan 4 query COUNT terpisah, pola yang sama
+// dengan CountGuestsGroupedByStatus di atas.
+//
+// arrived_* menghitung BARIS TAMU (undangan), bukan orang, konsisten dengan
+// `total_guests` sebagai penyebutnya. arrived_pax terpisah dan menjumlahkan
+// attending_count: itu jumlah orang yang DIJANJIKAN tamu saat RSVP, bukan
+// hasil hitung kepala di pintu - sistem ini memang tidak merekamnya
+// (docs/plan/scan-checkin-gate/PLAN.md §3.2). Label di UI harus jujur soal itu.
+func (q *Queries) GetCheckinSummary(ctx context.Context) (GetCheckinSummaryRow, error) {
+	row := q.db.QueryRowContext(ctx, getCheckinSummary)
+	var i GetCheckinSummaryRow
+	err := row.Scan(
+		&i.ArrivedGroom,
+		&i.ArrivedBride,
+		&i.ArrivedTotal,
+		&i.ArrivedPax,
+		&i.TotalGuests,
+	)
+	return i, err
+}
+
 const getGuestByID = `-- name: GetGuestByID :one
-SELECT id, name, phone, side, token, rsvp_status, rsvp_responded_at, created_at, updated_at, gender, invitation_type, souvenir_type, email, address, notes, attending_count, is_expected_attending FROM guests WHERE id = ? LIMIT 1
+SELECT id, name, phone, side, token, rsvp_status, rsvp_responded_at, created_at, updated_at, gender, invitation_type, souvenir_type, email, address, notes, attending_count, is_expected_attending, checked_in_at, group_id FROM guests WHERE id = ? LIMIT 1
 `
 
 func (q *Queries) GetGuestByID(ctx context.Context, id uint64) (Guest, error) {
@@ -283,12 +392,14 @@ func (q *Queries) GetGuestByID(ctx context.Context, id uint64) (Guest, error) {
 		&i.Notes,
 		&i.AttendingCount,
 		&i.IsExpectedAttending,
+		&i.CheckedInAt,
+		&i.GroupID,
 	)
 	return i, err
 }
 
 const getGuestByToken = `-- name: GetGuestByToken :one
-SELECT id, name, phone, side, token, rsvp_status, rsvp_responded_at, created_at, updated_at, gender, invitation_type, souvenir_type, email, address, notes, attending_count, is_expected_attending FROM guests WHERE token = ? LIMIT 1
+SELECT id, name, phone, side, token, rsvp_status, rsvp_responded_at, created_at, updated_at, gender, invitation_type, souvenir_type, email, address, notes, attending_count, is_expected_attending, checked_in_at, group_id FROM guests WHERE token = ? LIMIT 1
 `
 
 func (q *Queries) GetGuestByToken(ctx context.Context, token string) (Guest, error) {
@@ -312,16 +423,75 @@ func (q *Queries) GetGuestByToken(ctx context.Context, token string) (Guest, err
 		&i.Notes,
 		&i.AttendingCount,
 		&i.IsExpectedAttending,
+		&i.CheckedInAt,
+		&i.GroupID,
 	)
 	return i, err
 }
 
+const listCheckedInGuests = `-- name: ListCheckedInGuests :many
+SELECT id, name, side, souvenir_type, attending_count, checked_in_at FROM guests
+WHERE checked_in_at IS NOT NULL
+ORDER BY checked_in_at DESC
+LIMIT ? OFFSET ?
+`
+
+type ListCheckedInGuestsParams struct {
+	Limit  int32
+	Offset int32
+}
+
+type ListCheckedInGuestsRow struct {
+	ID             uint64
+	Name           string
+	Side           GuestsSide
+	SouvenirType   GuestsSouvenirType
+	AttendingCount uint8
+	CheckedInAt    sql.NullTime
+}
+
+// ListCheckedInGuests: daftar tamu yang SUDAH tiba, terbaru di atas -
+// menu "Tamu Masuk" milik petugas gate. Kolomnya disebut satu per satu
+// (bukan SELECT *) supaya baris hasil TIDAK membawa phone/email/address/
+// notes/token ke jalur yang diakses akun petugas; lihat CheckinSummaryDTO
+// di application/dto.go untuk alasan keamanannya.
+func (q *Queries) ListCheckedInGuests(ctx context.Context, arg ListCheckedInGuestsParams) ([]ListCheckedInGuestsRow, error) {
+	rows, err := q.db.QueryContext(ctx, listCheckedInGuests, arg.Limit, arg.Offset)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListCheckedInGuestsRow
+	for rows.Next() {
+		var i ListCheckedInGuestsRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.Name,
+			&i.Side,
+			&i.SouvenirType,
+			&i.AttendingCount,
+			&i.CheckedInAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listGuestsFiltered = `-- name: ListGuestsFiltered :many
-SELECT id, name, phone, side, token, rsvp_status, rsvp_responded_at, created_at, updated_at, gender, invitation_type, souvenir_type, email, address, notes, attending_count, is_expected_attending FROM guests
+SELECT id, name, phone, side, token, rsvp_status, rsvp_responded_at, created_at, updated_at, gender, invitation_type, souvenir_type, email, address, notes, attending_count, is_expected_attending, checked_in_at, group_id FROM guests
 WHERE (? IS NULL OR rsvp_status = ?)
   AND (CAST(? AS UNSIGNED) = 0 OR rsvp_status != 'pending')
   AND (? IS NULL OR invitation_type = ?)
   AND (? IS NULL OR souvenir_type = ?)
+  AND (? IS NULL OR group_id = ?)
   AND (? IS NULL OR name LIKE ? OR phone LIKE ? OR email LIKE ?)
 ORDER BY created_at DESC
 LIMIT ? OFFSET ?
@@ -332,6 +502,7 @@ type ListGuestsFilteredParams struct {
 	RespondedOnly  int64
 	InvitationType NullGuestsInvitationType
 	SouvenirType   NullGuestsSouvenirType
+	GroupID        sql.NullInt64
 	Q              sql.NullString
 	Limit          int32
 	Offset         int32
@@ -346,6 +517,8 @@ func (q *Queries) ListGuestsFiltered(ctx context.Context, arg ListGuestsFiltered
 		arg.InvitationType,
 		arg.SouvenirType,
 		arg.SouvenirType,
+		arg.GroupID,
+		arg.GroupID,
 		arg.Q,
 		arg.Q,
 		arg.Q,
@@ -378,6 +551,8 @@ func (q *Queries) ListGuestsFiltered(ctx context.Context, arg ListGuestsFiltered
 			&i.Notes,
 			&i.AttendingCount,
 			&i.IsExpectedAttending,
+			&i.CheckedInAt,
+			&i.GroupID,
 		); err != nil {
 			return nil, err
 		}
@@ -437,8 +612,27 @@ func (q *Queries) ListRecentRsvpResponses(ctx context.Context) ([]ListRecentRsvp
 	return items, nil
 }
 
+const markGuestCheckedIn = `-- name: MarkGuestCheckedIn :execrows
+UPDATE guests SET checked_in_at = NOW() WHERE id = ? AND checked_in_at IS NULL
+`
+
+// MarkGuestCheckedIn adalah UPDATE BERSYARAT, bukan baca-lalu-tulis
+// (docs/plan/scan-checkin-gate/PLAN.md D5). `AND checked_in_at IS NULL`
+// membuat dua petugas yang memindai QR yang sama pada detik yang sama tidak
+// saling menimpa jam kedatangan, tanpa perlu transaksi.
+// :execrows (BUKAN :exec) disengaja: jumlah baris terpengaruh itulah yang
+// membedakan "baru saja check-in" (1) dari "sudah check-in sebelumnya" (0) -
+// persis informasi yang diminta K3.
+func (q *Queries) MarkGuestCheckedIn(ctx context.Context, id uint64) (int64, error) {
+	result, err := q.db.ExecContext(ctx, markGuestCheckedIn, id)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected()
+}
+
 const updateGuest = `-- name: UpdateGuest :exec
-UPDATE guests SET name = ?, phone = ?, side = ?, gender = ?, invitation_type = ?, souvenir_type = ?, email = ?, address = ?, notes = ?, is_expected_attending = ?
+UPDATE guests SET name = ?, phone = ?, side = ?, group_id = ?, gender = ?, invitation_type = ?, souvenir_type = ?, email = ?, address = ?, notes = ?, is_expected_attending = ?
 WHERE id = ?
 `
 
@@ -446,6 +640,7 @@ type UpdateGuestParams struct {
 	Name                string
 	Phone               string
 	Side                GuestsSide
+	GroupID             sql.NullInt64
 	Gender              NullGuestsGender
 	InvitationType      GuestsInvitationType
 	SouvenirType        GuestsSouvenirType
@@ -461,6 +656,7 @@ func (q *Queries) UpdateGuest(ctx context.Context, arg UpdateGuestParams) error 
 		arg.Name,
 		arg.Phone,
 		arg.Side,
+		arg.GroupID,
 		arg.Gender,
 		arg.InvitationType,
 		arg.SouvenirType,

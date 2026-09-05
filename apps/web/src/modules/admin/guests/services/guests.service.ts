@@ -18,6 +18,10 @@ export interface Guest {
   notes: string
   attendingCount: number
   isExpectedAttending: boolean
+  /** null = tamu lama yang belum pernah disunting sejak migration 000016
+   * (guest-groups §2.6). Namanya dipetakan di halaman dari daftar group yang
+   * sudah dimuat sekali (D2) - backend sengaja hanya mengirim id-nya. */
+  groupId: number | null
 }
 
 export interface GuestInput {
@@ -31,6 +35,9 @@ export interface GuestInput {
   address: string
   notes: string
   isExpectedAttending: boolean
+  /** WAJIB terisi (>0). Bukan `| null`: form tidak boleh mengirim tamu tanpa
+   * group, dan backend menolaknya juga (D4). */
+  groupId: number
 }
 
 // RecentResponse - satu baris kartu "Aktivitas RSVP terbaru" (dashboard-
@@ -71,6 +78,9 @@ export interface GuestListParams {
   q: string
   invitationType: string
   souvenirType: string
+  /** String kosong = tanpa filter, sama seperti dua filter di atasnya.
+   * Dikirim sebagai `group_id` (snake_case) hanya bila terisi. */
+  groupId: string
   respondedOnly: boolean
 }
 
@@ -91,7 +101,7 @@ export interface ListResponse {
  * (keputusan #12).
  */
 export async function listGuests(params: GuestListParams): Promise<ListResponse> {
-  const { page, status, q, invitationType, souvenirType, respondedOnly } = params
+  const { page, status, q, invitationType, souvenirType, groupId, respondedOnly } = params
   const res = await httpClient.get<ApiListResponse>('/api/v1/admin/guests', {
     params: {
       page,
@@ -100,6 +110,7 @@ export async function listGuests(params: GuestListParams): Promise<ListResponse>
       ...(q ? { q } : {}),
       ...(invitationType ? { invitation_type: invitationType } : {}),
       ...(souvenirType ? { souvenir_type: souvenirType } : {}),
+      ...(groupId ? { group_id: groupId } : {}),
       ...(respondedOnly ? { responded: 'true' } : {}),
     },
   })

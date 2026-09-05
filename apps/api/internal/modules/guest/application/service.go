@@ -6,7 +6,6 @@ import (
 	"database/sql"
 	"encoding/hex"
 	"errors"
-	"fmt"
 	"log"
 	"strings"
 
@@ -25,6 +24,19 @@ var (
 	ErrInvalidInvitationType = errors.New("invitation type must be 'online' or 'physical'")
 	ErrInvalidSouvenirType   = errors.New("souvenir type must be 'regular' or 'vip'")
 	ErrInvalidAttendingCount = errors.New("attending count must be 1 or 2")
+	ErrInvalidCheckinCode    = errors.New("QR tidak dikenali")
+
+	// Group tamu (docs/plan/guest-groups/PLAN.md T5/T6). Pesannya berbahasa
+	// Indonesia dan LAYAK DIBACA ADMIN - GroupsPage menampilkan pesan dari
+	// respons backend apa adanya, tidak menulis ulang sendiri (T13). Pola yang
+	// sama sudah dipakai ErrInvalidCheckinCode di atas.
+	ErrGroupNameRequired       = errors.New("Nama group wajib diisi")
+	ErrGroupNameTooLong        = errors.New("Nama group maksimal 100 karakter")
+	ErrGroupDescriptionTooLong = errors.New("Deskripsi group maksimal 255 karakter")
+	ErrGroupNameTaken          = errors.New("Nama group sudah dipakai")
+	ErrGroupNotFound           = errors.New("Group tidak ditemukan")
+	ErrGroupInUse              = errors.New("Group tidak bisa dihapus")
+	ErrInvalidGroupID          = errors.New("Filter group tidak valid")
 )
 
 var validSides = map[string]bool{"groom": true, "bride": true}
@@ -96,6 +108,14 @@ func toDTO(g sqlc.Guest) GuestDTO {
 	if g.Notes.Valid {
 		notes = g.Notes.String
 	}
+	// GroupID mengikuti pola Gender di atas: NULL -> nil, terisi -> pointer.
+	// Kolomnya BIGINT UNSIGNED NULL tapi sqlc memilih sql.NullInt64 untuk itu,
+	// jadi cast eksplisit ke uint64 memang dibutuhkan di sini.
+	var groupID *uint64
+	if g.GroupID.Valid {
+		v := uint64(g.GroupID.Int64)
+		groupID = &v
+	}
 	return GuestDTO{
 		ID: g.ID, Name: g.Name, Phone: g.Phone,
 		Side: string(g.Side), Token: g.Token,
@@ -110,6 +130,7 @@ func toDTO(g sqlc.Guest) GuestDTO {
 		Notes:               notes,
 		AttendingCount:      int(g.AttendingCount),
 		IsExpectedAttending: g.IsExpectedAttending,
+		GroupID:             groupID,
 	}
 }
 
@@ -143,6 +164,11 @@ func (s *Service) Create(ctx context.Context, in GuestInput) (GuestDTO, error) {
 	if err := validateProfileFields(in); err != nil {
 		return GuestDTO{}, err
 	}
+	// Group WAJIB ditegakkan di backend, bukan cuma di form (D4) - lihat
+	// validateGroupID di service_groups.go.
+	if err := s.validateGroupID(ctx, in.GroupID); err != nil {
+		return GuestDTO{}, err
+	}
 	token, err := generateToken()
 	if err != nil {
 		return GuestDTO{}, err
@@ -151,6 +177,7 @@ func (s *Service) Create(ctx context.Context, in GuestInput) (GuestDTO, error) {
 		Name:                in.Name,
 		Phone:               in.Phone,
 		Side:                sqlc.GuestsSide(in.Side),
+		GroupID:             sql.NullInt64{Int64: int64(in.GroupID), Valid: true},
 		Token:               token,
 		Gender:              sqlc.NullGuestsGender{GuestsGender: sqlc.GuestsGender(in.Gender), Valid: true},
 		InvitationType:      sqlc.GuestsInvitationType(in.InvitationType),
@@ -176,10 +203,16 @@ func (s *Service) Update(ctx context.Context, id uint64, in GuestInput) error {
 	if err := validateProfileFields(in); err != nil {
 		return err
 	}
+	// Sama seperti Create - D4 berlaku di KEDUA jalur, kalau tidak, tamu bisa
+	// dilepas dari group-nya lewat Update.
+	if err := s.validateGroupID(ctx, in.GroupID); err != nil {
+		return err
+	}
 	return s.repo.Update(ctx, sqlc.UpdateGuestParams{
 		Name:                in.Name,
 		Phone:               in.Phone,
 		Side:                sqlc.GuestsSide(in.Side),
+		GroupID:             sql.NullInt64{Int64: int64(in.GroupID), Valid: true},
 		Gender:              sqlc.NullGuestsGender{GuestsGender: sqlc.GuestsGender(in.Gender), Valid: true},
 		InvitationType:      sqlc.GuestsInvitationType(in.InvitationType),
 		SouvenirType:        sqlc.GuestsSouvenirType(in.SouvenirType),
@@ -199,7 +232,7 @@ func (s *Service) Delete(ctx context.Context, id uint64) error {
 // filter status, jenis undangan, souvenir, DAN pencarian nama/telepon/email
 // digabung dalam satu query (admin-ui-redesign keputusan #9, diperluas
 // guest-fields-admin-layout keputusan #13).
-func (s *Service) List(ctx context.Context, status, q, invitationType, souvenirType string, respondedOnly bool, p pagination.Params) ([]GuestDTO, int, error) {
+func (s *Service) List(ctx context.Context, status, q, invitationType, souvenirType, groupID string, respondedOnly bool, p pagination.Params) ([]GuestDTO, int, error) {
 	var statusArg sqlc.NullGuestsRsvpStatus
 	if status != "" {
 		if !validStatuses[status] {
@@ -224,6 +257,14 @@ func (s *Service) List(ctx context.Context, status, q, invitationType, souvenirT
 		souvenirTypeArg = sqlc.NullGuestsSouvenirType{GuestsSouvenirType: sqlc.GuestsSouvenirType(souvenirType), Valid: true}
 	}
 
+	// Filter group TIDAK butuh JOIN sama sekali (§2.3): group_id ada di baris
+	// `guests` itu sendiri dan ber-index idx_guests_group_id, jadi ini cuma
+	// satu klausa narg tambahan - persis seperti tiga filter di atasnya.
+	groupIDArg, err := parseGroupIDFilter(groupID)
+	if err != nil {
+		return nil, 0, err
+	}
+
 	var qArg sql.NullString
 	if q != "" {
 		qArg = sql.NullString{String: escapeLike(q), Valid: true}
@@ -240,13 +281,13 @@ func (s *Service) List(ctx context.Context, status, q, invitationType, souvenirT
 	}
 
 	total, err := s.repo.CountFiltered(ctx, sqlc.CountGuestsFilteredParams{
-		Status: statusArg, RespondedOnly: respondedOnlyArg, InvitationType: invitationTypeArg, SouvenirType: souvenirTypeArg, Q: qArg,
+		Status: statusArg, RespondedOnly: respondedOnlyArg, InvitationType: invitationTypeArg, SouvenirType: souvenirTypeArg, GroupID: groupIDArg, Q: qArg,
 	})
 	if err != nil {
 		return nil, 0, err
 	}
 	rows, err := s.repo.ListFiltered(ctx, sqlc.ListGuestsFilteredParams{
-		Status: statusArg, RespondedOnly: respondedOnlyArg, InvitationType: invitationTypeArg, SouvenirType: souvenirTypeArg, Q: qArg,
+		Status: statusArg, RespondedOnly: respondedOnlyArg, InvitationType: invitationTypeArg, SouvenirType: souvenirTypeArg, GroupID: groupIDArg, Q: qArg,
 		Limit: int32(p.Limit), Offset: int32(p.Offset()),
 	})
 	if err != nil {
@@ -422,15 +463,46 @@ func resolveAttendingCount(status string, requested int) (int, error) {
 	return requested, nil
 }
 
-// buildQRPayload menyusun teks QR dari nama tamu (tabel guest sendiri) +
-// info undangan (lewat contract content, keputusan #19) + jumlah tamu.
-func buildQRPayload(guestName string, info contentContracts.QRInfo, attendingCount int) string {
-	return fmt.Sprintf(
-		"Wedding Invitation - %s & %s\nNama Tamu: %s\nStatus: Akan Hadir\nJumlah Tamu: %d\nTanggal: %s",
-		// Mempelai PRIA dulu, baru wanita - konsisten dengan tampilan
-		// undangan dan judul preview link (router/og_meta.go).
-		info.GroomName, info.BrideName, guestName, attendingCount, info.WeddingDateLabel,
-	)
+// checkinCodePrefix menandai QR terbitan sistem ini (docs/plan/
+// scan-checkin-gate/PLAN.md D1). Berprefiks, BUKAN URL: URL membuat token
+// tamu tercatat di riwayat browser siapa pun yang memindainya, sedangkan
+// prefiks berversi membuat pemindai bisa menolak QR asing SEBELUM menembak
+// API dan memudahkan ganti format kelak.
+//
+// KEMBAR LINTAS BAHASA (D10): nilai yang sama diketik ulang di
+// RsvpConfirmation.tsx (composeLocalQrPayload) karena browser tidak bisa
+// memanggil konstanta Go. Mengubah salah satu saja memutus rantai antara QR
+// yang diterbitkan dan pemindai di gate - ubah keduanya.
+const checkinCodePrefix = "ELW1:"
+
+// buildQRPayload menyusun ISI QR tamu: prefiks + token tamu.
+//
+// Sebelum docs/plan/scan-checkin-gate isinya teks yang dibaca manusia
+// (nama/status/jumlah/tanggal), dan itu SECARA TEKNIS TIDAK BISA dipakai
+// untuk identifikasi (§2.1): hasil pindaian tidak bisa dipetakan balik ke
+// baris tamu, nama kembar lumrah di daftar tamu pernikahan, dan siapa pun
+// bisa mengetik teks yang sama lalu membuat QR-nya sendiri. Kolom `token`
+// sudah ada, UNIQUE, dan selalu dibuat server-side - jadi ini memakai ulang
+// identitas yang sudah terbukti, bukan menciptakan yang baru.
+//
+// Informasi yang dulu dititipkan di dalam QR tidak hilang: kartu masuk sudah
+// menampilkan nama, jumlah orang, dan tanggal sebagai teks di kartunya
+// sendiri.
+func buildQRPayload(token string) string {
+	return checkinCodePrefix + token
+}
+
+// parseCheckinCode adalah FUNGSI MURNI (diuji tanpa DB - checkin_test.go).
+// TrimSpace dulu: pembaca QR kadang menyisipkan newline di ujung. Selain
+// prefiks yang benar dengan sisa tidak kosong, semuanya ditolak - termasuk
+// QR format LAMA, yang memang sengaja tidak diberi jalur kompatibilitas (K1)
+// dan lebih baik ditolak dengan pesan jelas daripada dicocokkan lewat nama.
+func parseCheckinCode(code string) (string, bool) {
+	token, ok := strings.CutPrefix(strings.TrimSpace(code), checkinCodePrefix)
+	if !ok || token == "" {
+		return "", false
+	}
+	return token, true
 }
 
 // UpdateRsvpStatus adalah endpoint publik (PLAN.md §5.4/fitur #6, diperluas
@@ -466,16 +538,25 @@ func (s *Service) UpdateRsvpStatus(ctx context.Context, token, status string, at
 		return "", nil
 	}
 
+	// Payload dihitung SEBELUM GetQRInfo, dan cabang gagal di bawah
+	// mengembalikan nilai yang SAMA (docs/plan/scan-checkin-gate D9/§2.4).
+	// Dulu cabang itu mengembalikan teks minimal tanpa identitas, dan itu
+	// benar untuk payload lama. Begitu QR berisi token, cabang tersebut jadi
+	// jebakan: gangguan sesaat pada tabel invitation_content akan diam-diam
+	// memberi tamu QR TANPA identitas yang ditolak di gate - padahal
+	// token-nya tersedia sepanjang waktu di row.Token dan tidak bergantung
+	// pada `info` sama sekali.
+	qrPayload := buildQRPayload(row.Token)
+
 	info, err := s.invitationInfo.GetQRInfo(ctx)
 	if err != nil {
-		// Kegagalan membaca info undangan TIDAK membuat RSVP gagal - qrPayload
-		// minimal tetap dikembalikan, pengiriman WhatsApp dilewati (butuh
-		// CoupleName/EventDateLabel yang gagal diambil).
+		// Kegagalan membaca info undangan TIDAK membuat RSVP gagal - QR-nya
+		// tetap sah dan tetap bisa dipindai di gate; hanya pengiriman
+		// WhatsApp yang dilewati (butuh CoupleName/EventDateLabel yang gagal
+		// diambil).
 		log.Printf("guest: gagal membaca info undangan untuk QR tamu %d: %v", row.ID, err)
-		return fmt.Sprintf("Nama Tamu: %s\nStatus: Akan Hadir\nJumlah Tamu: %d", row.Name, finalCount), nil
+		return qrPayload, nil
 	}
-
-	qrPayload := buildQRPayload(row.Name, info, finalCount)
 
 	if s.sender != nil {
 		guestID, guestName, phone := row.ID, row.Name, row.Phone
@@ -495,14 +576,213 @@ func (s *Service) UpdateRsvpStatus(ctx context.Context, token, status string, at
 	return qrPayload, nil
 }
 
+// --- check-in di gate (docs/plan/scan-checkin-gate/PLAN.md T7) ---
+
+// CheckinByCode adalah jalur pindai QR. Kode yang bukan terbitan sistem ini
+// ditolak SEBELUM menyentuh database.
+func (s *Service) CheckinByCode(ctx context.Context, code string) (CheckinResultDTO, error) {
+	token, ok := parseCheckinCode(code)
+	if !ok {
+		return CheckinResultDTO{}, ErrInvalidCheckinCode
+	}
+	row, err := s.repo.GetByToken(ctx, token)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return CheckinResultDTO{}, ErrNotFound
+		}
+		return CheckinResultDTO{}, err
+	}
+	return s.markAndBuildResult(ctx, row)
+}
+
+// CheckinByID adalah jalur check-in MANUAL: petugas mencari nama tamu yang
+// lupa atau kehilangan QR-nya, lalu menekan tombol check-in pada barisnya
+// (K3). Hasilnya sengaja sama persis dengan jalur pindai.
+func (s *Service) CheckinByID(ctx context.Context, id uint64) (CheckinResultDTO, error) {
+	row, err := s.repo.GetByID(ctx, id)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return CheckinResultDTO{}, ErrNotFound
+		}
+		return CheckinResultDTO{}, err
+	}
+	return s.markAndBuildResult(ctx, row)
+}
+
+// markAndBuildResult menandai kehadiran lalu menyusun hasil untuk layar
+// petugas.
+//
+// STATUS RSVP TIDAK MEMBLOKIR CHECK-IN: tamu ber-status 'pending' atau
+// 'not_attending' yang tetap datang harus bisa dicatat. RsvpStatus ikut
+// dikembalikan supaya petugas melihatnya sendiri di layar - jangan
+// menambahkan penolakan berbasis status di sini.
+func (s *Service) markAndBuildResult(ctx context.Context, row sqlc.Guest) (CheckinResultDTO, error) {
+	rows, err := s.repo.MarkCheckedIn(ctx, row.ID)
+	if err != nil {
+		return CheckinResultDTO{}, err
+	}
+
+	out := CheckinResultDTO{
+		ID:             row.ID,
+		Name:           row.Name,
+		Side:           string(row.Side),
+		InvitationType: string(row.InvitationType),
+		SouvenirType:   string(row.SouvenirType),
+		RsvpStatus:     string(row.RsvpStatus),
+		AttendingCount: int(row.AttendingCount),
+	}
+
+	// LETAKNYA DI SINI DAN TIDAK BOLEH PINDAH (T7): sesudah `out` tersusun,
+	// SEBELUM percabangan rows di bawah. Kedua cabang itu sama-sama
+	// `return out, nil` - cabang rows == 1 keluar lebih awal, jadi tidak ada
+	// titik temu sesudahnya. Menaruhnya di dalam salah satu cabang membuat
+	// group hilang pada pemindaian PERTAMA atau pada pemindaian KEDUA saja -
+	// bug yang lolos pengujian sepintas karena separuh kasusnya tetap benar.
+	//
+	// Error-nya DI-LOG LALU DIABAIKAN, tidak pernah di-return (D9): tamu yang
+	// berdiri di pintu harus tetap tercatat masuk walau nama group-nya gagal
+	// dibaca. Kolom group-nya saja yang kosong.
+	if row.GroupID.Valid {
+		group, err := s.repo.GetGroupByID(ctx, uint64(row.GroupID.Int64))
+		if err != nil {
+			log.Printf("guest: gagal membaca group tamu %d: %v", row.ID, err)
+		} else {
+			out.GroupName = group.Name
+		}
+	}
+
+	if rows == 1 {
+		// Baru saja datang. Jam kedatangan diambil dari baris yang baru
+		// ditulis, bukan dari time.Now() lokal, supaya yang ditampilkan
+		// persis sama dengan yang tersimpan (NOW() milik MySQL).
+		fresh, err := s.repo.GetByID(ctx, row.ID)
+		if err != nil {
+			return CheckinResultDTO{}, err
+		}
+		out.CheckedInAt = formatCheckedInAt(fresh.CheckedInAt)
+		return out, nil
+	}
+
+	// rows == 0: sudah pernah check-in. Barisnya DIBACA ULANG - `row` yang
+	// kita pegang bisa saja terbaca sebelum petugas lain menandainya, jadi
+	// checked_in_at di dalamnya belum tentu yang asli (D5/§7 butir 5).
+	current, err := s.repo.GetByID(ctx, row.ID)
+	if err != nil {
+		return CheckinResultDTO{}, err
+	}
+	out.AlreadyCheckedIn = true
+	out.CheckedInAt = formatCheckedInAt(current.CheckedInAt)
+	return out, nil
+}
+
+func formatCheckedInAt(t sql.NullTime) string {
+	if !t.Valid {
+		return ""
+	}
+	return t.Time.Format("2006-01-02T15:04:05Z07:00")
+}
+
+// SearchForCheckin mencari tamu berdasarkan nama untuk check-in manual.
+//
+// DIBATASI, BUKAN DIPAGINASI (T7): petugas mencari SATU tamu, bukan meramban
+// daftar, jadi halaman kedua tidak ada gunanya. Tanpa paginasi tidak perlu
+// CountFiltered, sehingga tiap ketikan hanya menghasilkan SATU query, bukan
+// dua - dan responsnya tidak pernah tumbuh mengikuti besar tabel. Karena
+// tidak berpaginasi, amplopnya juga tanpa `meta` (api-standard.md mewajibkan
+// meta hanya untuk respons berpaginasi).
+//
+// Query & escaping DIPAKAI ULANG apa adanya dari List - yang baru hanya
+// pemetaan DTO-nya.
+func (s *Service) SearchForCheckin(ctx context.Context, q string) ([]CheckinSearchItemDTO, error) {
+	rows, err := s.repo.ListFiltered(ctx, sqlc.ListGuestsFilteredParams{
+		Q:      sql.NullString{String: escapeLike(q), Valid: true},
+		Limit:  checkinSearchLimit,
+		Offset: 0,
+	})
+	if err != nil {
+		return nil, err
+	}
+	out := make([]CheckinSearchItemDTO, 0, len(rows))
+	for _, r := range rows {
+		out = append(out, CheckinSearchItemDTO{
+			ID:             r.ID,
+			Name:           r.Name,
+			Side:           string(r.Side),
+			RsvpStatus:     string(r.RsvpStatus),
+			AttendingCount: int(r.AttendingCount),
+			CheckedIn:      r.CheckedInAt.Valid,
+		})
+	}
+	return out, nil
+}
+
+const checkinSearchLimit = 20
+
+// ListArrivals mengembalikan tamu yang SUDAH tiba, terbaru di atas, dengan
+// paginasi standar - menu "Tamu Masuk" milik petugas gate.
+//
+// BERPAGINASI (beda dari SearchForCheckin yang dibatasi keras 20 tanpa meta):
+// ini daftar untuk DIRAMBAN, bukan pencarian satu tamu, dan panjangnya tumbuh
+// sepanjang acara sampai sebesar daftar tamu. Karena itu ia memang butuh
+// CountFiltered-nya sendiri dan mengikuti amplop `meta` di api-standard.md.
+func (s *Service) ListArrivals(ctx context.Context, p pagination.Params) ([]ArrivalItemDTO, int, error) {
+	total, err := s.repo.CountCheckedIn(ctx)
+	if err != nil {
+		return nil, 0, err
+	}
+	rows, err := s.repo.ListCheckedIn(ctx, int32(p.Limit), int32(p.Offset()))
+	if err != nil {
+		return nil, 0, err
+	}
+	out := make([]ArrivalItemDTO, 0, len(rows))
+	for _, r := range rows {
+		out = append(out, ArrivalItemDTO{
+			ID:             r.ID,
+			Name:           r.Name,
+			Side:           string(r.Side),
+			SouvenirType:   string(r.SouvenirType),
+			AttendingCount: int(r.AttendingCount),
+			CheckedInAt:    formatCheckedInAt(r.CheckedInAt),
+		})
+	}
+	return out, int(total), nil
+}
+
+// CheckinSummary mengembalikan angka kartu ringkasan gate - SATU query
+// agregat, bukan 4 COUNT terpisah.
+func (s *Service) CheckinSummary(ctx context.Context) (CheckinSummaryDTO, error) {
+	row, err := s.repo.CheckinSummary(ctx)
+	if err != nil {
+		return CheckinSummaryDTO{}, err
+	}
+	return buildCheckinSummaryDTO(row), nil
+}
+
+// buildCheckinSummaryDTO diisolasi supaya bisa diuji tanpa DB (pola sama
+// seperti buildSummaryDTO). Pemetaannya sepele TAPI mudah tertukar: menukar
+// groom<->bride di sini menghasilkan angka yang tetap terlihat masuk akal di
+// layar, jadi justru itu yang perlu dikunci tes.
+func buildCheckinSummaryDTO(row sqlc.GetCheckinSummaryRow) CheckinSummaryDTO {
+	return CheckinSummaryDTO{
+		ArrivedGroom: int(row.ArrivedGroom),
+		ArrivedBride: int(row.ArrivedBride),
+		ArrivedTotal: int(row.ArrivedTotal),
+		ArrivedPax:   int(row.ArrivedPax),
+		TotalGuests:  int(row.TotalGuests),
+	}
+}
+
 // statusHTTPCode memetakan error domain ke status HTTP - dipakai presentation.
 func StatusHTTPCode(err error) int {
 	switch {
-	case errors.Is(err, ErrNotFound):
+	case errors.Is(err, ErrNotFound), errors.Is(err, ErrGroupNotFound):
 		return 404
 	case errors.Is(err, ErrInvalidSide), errors.Is(err, ErrInvalidStatus),
 		errors.Is(err, ErrInvalidGender), errors.Is(err, ErrInvalidInvitationType), errors.Is(err, ErrInvalidSouvenirType),
-		errors.Is(err, ErrInvalidAttendingCount):
+		errors.Is(err, ErrInvalidAttendingCount), errors.Is(err, ErrInvalidCheckinCode),
+		errors.Is(err, ErrGroupNameRequired), errors.Is(err, ErrGroupNameTooLong),
+		errors.Is(err, ErrGroupDescriptionTooLong), errors.Is(err, ErrGroupNameTaken),
+		errors.Is(err, ErrGroupInUse), errors.Is(err, ErrInvalidGroupID):
 		return 400
 	default:
 		return 500

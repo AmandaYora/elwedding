@@ -7,26 +7,40 @@ import {
   listUsers,
   updateUser,
 } from '@/modules/admin/users/services/users.service'
-import { createUserSchema, updateUserSchema, type CreateUserFormValues, type UpdateUserFormValues } from '@/modules/admin/users/schemas/user.schema'
+import {
+  ROLE_DESCRIPTION,
+  ROLE_LABEL,
+  ROLE_OPTIONS,
+  createUserSchema,
+  updateUserSchema,
+  type CreateUserFormValues,
+  type UpdateUserFormValues,
+  type UserRole,
+} from '@/modules/admin/users/schemas/user.schema'
 import { formatRelativeTime } from '@/shared/utils/relative-time'
-import { Button, Input, Card, Table, Thead, Tbody, Tr, Th, Td, Modal, Pagination } from '@/shared/components/ui'
+import { Button, Input, Select, Badge, Card, Table, Thead, Tbody, Tr, Th, Td, Modal, Pagination } from '@/shared/components/ui'
 import { PageHeader } from '@/shared/components/layout/PageHeader'
 import { EmptyState } from '@/shared/components/feedback/EmptyState'
 import { TableSkeleton } from '@/shared/components/feedback/Skeleton'
 import { ErrorState } from '@/shared/components/feedback/ErrorState'
 import { useToast } from '@/shared/components/toast/ToastProvider'
 
-const EMPTY_FORM: CreateUserInput = { username: '', password: '' }
+const EMPTY_FORM: CreateUserInput = { username: '', password: '', role: 'admin' }
 
 type FormErrors = Partial<Record<keyof CreateUserFormValues, string>>
 
 /**
- * Pengguna (admin-users): CRUD akun admin, semua admin setara/tanpa role
- * (PLAN.md keputusan #2) - tanpa filter/pencarian (skala akun admin kecil,
- * §2 keputusan desain). Guardrail hapus diri sendiri/admin terakhir
- * ditegakkan backend - di sini cuma toast generik saat gagal, sama persis
- * pola GuestsPage.tsx (tidak ada preseden menampilkan pesan error backend
- * spesifik di frontend manapun).
+ * Pengguna (admin-users): CRUD akun admin - tanpa filter/pencarian (skala
+ * akun admin kecil, §2 keputusan desain).
+ *
+ * Akun TIDAK LAGI setara sejak docs/plan/scan-checkin-gate (K2): ada peran
+ * 'admin' (akses penuh) dan 'scanner' (petugas gate, hanya menu Scan), yang
+ * membalik keputusan #2 secara sadar. Menu ini sendiri hanya bisa dibuka
+ * admin penuh - RequireFullAdmin menolak akun petugas di server.
+ *
+ * Guardrail hapus diri sendiri / admin PENUH terakhir ditegakkan backend
+ * (§2.3) - di sini cuma toast generik saat gagal, sama persis pola
+ * GuestsPage.tsx.
  */
 export default function UsersPage() {
   const [users, setUsers] = useState<AdminUser[]>([])
@@ -75,7 +89,7 @@ export default function UsersPage() {
 
   function openEdit(user: AdminUser) {
     setEditingId(user.id)
-    setForm({ username: user.username, password: '' })
+    setForm({ username: user.username, password: '', role: user.role })
     setFormErrors({})
     setFormOpen(true)
   }
@@ -150,7 +164,7 @@ export default function UsersPage() {
           </div>
         </div>
 
-        {loading && <TableSkeleton rows={4} cols={3} />}
+        {loading && <TableSkeleton rows={4} cols={4} />}
 
         {!loading && error && <ErrorState message="Gagal memuat data pengguna." onRetry={() => setReloadToken((t) => t + 1)} />}
 
@@ -168,6 +182,7 @@ export default function UsersPage() {
               <Thead>
                 <Tr>
                   <Th>Username</Th>
+                  <Th>Peran</Th>
                   <Th>Dibuat pada</Th>
                   <Th className="text-right pr-6">Aksi</Th>
                 </Tr>
@@ -184,6 +199,9 @@ export default function UsersPage() {
                           </div>
                           <span className="font-semibold text-slate-900">{user.username}</span>
                         </div>
+                      </Td>
+                      <Td>
+                        <Badge tone={user.role === 'scanner' ? 'amber' : 'blue'} label={ROLE_LABEL[user.role] ?? user.role} />
                       </Td>
                       <Td>
                         <span className="text-xs text-slate-500">{formatRelativeTime(user.createdAt)}</span>
@@ -259,6 +277,21 @@ export default function UsersPage() {
             error={formErrors.password}
             placeholder={editingId ? 'Kosongkan bila tidak ingin mengganti password' : 'Minimal 6 karakter'}
           />
+          <div className="flex flex-col gap-1.5">
+            <Select
+              label="Peran"
+              value={form.role}
+              onChange={(e) => setForm((f) => ({ ...f, role: e.target.value as UserRole }))}
+              error={formErrors.role}
+            >
+              {ROLE_OPTIONS.map((role) => (
+                <option key={role} value={role}>
+                  {ROLE_LABEL[role]}
+                </option>
+              ))}
+            </Select>
+            <p className="text-xs text-slate-500 leading-relaxed">{ROLE_DESCRIPTION[form.role]}</p>
+          </div>
         </form>
       </Modal>
 

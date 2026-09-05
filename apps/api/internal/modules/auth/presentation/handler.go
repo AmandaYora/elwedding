@@ -37,7 +37,7 @@ func (h *Handler) Login(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	token, err := h.service.Authenticate(r.Context(), req.Username, req.Password)
+	token, role, err := h.service.Authenticate(r.Context(), req.Username, req.Password)
 	if err != nil {
 		if errors.Is(err, application.ErrInvalidCredentials) {
 			response.Unauthorized(w, "Invalid username or password")
@@ -47,7 +47,9 @@ func (h *Handler) Login(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	response.OK(w, "Login successful", map[string]string{"token": token})
+	// `role` ikut di respons login (docs/plan/scan-checkin-gate T6/T12) -
+	// SPA butuh tahu peran untuk memilih halaman awal & menyaring menu.
+	response.OK(w, "Login successful", map[string]string{"token": token, "role": role})
 }
 
 func decodeJSON(w http.ResponseWriter, r *http.Request, dst any) bool {
@@ -60,6 +62,8 @@ func decodeJSON(w http.ResponseWriter, r *http.Request, dst any) bool {
 
 func writeServiceError(w http.ResponseWriter, err error) {
 	switch application.StatusHTTPCode(err) {
+	case 404:
+		response.NotFound(w, err.Error())
 	case 400:
 		response.BadRequest(w, err.Error(), nil)
 	default:

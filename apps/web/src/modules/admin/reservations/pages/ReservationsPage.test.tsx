@@ -25,6 +25,7 @@ const sampleGuest = {
   notes: '',
   attendingCount: 2,
   isExpectedAttending: true,
+  groupId: 3,
 }
 
 afterEach(() => {
@@ -37,7 +38,7 @@ test('mount awal -> memanggil listGuests dengan respondedOnly true', async () =>
   render(<ReservationsPage />)
 
   await waitFor(() =>
-    expect(mockedList).toHaveBeenCalledWith({ page: 1, status: '', q: '', invitationType: '', souvenirType: '', respondedOnly: true }),
+    expect(mockedList).toHaveBeenCalledWith({ page: 1, status: '', q: '', invitationType: '', souvenirType: '', groupId: '', respondedOnly: true }),
   )
 })
 
@@ -57,7 +58,7 @@ test('memilih sub-filter status -> listGuests dipanggil ulang dengan status terp
 
   render(<ReservationsPage />)
   await waitFor(() =>
-    expect(mockedList).toHaveBeenCalledWith({ page: 1, status: '', q: '', invitationType: '', souvenirType: '', respondedOnly: true }),
+    expect(mockedList).toHaveBeenCalledWith({ page: 1, status: '', q: '', invitationType: '', souvenirType: '', groupId: '', respondedOnly: true }),
   )
 
   fireEvent.change(screen.getByDisplayValue('Semua status'), { target: { value: 'not_attending' } })
@@ -69,6 +70,7 @@ test('memilih sub-filter status -> listGuests dipanggil ulang dengan status terp
       q: '',
       invitationType: '',
       souvenirType: '',
+      groupId: '',
       respondedOnly: true,
     }),
   )

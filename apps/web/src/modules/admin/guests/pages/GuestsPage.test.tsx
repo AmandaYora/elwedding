@@ -1,8 +1,9 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import GuestsPage from './GuestsPage'
-import { listGuests, deleteGuest } from '@/modules/admin/guests/services/guests.service'
+import { listGuests, createGuest, deleteGuest } from '@/modules/admin/guests/services/guests.service'
 import { getConfig } from '@/modules/admin/whatsapp/services/whatsapp.service'
 import { getContent } from '@/modules/admin/content/services/content.service'
+import { listAllGroups } from '@/modules/admin/groups/services/groups.service'
 import { ToastProvider } from '@/shared/components/toast/ToastProvider'
 
 function renderPage() {
@@ -30,10 +31,18 @@ vi.mock('@/modules/admin/content/services/content.service', () => ({
   getContent: vi.fn(),
 }))
 
+// Daftar group dimuat sekali oleh halaman ini (guest-groups D2/T16) - di-mock
+// supaya test tidak menembus httpClient, sama seperti dua singleton di atas.
+vi.mock('@/modules/admin/groups/services/groups.service', () => ({
+  listAllGroups: vi.fn(),
+}))
+
 const mockedList = vi.mocked(listGuests)
 const mockedDelete = vi.mocked(deleteGuest)
+const mockedCreate = vi.mocked(createGuest)
 const mockedGetConfig = vi.mocked(getConfig)
 const mockedGetContent = vi.mocked(getContent)
+const mockedListAllGroups = vi.mocked(listAllGroups)
 
 const sampleGuest = {
   id: 1,
@@ -52,7 +61,13 @@ const sampleGuest = {
   notes: '',
   attendingCount: 1,
   isExpectedAttending: true,
+  groupId: 3,
 }
+
+const sampleGroups = [
+  { id: 3, name: 'Teman Kantor', description: '', guestCount: 1, createdAt: '2026-01-01T00:00:00Z' },
+  { id: 4, name: 'Keluarga', description: '', guestCount: 0, createdAt: '2026-01-01T00:00:00Z' },
+]
 
 const sampleConfig = {
   messageTemplate: 'Halo {nama}, {jumlah} orang',
@@ -70,13 +85,16 @@ beforeEach(() => {
   // Default "jalan normal" - test yang menguji jalur gagal menimpanya sendiri.
   mockedGetConfig.mockResolvedValue(sampleConfig)
   mockedGetContent.mockResolvedValue(sampleContent)
+  mockedListAllGroups.mockResolvedValue(sampleGroups)
 })
 
 afterEach(() => {
   mockedList.mockReset()
   mockedDelete.mockReset()
+  mockedCreate.mockReset()
   mockedGetConfig.mockReset()
   mockedGetContent.mockReset()
+  mockedListAllGroups.mockReset()
 })
 
 test('daftar kosong -> EmptyState', async () => {
@@ -92,13 +110,13 @@ test('ketik pencarian -> service dipanggil dengan q (setelah debounce)', async (
 
   renderPage()
   await waitFor(() =>
-    expect(mockedList).toHaveBeenCalledWith({ page: 1, status: '', q: '', invitationType: '', souvenirType: '', respondedOnly: false }),
+    expect(mockedList).toHaveBeenCalledWith({ page: 1, status: '', q: '', invitationType: '', souvenirType: '', groupId: '', respondedOnly: false }),
   )
 
   fireEvent.change(screen.getByPlaceholderText('Cari nama, telepon, atau email...'), { target: { value: 'budi' } })
 
   await waitFor(
-    () => expect(mockedList).toHaveBeenCalledWith({ page: 1, status: '', q: 'budi', invitationType: '', souvenirType: '', respondedOnly: false }),
+    () => expect(mockedList).toHaveBeenCalledWith({ page: 1, status: '', q: 'budi', invitationType: '', souvenirType: '', groupId: '', respondedOnly: false }),
     { timeout: 2000 },
   )
 })
@@ -160,13 +178,13 @@ test('ubah filter jenis undangan -> listGuests dipanggil dengan invitationType t
 
   renderPage()
   await waitFor(() =>
-    expect(mockedList).toHaveBeenCalledWith({ page: 1, status: '', q: '', invitationType: '', souvenirType: '', respondedOnly: false }),
+    expect(mockedList).toHaveBeenCalledWith({ page: 1, status: '', q: '', invitationType: '', souvenirType: '', groupId: '', respondedOnly: false }),
   )
 
   fireEvent.change(screen.getByDisplayValue('Semua jenis undangan'), { target: { value: 'physical' } })
 
   await waitFor(() =>
-    expect(mockedList).toHaveBeenCalledWith({ page: 1, status: '', q: '', invitationType: 'physical', souvenirType: '', respondedOnly: false }),
+    expect(mockedList).toHaveBeenCalledWith({ page: 1, status: '', q: '', invitationType: 'physical', souvenirType: '', groupId: '', respondedOnly: false }),
   )
 })
 
@@ -234,4 +252,122 @@ test('template undangan kosong -> tombol nonaktif dengan title yang menyebut tem
   const btn = await screen.findByRole('button', { name: /Kirim Undangan/ })
   expect(btn).toBeDisabled()
   expect(btn).toHaveAttribute('title', expect.stringContaining('Template'))
+})
+
+// --- group tamu (docs/plan/guest-groups/PLAN.md T18) ---
+
+test('kolom Group menampilkan nama yang dipetakan dari daftar group', async () => {
+  mockedList.mockResolvedValue({ data: [sampleGuest], meta: { page: 1, limit: 20, total: 1, totalPages: 1 } })
+
+  renderPage()
+
+  await waitFor(() => expect(screen.getByText('Budi Santoso')).toBeInTheDocument())
+  const row = screen.getByText('Budi Santoso').closest('tr') as HTMLElement
+  // Nama datang dari listAllGroups (D2), BUKAN dari respons daftar tamu -
+  // backend hanya mengirim groupId.
+  expect(within(row).getByText('Teman Kantor')).toBeInTheDocument()
+})
+
+// 2.6: tamu lama bergroup kosong tampil sebagai strip, bukan kosong melompong
+// atau "undefined".
+test('tamu tanpa group (groupId null) -> kolom Group menampilkan strip', async () => {
+  mockedList.mockResolvedValue({
+    data: [{ ...sampleGuest, groupId: null }],
+    meta: { page: 1, limit: 20, total: 1, totalPages: 1 },
+  })
+
+  renderPage()
+
+  await waitFor(() => expect(screen.getByText('Budi Santoso')).toBeInTheDocument())
+  const row = screen.getByText('Budi Santoso').closest('tr') as HTMLElement
+  expect(within(row).getByText('—')).toBeInTheDocument()
+})
+
+test('ubah filter Group -> listGuests dipanggil dengan groupId terisi', async () => {
+  mockedList.mockResolvedValue({ data: [], meta: { page: 1, limit: 20, total: 0, totalPages: 1 } })
+
+  renderPage()
+  await waitFor(() => expect(screen.getByDisplayValue('Semua group')).toBeInTheDocument())
+
+  fireEvent.change(screen.getByDisplayValue('Semua group'), { target: { value: '4' } })
+
+  await waitFor(() =>
+    expect(mockedList).toHaveBeenCalledWith({
+      page: 1,
+      status: '',
+      q: '',
+      invitationType: '',
+      souvenirType: '',
+      groupId: '4',
+      respondedOnly: false,
+    }),
+  )
+})
+
+test('submit form tamu tanpa memilih group -> pesan error dan createGuest tidak dipanggil', async () => {
+  mockedList.mockResolvedValue({ data: [], meta: { page: 1, limit: 20, total: 0, totalPages: 1 } })
+
+  renderPage()
+  await waitFor(() => expect(screen.getByText('Belum ada tamu')).toBeInTheDocument())
+
+  fireEvent.click(screen.getAllByRole('button', { name: '+ Tambah tamu' })[0])
+  await screen.findByText('Tambah tamu')
+
+  fireEvent.change(screen.getByPlaceholderText('Nama lengkap tamu'), { target: { value: 'Siti' } })
+  fireEvent.click(screen.getByRole('button', { name: 'Simpan' }))
+
+  expect(await screen.findByText('Group wajib dipilih')).toBeInTheDocument()
+  expect(mockedCreate).not.toHaveBeenCalled()
+})
+
+test('pilih group di form -> createGuest terpanggil dengan groupId terisi', async () => {
+  mockedList.mockResolvedValue({ data: [], meta: { page: 1, limit: 20, total: 0, totalPages: 1 } })
+  mockedCreate.mockResolvedValueOnce({ ...sampleGuest, id: 9, name: 'Siti' })
+
+  renderPage()
+  await waitFor(() => expect(screen.getByText('Belum ada tamu')).toBeInTheDocument())
+
+  fireEvent.click(screen.getAllByRole('button', { name: '+ Tambah tamu' })[0])
+  await screen.findByText('Tambah tamu')
+
+  fireEvent.change(screen.getByPlaceholderText('Nama lengkap tamu'), { target: { value: 'Siti' } })
+  fireEvent.change(screen.getByDisplayValue('Pilih group...'), { target: { value: '4' } })
+  fireEvent.click(screen.getByRole('button', { name: 'Simpan' }))
+
+  await waitFor(() => expect(mockedCreate).toHaveBeenCalledWith(expect.objectContaining({ name: 'Siti', groupId: 4 })))
+})
+
+// 2.5 butir 1: instalasi baru tanpa group sama sekali. TANPA penjaga ini,
+// menu Tamu mati total - form mewajibkan group sementara dropdown-nya kosong.
+test('daftar group kosong -> tombol Tambah tamu nonaktif + ajakan membuat group', async () => {
+  mockedList.mockResolvedValue({ data: [], meta: { page: 1, limit: 20, total: 0, totalPages: 1 } })
+  mockedListAllGroups.mockResolvedValue([])
+
+  renderPage()
+
+  expect(await screen.findByText('Belum ada group tamu')).toBeInTheDocument()
+  expect(screen.getByRole('link', { name: 'Buat group' })).toHaveAttribute('href', '/admin/groups')
+  await waitFor(() => {
+    for (const btn of screen.getAllByRole('button', { name: /Tambah tamu/ })) {
+      expect(btn).toBeDisabled()
+    }
+  })
+})
+
+// 2.5 butir 2: gejalanya identik dengan di atas tapi SEBABNYA beda - pesannya
+// wajib berbeda, dan daftar tamu tetap harus terbaca.
+test('daftar group gagal dimuat -> pesan berbeda + daftar tamu tetap tampil', async () => {
+  mockedList.mockResolvedValue({ data: [sampleGuest], meta: { page: 1, limit: 20, total: 1, totalPages: 1 } })
+  mockedListAllGroups.mockRejectedValue(new Error('500'))
+
+  renderPage()
+
+  expect(await screen.findByText('Daftar group gagal dimuat')).toBeInTheDocument()
+  expect(screen.queryByText('Belum ada group tamu')).not.toBeInTheDocument()
+  expect(screen.getByText('Budi Santoso')).toBeInTheDocument()
+  await waitFor(() => {
+    for (const btn of screen.getAllByRole('button', { name: /Tambah tamu/ })) {
+      expect(btn).toBeDisabled()
+    }
+  })
 })

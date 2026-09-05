@@ -12,6 +12,11 @@ export const guestSchema = z.object({
   gender: z.enum(['male', 'female'], { message: 'Gender wajib dipilih' }),
   invitationType: z.enum(['online', 'physical'], { message: 'Jenis undangan wajib dipilih' }),
   side: z.enum(['groom', 'bride'], { message: 'Pihak wajib dipilih' }),
+  // Group WAJIB (docs/plan/guest-groups/PLAN.md T15/K2): 0 = belum dipilih dan
+  // ditolak di sini. Penegakan sebenarnya tetap di backend (validateGroupID,
+  // D4) - yang di sini hanya memberi pesan lebih cepat, pola yang sama dengan
+  // enum wajib di atasnya.
+  groupId: z.number().int().positive('Group wajib dipilih'),
   souvenirType: z.enum(['regular', 'vip'], { message: 'Jenis souvenir wajib dipilih' }),
   email: z.union([z.literal(''), z.string().email('Format email tidak valid')]),
   phone: z.string(),

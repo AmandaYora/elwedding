@@ -44,6 +44,24 @@ export default function RsvpConfirmation({ content }: RsvpConfirmationProps) {
   function composeLocalQrPayload(count: number) {
     // Fallback client-side (keputusan #15 mode preview / PATCH gagal) -
     // format sama seperti yang disusun backend (buildQRPayload).
+    //
+    // Isi QR kini token tamu berprefiks, bukan teks yang dibaca manusia
+    // (docs/plan/scan-checkin-gate/PLAN.md T18/§2.1): teks lama secara teknis
+    // TIDAK BISA dipakai untuk identifikasi di gate - tidak bisa dipetakan
+    // balik ke baris tamu, dan sepele dipalsukan siapa pun.
+    //
+    // 'ELW1:' KEMBAR LINTAS BAHASA dengan checkinCodePrefix di
+    // guest/application/service.go (D10) - browser tidak bisa memanggil
+    // konstanta Go, jadi duplikasi ini tidak terhindarkan. Mengubah salah
+    // satu saja memutus rantai antara QR yang diterbitkan dan pemindai.
+    if (session.token) {
+      return `ELW1:${session.token}`
+    }
+
+    // Tanpa token = mode pratinjau (`/` tanpa ?guest=). Kembalikan teks lama
+    // apa adanya: QR itu memang tidak mewakili tamu mana pun, dan pemindai
+    // akan menolaknya dengan pesan yang benar. Konsisten dengan perilaku yang
+    // sudah ada - RSVP-nya juga tidak tersimpan (§3.2).
     return [
       `Wedding Invitation - ${content.groomName} & ${content.brideName}`,
       `Nama Tamu: ${session.name}`,

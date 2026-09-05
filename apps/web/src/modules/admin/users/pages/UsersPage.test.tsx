@@ -26,6 +26,7 @@ const mockedDelete = vi.mocked(deleteUser)
 const sampleUser = {
   id: 1,
   username: 'admin',
+  role: 'admin' as const,
   createdAt: '2026-01-01T00:00:00Z',
 }
 
@@ -62,7 +63,7 @@ test('submit form tambah tanpa mengisi apa pun -> pesan error field wajib muncul
 
 test('isi form tambah dengan data valid -> createUser terpanggil', async () => {
   mockedList.mockResolvedValue({ data: [], meta: { page: 1, limit: 20, total: 0, totalPages: 1 } })
-  mockedCreate.mockResolvedValueOnce({ id: 2, username: 'newadmin', createdAt: '2026-01-02T00:00:00Z' })
+  mockedCreate.mockResolvedValueOnce({ id: 2, username: 'newadmin', role: 'admin', createdAt: '2026-01-02T00:00:00Z' })
 
   renderPage()
   await waitFor(() => expect(screen.getByText('Belum ada pengguna')).toBeInTheDocument())
@@ -74,7 +75,9 @@ test('isi form tambah dengan data valid -> createUser terpanggil', async () => {
   fireEvent.change(screen.getByPlaceholderText('Minimal 6 karakter'), { target: { value: 'rahasia123' } })
   fireEvent.click(screen.getByRole('button', { name: 'Simpan' }))
 
-  await waitFor(() => expect(mockedCreate).toHaveBeenCalledWith({ username: 'newadmin', password: 'rahasia123' }))
+  await waitFor(() =>
+    expect(mockedCreate).toHaveBeenCalledWith({ username: 'newadmin', password: 'rahasia123', role: 'admin' }),
+  )
 })
 
 test('ubah pengguna dengan password dikosongkan -> updateUser terpanggil dengan password kosong', async () => {
@@ -90,7 +93,7 @@ test('ubah pengguna dengan password dikosongkan -> updateUser terpanggil dengan 
   fireEvent.change(screen.getByDisplayValue('admin'), { target: { value: 'admin2' } })
   fireEvent.click(screen.getByRole('button', { name: 'Simpan' }))
 
-  await waitFor(() => expect(mockedUpdate).toHaveBeenCalledWith(1, { username: 'admin2', password: '' }))
+  await waitFor(() => expect(mockedUpdate).toHaveBeenCalledWith(1, { username: 'admin2', password: '', role: 'admin' }))
 })
 
 test('klik Hapus -> modal konfirmasi muncul dan TIDAK menghapus sebelum dikonfirmasi', async () => {

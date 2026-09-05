@@ -11,16 +11,26 @@ import (
 	"github.com/golang-jwt/jwt/v5"
 )
 
+// Role membawa peran akun di dalam token (docs/plan/scan-checkin-gate/
+// PLAN.md T4/D8): "admin" (akses penuh) atau "scanner" (HANYA menu Scan).
+//
+// Peran KOSONG diperlakukan sebagai admin penuh oleh authmw.RequireFullAdmin,
+// bukan sebagai petugas - token yang sudah tersimpan di localStorage admin
+// sebelum fitur ini ada tidak punya klaim `role`, dan membalik artinya akan
+// membuat admin yang sedang login kehilangan seluruh menu tanpa sebab yang
+// terlihat.
 type Claims struct {
 	AdminUserID uint64 `json:"admin_user_id"`
 	Username    string `json:"username"`
+	Role        string `json:"role"`
 	jwt.RegisteredClaims
 }
 
-func Generate(secret string, expiresIn time.Duration, adminUserID uint64, username string) (string, error) {
+func Generate(secret string, expiresIn time.Duration, adminUserID uint64, username, role string) (string, error) {
 	claims := Claims{
 		AdminUserID: adminUserID,
 		Username:    username,
+		Role:        role,
 		RegisteredClaims: jwt.RegisteredClaims{
 			ExpiresAt: jwt.NewNumericDate(time.Now().Add(expiresIn)),
 			IssuedAt:  jwt.NewNumericDate(time.Now()),

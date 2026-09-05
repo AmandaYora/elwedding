@@ -1,19 +1,23 @@
 import { httpClient } from '@/shared/services/http-client'
+import type { UserRole } from '@/modules/admin/users/schemas/user.schema'
 
 export interface AdminUser {
   id: number
   username: string
+  role: UserRole
   createdAt: string
 }
 
 export interface CreateUserInput {
   username: string
   password: string
+  role: UserRole
 }
 
 export interface UpdateUserInput {
   username: string
   password: string // kosong = tidak diganti
+  role: UserRole
 }
 
 export interface ListResponse {

@@ -2,6 +2,7 @@ package infrastructure
 
 import (
 	"context"
+	"database/sql"
 
 	"undangan-ariana-adrian/internal/modules/guest/infrastructure/sqlc"
 )
@@ -32,6 +33,30 @@ func (r *Repository) Update(ctx context.Context, arg sqlc.UpdateGuestParams) err
 
 func (r *Repository) UpdateRsvpStatusByToken(ctx context.Context, arg sqlc.UpdateGuestRsvpStatusByTokenParams) error {
 	return r.q.UpdateGuestRsvpStatusByToken(ctx, arg)
+}
+
+// MarkCheckedIn meneruskan ROWS AFFECTED, bukan error saja (docs/plan/
+// scan-checkin-gate/PLAN.md D5): 1 = tamu baru saja check-in, 0 = sudah
+// pernah check-in sebelumnya. Itulah yang membedakan kedua keadaan tanpa
+// baca-lalu-tulis yang bisa saling menimpa antar petugas.
+func (r *Repository) MarkCheckedIn(ctx context.Context, id uint64) (int64, error) {
+	return r.q.MarkGuestCheckedIn(ctx, id)
+}
+
+// ListCheckedIn/CountCheckedIn/CheckinSummary melayani menu "Tamu Masuk"
+// milik petugas gate. Baris hasilnya bertipe ListCheckedInGuestsRow (bukan
+// sqlc.Guest) karena query-nya menyebut kolom satu per satu - itu disengaja,
+// lihat komentar di queries/guests.sql.
+func (r *Repository) ListCheckedIn(ctx context.Context, limit, offset int32) ([]sqlc.ListCheckedInGuestsRow, error) {
+	return r.q.ListCheckedInGuests(ctx, sqlc.ListCheckedInGuestsParams{Limit: limit, Offset: offset})
+}
+
+func (r *Repository) CountCheckedIn(ctx context.Context) (int64, error) {
+	return r.q.CountCheckedInGuests(ctx)
+}
+
+func (r *Repository) CheckinSummary(ctx context.Context) (sqlc.GetCheckinSummaryRow, error) {
+	return r.q.GetCheckinSummary(ctx)
 }
 
 func (r *Repository) Delete(ctx context.Context, id uint64) error {
@@ -80,4 +105,53 @@ func (r *Repository) CountGroupedByGender(ctx context.Context) ([]sqlc.CountGues
 
 func (r *Repository) ListRecentRsvpResponses(ctx context.Context) ([]sqlc.ListRecentRsvpResponsesRow, error) {
 	return r.q.ListRecentRsvpResponses(ctx)
+}
+
+// --- group tamu (docs/plan/guest-groups/PLAN.md T3) ---
+//
+// Tabel guest_groups DIMILIKI modul guest yang sama (D1), jadi seluruh method
+// di bawah tetap penerusan tipis ke r.q.* seperti method tamu di atas - tidak
+// ada repository baru, tidak ada contracts/, tidak ada module client.
+
+func (r *Repository) CreateGroup(ctx context.Context, arg sqlc.CreateGuestGroupParams) (int64, error) {
+	return r.q.CreateGuestGroup(ctx, arg)
+}
+
+func (r *Repository) GetGroupByID(ctx context.Context, id uint64) (sqlc.GuestGroup, error) {
+	return r.q.GetGuestGroupByID(ctx, id)
+}
+
+func (r *Repository) GetGroupByName(ctx context.Context, name string) (sqlc.GuestGroup, error) {
+	return r.q.GetGuestGroupByName(ctx, name)
+}
+
+func (r *Repository) ListGroups(ctx context.Context, limit, offset int32) ([]sqlc.GuestGroup, error) {
+	return r.q.ListGuestGroups(ctx, sqlc.ListGuestGroupsParams{Limit: limit, Offset: offset})
+}
+
+func (r *Repository) CountGroups(ctx context.Context) (int64, error) {
+	return r.q.CountGuestGroups(ctx)
+}
+
+func (r *Repository) UpdateGroup(ctx context.Context, arg sqlc.UpdateGuestGroupParams) error {
+	return r.q.UpdateGuestGroup(ctx, arg)
+}
+
+func (r *Repository) DeleteGroup(ctx context.Context, id uint64) error {
+	return r.q.DeleteGuestGroup(ctx, id)
+}
+
+// CountGuestsByGroupID & CountGroupedByGroup menyentuh tabel `guests`, bukan
+// guest_groups - keduanya tetap di sini karena repository ini memang pemilik
+// kedua tabel itu.
+//
+// CountGuestsByGroupID adalah penjaga K4, dipanggil tepat sebelum hapus.
+func (r *Repository) CountGuestsByGroupID(ctx context.Context, id uint64) (int64, error) {
+	return r.q.CountGuestsByGroupID(ctx, sql.NullInt64{Int64: int64(id), Valid: true})
+}
+
+// CountGroupedByGroup mengisi kolom "Jumlah tamu" SELURUH halaman Group lewat
+// satu GROUP BY - pola CountGroupedByStatus, bukan satu COUNT per baris.
+func (r *Repository) CountGroupedByGroup(ctx context.Context) ([]sqlc.CountGuestsGroupedByGroupRow, error) {
+	return r.q.CountGuestsGroupedByGroup(ctx)
 }

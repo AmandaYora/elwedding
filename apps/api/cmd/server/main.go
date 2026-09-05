@@ -24,6 +24,13 @@ func main() {
 
 	cfg := config.Load()
 
+	// Dicek SEBELUM koneksi apa pun dibuka: kalau .env kurang lengkap, yang
+	// harus terbaca adalah NAMA variabelnya, bukan error minio/MySQL yang
+	// tidak menyebutkan berkas maupun kunci mana yang kosong.
+	if err := cfg.Validate(); err != nil {
+		log.Fatalf("konfigurasi tidak lengkap: %v", err)
+	}
+
 	db, err := database.Open(cfg.DBDSN)
 	if err != nil {
 		log.Fatalf("failed to connect to database: %v", err)

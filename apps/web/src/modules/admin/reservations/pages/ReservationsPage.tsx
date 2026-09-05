@@ -34,7 +34,7 @@ export default function ReservationsPage() {
 
   useEffect(() => {
     let cancelled = false
-    listGuests({ page, status: statusFilter, q: debouncedSearch, invitationType: '', souvenirType: '', respondedOnly: true })
+    listGuests({ page, status: statusFilter, q: debouncedSearch, invitationType: '', souvenirType: '', groupId: '', respondedOnly: true })
       .then((res) => {
         if (cancelled) return
         setGuests(res.data)

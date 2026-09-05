@@ -54,8 +54,10 @@ production, regardless of what's tracked in git.
 `/etc/nginx/sites-enabled/` and its own `127.0.0.1`-only port. `elwedding-app` itself listens
 on `8083` (its `APP_PORT` is overridden from the Dockerfile's default `8080` to avoid colliding
 with the sibling apps). Never run a box-wide destructive Docker command here - always scope to
-the `elwedding` container/compose project. `WA_STORE_DIR` and `UPLOADS_DIR` (above) must be
-mounted as persistent volumes in `docker-compose.prod.yml`, the same as in local Docker.
+the `elwedding` container/compose project. `WA_STORE_DIR` (above) must be mounted as a
+persistent volume in `docker-compose.prod.yml`, the same as in local Docker. There is **no**
+`UPLOADS_DIR` any more - admin photo/music uploads live in S3 object storage (`S3_*`), so
+nothing else needs a persistent volume.
 
 ## Reverse proxy body size limit
 

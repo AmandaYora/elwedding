@@ -3,8 +3,10 @@
 package config
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 )
 
@@ -73,4 +75,44 @@ func parseDuration(s string, fallback time.Duration) time.Duration {
 		return fallback
 	}
 	return d
+}
+
+// Validate memastikan konfigurasi yang SENGAJA tidak punya default memang
+// terisi, dan menyebut nama variabelnya.
+//
+// Tanpa ini kegagalannya tidak bisa didiagnosis: S3_ENDPOINT kosong hanya
+// muncul sebagai error minio yang tidak menyebut satu pun nama variabel
+// ("Endpoint:  does not follow ip address or domain name standards"), dan
+// DB_DSN kosong sebagai error driver MySQL - keduanya membuat orang menebak
+// berkas .env mana yang kurang. Ditemukan langsung saat `npm run dev:api`
+// gagal boot dengan .env yang belum ikut diperbarui setelah unggahan konten
+// pindah ke object storage.
+//
+// JWT_SECRET & APP_PORT TIDAK ikut diperiksa - keduanya memang punya default
+// di Load() di atas.
+func (c Config) Validate() error {
+	required := []struct {
+		name  string
+		value string
+	}{
+		{"DB_DSN", c.DBDSN},
+		{"S3_ENDPOINT", c.S3Endpoint},
+		{"S3_BUCKET", c.S3Bucket},
+		{"S3_ACCESS_KEY", c.S3AccessKey},
+		{"S3_SECRET_KEY", c.S3SecretKey},
+	}
+
+	var missing []string
+	for _, r := range required {
+		if strings.TrimSpace(r.value) == "" {
+			missing = append(missing, r.name)
+		}
+	}
+	if len(missing) == 0 {
+		return nil
+	}
+	return fmt.Errorf(
+		"environment variable wajib belum terisi: %s - salin .env.example ke .env di root repo lalu isi nilainya",
+		strings.Join(missing, ", "),
+	)
 }

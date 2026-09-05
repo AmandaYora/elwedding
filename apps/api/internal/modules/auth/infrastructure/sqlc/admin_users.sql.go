@@ -21,17 +21,33 @@ func (q *Queries) CountAdminUsers(ctx context.Context) (int64, error) {
 	return count, err
 }
 
+const countFullAdmins = `-- name: CountFullAdmins :one
+SELECT COUNT(*) FROM admin_users WHERE role = 'admin'
+`
+
+// CountFullAdmins dipakai guardrail anti-terkunci (§2.3) - TIDAK boleh
+// diganti CountAdminUsers. Begitu akun petugas ada, menghitung seluruh baris
+// membuat admin penuh terakhir lolos dihapus dan sistem terkunci permanen:
+// tidak ada lagi akun yang bisa membuka menu Pengguna untuk memperbaikinya.
+func (q *Queries) CountFullAdmins(ctx context.Context) (int64, error) {
+	row := q.db.QueryRowContext(ctx, countFullAdmins)
+	var count int64
+	err := row.Scan(&count)
+	return count, err
+}
+
 const createAdminUser = `-- name: CreateAdminUser :execlastid
-INSERT INTO admin_users (username, password_hash) VALUES (?, ?)
+INSERT INTO admin_users (username, password_hash, role) VALUES (?, ?, ?)
 `
 
 type CreateAdminUserParams struct {
 	Username     string
 	PasswordHash string
+	Role         AdminUsersRole
 }
 
 func (q *Queries) CreateAdminUser(ctx context.Context, arg CreateAdminUserParams) (int64, error) {
-	result, err := q.db.ExecContext(ctx, createAdminUser, arg.Username, arg.PasswordHash)
+	result, err := q.db.ExecContext(ctx, createAdminUser, arg.Username, arg.PasswordHash, arg.Role)
 	if err != nil {
 		return 0, err
 	}
@@ -47,24 +63,65 @@ func (q *Queries) DeleteAdminUser(ctx context.Context, id uint64) error {
 	return err
 }
 
-const getAdminUserByUsername = `-- name: GetAdminUserByUsername :one
-SELECT id, username, password_hash, created_at FROM admin_users WHERE username = ? LIMIT 1
+const getAdminUserByID = `-- name: GetAdminUserByID :one
+SELECT id, username, password_hash, role, created_at FROM admin_users WHERE id = ? LIMIT 1
 `
 
-func (q *Queries) GetAdminUserByUsername(ctx context.Context, username string) (AdminUser, error) {
-	row := q.db.QueryRowContext(ctx, getAdminUserByUsername, username)
-	var i AdminUser
+type GetAdminUserByIDRow struct {
+	ID           uint64
+	Username     string
+	PasswordHash string
+	Role         AdminUsersRole
+	CreatedAt    time.Time
+}
+
+func (q *Queries) GetAdminUserByID(ctx context.Context, id uint64) (GetAdminUserByIDRow, error) {
+	row := q.db.QueryRowContext(ctx, getAdminUserByID, id)
+	var i GetAdminUserByIDRow
 	err := row.Scan(
 		&i.ID,
 		&i.Username,
 		&i.PasswordHash,
+		&i.Role,
+		&i.CreatedAt,
+	)
+	return i, err
+}
+
+const getAdminUserByUsername = `-- name: GetAdminUserByUsername :one
+
+SELECT id, username, password_hash, role, created_at FROM admin_users WHERE username = ? LIMIT 1
+`
+
+type GetAdminUserByUsernameRow struct {
+	ID           uint64
+	Username     string
+	PasswordHash string
+	Role         AdminUsersRole
+	CreatedAt    time.Time
+}
+
+// PENTING (docs/plan/scan-checkin-gate/PLAN.md §2.5): query di berkas ini
+// MENYEBUT KOLOM SATU PER SATU, bukan `SELECT *` seperti modul content/
+// whatsapp. Artinya kolom baru TIDAK ikut otomatis. Kalau `role` lupa
+// ditambahkan di GetAdminUserByUsername, Authenticate selalu menerbitkan JWT
+// berperan kosong - dan karena peran kosong berarti admin penuh (D8),
+// SELURUH pembatasan akses petugas mati tanpa satu pun error.
+func (q *Queries) GetAdminUserByUsername(ctx context.Context, username string) (GetAdminUserByUsernameRow, error) {
+	row := q.db.QueryRowContext(ctx, getAdminUserByUsername, username)
+	var i GetAdminUserByUsernameRow
+	err := row.Scan(
+		&i.ID,
+		&i.Username,
+		&i.PasswordHash,
+		&i.Role,
 		&i.CreatedAt,
 	)
 	return i, err
 }
 
 const listAdminUsers = `-- name: ListAdminUsers :many
-SELECT id, username, created_at FROM admin_users ORDER BY created_at DESC LIMIT ? OFFSET ?
+SELECT id, username, role, created_at FROM admin_users ORDER BY created_at DESC LIMIT ? OFFSET ?
 `
 
 type ListAdminUsersParams struct {
@@ -75,6 +132,7 @@ type ListAdminUsersParams struct {
 type ListAdminUsersRow struct {
 	ID        uint64
 	Username  string
+	Role      AdminUsersRole
 	CreatedAt time.Time
 }
 
@@ -87,7 +145,12 @@ func (q *Queries) ListAdminUsers(ctx context.Context, arg ListAdminUsersParams) 
 	var items []ListAdminUsersRow
 	for rows.Next() {
 		var i ListAdminUsersRow
-		if err := rows.Scan(&i.ID, &i.Username, &i.CreatedAt); err != nil {
+		if err := rows.Scan(
+			&i.ID,
+			&i.Username,
+			&i.Role,
+			&i.CreatedAt,
+		); err != nil {
 			return nil, err
 		}
 		items = append(items, i)
@@ -99,6 +162,20 @@ func (q *Queries) ListAdminUsers(ctx context.Context, arg ListAdminUsersParams) 
 		return nil, err
 	}
 	return items, nil
+}
+
+const updateAdminUserRole = `-- name: UpdateAdminUserRole :exec
+UPDATE admin_users SET role = ? WHERE id = ?
+`
+
+type UpdateAdminUserRoleParams struct {
+	Role AdminUsersRole
+	ID   uint64
+}
+
+func (q *Queries) UpdateAdminUserRole(ctx context.Context, arg UpdateAdminUserRoleParams) error {
+	_, err := q.db.ExecContext(ctx, updateAdminUserRole, arg.Role, arg.ID)
+	return err
 }
 
 const updateAdminUserUsername = `-- name: UpdateAdminUserUsername :exec

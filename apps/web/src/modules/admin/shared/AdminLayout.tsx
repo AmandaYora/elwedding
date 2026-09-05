@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { NavLink, Outlet, useNavigate, useLocation } from 'react-router-dom'
-import { useAuthStore } from '@/shared/stores/auth.store'
-import { ROUTE_PATHS } from '@/app/routes/route-paths'
+import { useAuthStore, isScannerRole } from '@/shared/stores/auth.store'
+import { ROUTE_PATHS, SCANNER_ALLOWED_PATHS } from '@/app/routes/route-paths'
 
 interface NavItem {
   to: string
@@ -52,6 +52,36 @@ const NAV_ITEMS: NavItem[] = [
     ),
   },
   {
+    to: ROUTE_PATHS.groups,
+    label: 'Group',
+    end: false,
+    icon: (active) => (
+      <svg className={`w-4.5 h-4.5 transition-colors ${active ? 'text-blue-400' : 'text-slate-400 group-hover:text-slate-200'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+      </svg>
+    ),
+  },
+  {
+    to: ROUTE_PATHS.scan,
+    label: 'Scan',
+    end: false,
+    icon: (active) => (
+      <svg className={`w-4.5 h-4.5 transition-colors ${active ? 'text-blue-400' : 'text-slate-400 group-hover:text-slate-200'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h4M4 12h4m12 0h.01M5 8h2a1 1 0 001-1V5a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1zm12 0h2a1 1 0 001-1V5a1 1 0 00-1-1h-2a1 1 0 00-1 1v2a1 1 0 001 1zM5 20h2a1 1 0 001-1v-2a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1z" />
+      </svg>
+    ),
+  },
+  {
+    to: ROUTE_PATHS.arrivals,
+    label: 'Tamu Masuk',
+    end: false,
+    icon: (active) => (
+      <svg className={`w-4.5 h-4.5 transition-colors ${active ? 'text-blue-400' : 'text-slate-400 group-hover:text-slate-200'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M11 16l-4-4m0 0l4-4m-4 4h14m-5 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+      </svg>
+    ),
+  },
+  {
     to: ROUTE_PATHS.reservations,
     label: 'Reservasi',
     end: false,
@@ -97,8 +127,20 @@ const NAV_ITEMS: NavItem[] = [
 export default function AdminLayout() {
   const [mobileOpen, setMobileOpen] = useState(false)
   const logout = useAuthStore((s) => s.logout)
+  const role = useAuthStore((s) => s.role)
   const navigate = useNavigate()
   const location = useLocation()
+
+  // Akun petugas gate HANYA melihat menu Scan & Tamu Masuk
+  // (docs/plan/scan-checkin-gate T13/K2). Daftar rutenya dipakai bersama
+  // ProtectedRoute lewat SCANNER_ALLOWED_PATHS supaya sidebar dan pengalihan
+  // tidak bisa berbeda pendapat. Penyaringan ini KOSMETIK - penegakan sebenarnya ada di
+  // authmw.RequireFullAdmin di backend, yang membalas 403 untuk seluruh
+  // /api/v1/admin/ selain /checkin/*. Jangan pernah menjadikan penyembunyian
+  // menu sebagai satu-satunya pembatas.
+  const navItems = isScannerRole(role)
+    ? NAV_ITEMS.filter((item) => SCANNER_ALLOWED_PATHS.includes(item.to))
+    : NAV_ITEMS
 
   function handleLogout() {
     logout()
@@ -106,7 +148,7 @@ export default function AdminLayout() {
   }
 
   // Menentukan judul halaman aktif
-  const currentNav = NAV_ITEMS.find((item) =>
+  const currentNav = navItems.find((item) =>
     item.end ? location.pathname === item.to : location.pathname.startsWith(item.to)
   )
 
@@ -154,7 +196,7 @@ export default function AdminLayout() {
           <p className="px-3 pb-2 text-[11px] font-semibold text-slate-400 uppercase tracking-wider">
             Menu Utama
           </p>
-          {NAV_ITEMS.map((item) => (
+          {navItems.map((item) => (
             <NavLink
               key={item.to}
               to={item.to}

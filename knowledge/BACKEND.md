@@ -96,3 +96,100 @@ Ubah query: edit `.sql` di `infrastructure/queries/`, lalu jalankan
   `?parseTime=true&loc=Asia%2FJakarta` - ini yang membuat konversi
   `wedding_date` -> epoch selalu benar tanpa perlu konversi timezone manual
   di kode lain.
+- **Dua peran akun admin, dan penegakannya ada di middleware - bukan di menu**
+  (docs/plan/scan-checkin-gate/PLAN.md K2/D7/T5). `admin_users.role` bernilai
+  `admin` (akses penuh) atau `scanner` (petugas gate). Ini **membalik**
+  keputusan lama "semua admin setara/tanpa role" secara sadar.
+  - `authmw.RequireAdmin` **tidak diubah**: ia hanya memvalidasi JWT, dan
+    petugas tetap lolos di sana. Itulah yang membuat route `/admin/checkin/*`
+    bisa dibuka akun petugas.
+  - `authmw.RequireFullAdmin` membungkus `RequireAdmin` lalu menolak peran
+    `scanner` dengan **403**. Dipasang pada prefix `/api/v1/admin/`, jadi
+    seluruh menu admin selain check-in tertutup untuk petugas.
+  - **Peran KOSONG = admin penuh**, jangan pernah dibalik. JWT yang sudah
+    tersimpan di localStorage admin sebelum fitur ini ada tidak punya klaim
+    `role`; menolaknya akan membuat admin yang sedang login kehilangan
+    seluruh menu tanpa sebab yang terlihat. Kolomnya sendiri `NOT NULL
+    DEFAULT 'admin'`, jadi setiap token baru selalu berperan eksplisit.
+  - Penyaringan menu di `AdminLayout.tsx` murni **kosmetik**. Jangan pernah
+    memperlakukannya sebagai pembatas akses.
+- **Query modul `auth` menyebut kolom SATU PER SATU, bukan `SELECT *`** -
+  berbeda dari modul content/whatsapp. Kolom baru **tidak** ikut otomatis.
+  Kalau `role` lupa ditambahkan di `GetAdminUserByUsername`, `Authenticate`
+  selalu menerbitkan JWT berperan kosong dan - karena peran kosong berarti
+  admin penuh - **seluruh pembatasan akses mati tanpa satu pun error**. Ini
+  kegagalan paling senyap di modul ini.
+- **Guardrail "admin terakhir" menghitung ADMIN PENUH saja** (`CountFullAdmins`,
+  bukan `Count`). Dengan `COUNT(*)` apa adanya, 1 admin penuh + 3 petugas = 4,
+  sehingga admin penuh terakhir lolos dihapus dan sistem terkunci permanen -
+  tidak ada lagi akun yang bisa membuka menu Pengguna untuk memperbaikinya.
+  Hal yang sama berlaku untuk **penurunan peran**: `canChangeRole` menolak
+  admin penuh terakhir diturunkan jadi petugas. Keputusannya diekstrak jadi
+  dua fungsi murni (`canDeleteAdmin`, `canChangeRole`) supaya bisa diuji tanpa
+  DB - `Service` memegang `*infrastructure.Repository` konkret. `Count()` tetap
+  ada dan tetap dipakai paginasi `List`; hanya guardrail yang pindah.
+- **Isi QR tamu adalah `ELW1:<token>`, bukan teks yang dibaca manusia**
+  (docs/plan/scan-checkin-gate/PLAN.md D1/T10). Format lama (nama/status/
+  jumlah/tanggal) secara teknis **tidak bisa dipakai untuk identifikasi**:
+  hasil pindaian tidak bisa dipetakan balik ke baris tamu, nama kembar lumrah
+  di daftar tamu pernikahan, dan siapa pun bisa mengetik teks yang sama lalu
+  membuat QR-nya sendiri. Berprefiks, **bukan URL** - URL membuat token tamu
+  tercatat di riwayat browser siapa pun yang memindainya.
+  - Prefiks `ELW1:` **kembar di dua bahasa** dan harus diubah bersamaan:
+    `checkinCodePrefix` di `modules/guest/application/service.go` dan
+    `composeLocalQrPayload` di `apps/web/src/components/RsvpConfirmation/
+    RsvpConfirmation.tsx`. Pola yang sama dengan `normalizePhone` di atas.
+    `checkin_test.go` menguji bolak-balik terbit->pindai untuk menguncinya.
+  - **`qrPayload` dihitung SEBELUM `GetQRInfo`**, dan cabang gagalnya
+    mengembalikan nilai yang sama. Kalau tidak, gangguan sesaat pada tabel
+    `invitation_content` akan diam-diam menerbitkan QR tanpa identitas yang
+    ditolak di gate - padahal token-nya tersedia sepanjang waktu di `row.Token`
+    dan tidak bergantung pada `info` sama sekali.
+  - Modul `whatsapp` **tidak berubah**: `renderQRPNG` memperlakukan payload
+    sebagai string buram. Snapshot `qr_payload` di `whatsapp_send_logs` ikut
+    menyimpan format baru dengan sendirinya.
+- **Check-in ditulis lewat UPDATE bersyarat, bukan baca-lalu-tulis**
+  (`MarkGuestCheckedIn`, `:execrows`):
+  `UPDATE guests SET checked_in_at = NOW() WHERE id = ? AND checked_in_at IS NULL`.
+  Dua petugas yang memindai QR yang sama pada detik yang sama tidak saling
+  menimpa, tanpa perlu transaksi. `rows = 1` berarti baru datang; `rows = 0`
+  berarti sudah check-in - dan pada kasus itu barisnya **dibaca ulang** untuk
+  mengambil `checked_in_at` yang asli, karena baris yang sudah dipegang bisa
+  saja terbaca sebelum petugas lain menandainya.
+- **Status RSVP tidak memblokir check-in.** Tamu ber-status `pending` atau
+  `not_attending` yang tetap datang harus bisa dicatat; `rsvpStatus` ikut
+  dikembalikan supaya petugas melihatnya di layar. Jangan menambahkan
+  penolakan berbasis status.
+- **Rute `/admin/checkin/*` didaftarkan sebagai pola SPESIFIK di mux root**,
+  bukan di dalam mux `admin` (docs/plan/scan-checkin-gate/PLAN.md D6). Go 1.22+
+  `ServeMux` memilih pola paling spesifik, jadi `POST /api/v1/admin/checkin/scan`
+  menang atas prefix `/api/v1/admin/` yang dijaga `RequireFullAdmin` - itulah
+  yang membuat ketiganya bisa dibuka petugas. Mekanismenya sama persis dengan
+  `GET /guests/summary` vs `PUT /guests/{id}`. **Jangan** memindahkannya ke
+  dalam mux `admin` demi kerapian: akun petugas akan langsung kehilangan menu
+  Scan.
+- **Satuan angka ringkasan gate mudah tertukar, dan itu bukan detail sepele.**
+  `GetCheckinSummary` (satu query agregat, bukan 4 COUNT terpisah)
+  mengembalikan `arrived_groom`/`arrived_bride`/`arrived_total`/`total_guests`
+  yang semuanya menghitung **BARIS TAMU (undangan)**, plus `arrived_pax` yang
+  menghitung **ORANG**. Menyamakan keduanya menghasilkan "12 dari 80" yang
+  membandingkan orang dengan undangan. `arrived_pax` sendiri berasal dari
+  `attending_count` - janji tamu saat RSVP, **bukan** hitung kepala di pintu,
+  karena §3.2 menolak kolom `checked_in_count`. Label di UI wajib jujur soal
+  itu; jangan pernah menyajikannya sebagai jumlah orang terverifikasi.
+- **Rute check-in kini ADA LIMA**, semuanya pola spesifik di mux root:
+  `POST checkin/scan`, `GET checkin/search`, `GET checkin/arrivals`,
+  `GET checkin/summary`, dan `POST checkin/{id}`. Keempat literal menang atas
+  wildcard `{id}` **dan** atas prefix `/api/v1/admin/`. Menambah literal baru
+  di bawah `checkin/` aman; memindahkan salah satunya ke mux `admin` akan
+  langsung mencabutnya dari akun petugas.
+- **`ListArrivals` berpaginasi, `SearchForCheckin` tidak** - dan perbedaannya
+  disengaja. Daftar tamu masuk diramban serta tumbuh sepanjang acara sampai
+  sebesar daftar tamu, jadi ia memakai `pagination.Meta` standar. Pencarian
+  hanya mencari satu orang, jadi ia dibatasi keras 20 tanpa `meta` supaya tiap
+  ketikan cuma menghasilkan satu query. Jangan menyeragamkan keduanya.
+- **DTO petugas sengaja BUKAN `GuestDTO`.** `CheckinResultDTO` &
+  `CheckinSearchItemDTO` & `ArrivalItemDTO` tidak membawa `phone`, `email`, `address`, `notes`,
+  maupun **`token`**. Memakai ulang `GuestDTO` berarti menyerahkan kredensial
+  undangan setiap tamu ke staf vendor yang berjaga di pintu. Ini keputusan
+  keamanan, bukan duplikasi yang perlu "dirapikan".

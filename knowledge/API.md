@@ -3,26 +3,36 @@
 Konvensi umum (`/api/v1`, envelope `success/message/data/errors/meta`) ada
 di `.claude/rules/api-standard.md`. Endpoint spesifik project ini:
 
+Kolom **Auth**: `publik` tanpa token; `JWT (admin)` = butuh token berperan
+`admin` (`authmw.RequireFullAdmin`, petugas dibalas **403**); `JWT (admin+petugas)`
+= token valid apa pun perannya (`authmw.RequireAdmin`). Lihat `BACKEND.md`.
+
 | Method | Path | Auth | Modul |
 |---|---|---|---|
 | POST | `/api/v1/auth/login` | publik | auth |
 | GET | `/api/v1/public/invitation` | publik (`Cache-Control: public, max-age=60`) | content |
 | GET | `/api/v1/public/guests/by-token/{token}` | publik | guest |
 | PATCH | `/api/v1/public/guests/by-token/{token}/rsvp` | publik | guest |
-| GET/PATCH | `/api/v1/admin/content` | JWT | content |
-| GET/POST/PUT/DELETE | `/api/v1/admin/content/{agenda-events,rundown-items,gallery-photos,love-story-chapters,gift-banks}[/{id}]` | JWT | content |
-| GET/PATCH | `/api/v1/admin/sections` | JWT | content |
-| POST | `/api/v1/admin/uploads` | JWT | content |
-| POST | `/api/v1/admin/uploads/base64` | JWT | content |
-| GET/POST/PUT/DELETE | `/api/v1/admin/guests[/{id}]` | JWT | guest |
-| GET | `/api/v1/admin/guests/summary` | JWT | guest |
-| GET | `/api/v1/admin/whatsapp/status` | JWT | whatsapp |
-| POST | `/api/v1/admin/whatsapp/pair/start` | JWT | whatsapp |
-| POST | `/api/v1/admin/whatsapp/logout` | JWT | whatsapp |
-| GET/PUT | `/api/v1/admin/whatsapp/config` | JWT | whatsapp |
-| GET | `/api/v1/admin/whatsapp/logs` | JWT | whatsapp |
-| POST | `/api/v1/admin/whatsapp/logs/{id}/resend` | JWT | whatsapp |
-| GET/POST/PUT/DELETE | `/api/v1/admin/users[/{id}]` | JWT | auth |
+| GET/PATCH | `/api/v1/admin/content` | JWT (admin) | content |
+| GET/POST/PUT/DELETE | `/api/v1/admin/content/{agenda-events,rundown-items,gallery-photos,love-story-chapters,gift-banks}[/{id}]` | JWT (admin) | content |
+| GET/PATCH | `/api/v1/admin/sections` | JWT (admin) | content |
+| POST | `/api/v1/admin/uploads` | JWT (admin) | content |
+| POST | `/api/v1/admin/uploads/base64` | JWT (admin) | content |
+| GET/POST/PUT/DELETE | `/api/v1/admin/guests[/{id}]` | JWT (admin) | guest |
+| GET | `/api/v1/admin/guests/summary` | JWT (admin) | guest |
+| GET/POST/PUT/DELETE | `/api/v1/admin/groups[/{id}]` | JWT (admin) | guest |
+| GET | `/api/v1/admin/whatsapp/status` | JWT (admin) | whatsapp |
+| POST | `/api/v1/admin/whatsapp/pair/start` | JWT (admin) | whatsapp |
+| POST | `/api/v1/admin/whatsapp/logout` | JWT (admin) | whatsapp |
+| GET/PUT | `/api/v1/admin/whatsapp/config` | JWT (admin) | whatsapp |
+| GET | `/api/v1/admin/whatsapp/logs` | JWT (admin) | whatsapp |
+| POST | `/api/v1/admin/whatsapp/logs/{id}/resend` | JWT (admin) | whatsapp |
+| GET/POST/PUT/DELETE | `/api/v1/admin/users[/{id}]` | JWT (admin) | auth |
+| POST | `/api/v1/admin/checkin/scan` | JWT (admin+petugas) | guest |
+| GET | `/api/v1/admin/checkin/search` | JWT (admin+petugas) | guest |
+| GET | `/api/v1/admin/checkin/arrivals` | JWT (admin+petugas) | guest |
+| GET | `/api/v1/admin/checkin/summary` | JWT (admin+petugas) | guest |
+| POST | `/api/v1/admin/checkin/{id}` | JWT (admin+petugas) | guest |
 
 `POST /api/v1/admin/uploads/base64` menerima image (JPG/PNG/WebP/GIF -
 audio TIDAK diterima di sini, tetap lewat `/api/v1/admin/uploads` multipart)
@@ -51,16 +61,24 @@ mentah) - lihat `application/service.go` (`listEnabledSectionsNormalized`).
 dipakai di `LIKE` - lihat `DATABASE.md`), `invitation_type`
 (`online`/`physical`), `souvenir_type` (`regular`/`vip`), dan `responded`
 (`true` = hanya tamu dengan `rsvp_status != 'pending'` - dipakai menu
-Reservasi, lihat `docs/plan/guest-reservation-split/PLAN.md`); semuanya
-digabung dengan `AND`. `GET /api/v1/admin/guests/summary` mengembalikan
+Reservasi, lihat `docs/plan/guest-reservation-split/PLAN.md`), dan `group_id`
+(id numerik group; kosong = tanpa filter, nilai non-numerik ditolak **400**);
+semuanya digabung dengan `AND`. Filter group TIDAK memakai JOIN - `group_id`
+ada di baris `guests` sendiri dan ber-index. Respons tamu membawa `groupId`
+(nullable) **tanpa nama group**: pemetaan id -> nama dilakukan frontend dari
+daftar group yang sudah dimuat sekali, sehingga tidak ada N+1
+(`docs/plan/guest-groups/PLAN.md` D2). `GET /api/v1/admin/guests/summary` mengembalikan
 angka agregat (status RSVP + pax, jenis undangan, jenis souvenir, pihak,
 gender, aktivitas RSVP terbaru) untuk dashboard admin - lihat
 `docs/plan/dashboard-wa-rsvp/PLAN.md`.
 
 `PATCH /api/v1/public/guests/by-token/{token}/rsvp` menerima `status` dan
 `attendingCount` (wajib 1 atau 2 saat `status='attending'`, diabaikan untuk
-status lain). Respons berisi `data.qrPayload` (string teks QR) - kosong
-untuk status selain `attending`. Pengiriman QR ke WhatsApp tamu (bila
+status lain). Respons berisi `data.qrPayload` - kini berbentuk
+`ELW1:<token tamu>`, **bukan lagi teks undangan** (lihat `BACKEND.md`) - dan
+kosong untuk status selain `attending`. Nilainya dihitung SEBELUM info
+undangan dibaca, jadi tetap sah walau tabel `invitation_content` sedang gagal
+dibaca. Pengiriman QR ke WhatsApp tamu (bila
 modul whatsapp aktif & tertaut) berjalan di goroutine terpisah - endpoint
 ini TIDAK menunggu hasil kirim WhatsApp.
 
@@ -71,11 +89,74 @@ Endpoint `/api/v1/admin/whatsapp/*` mengelola integrasi WhatsApp
 `logs` menerima `page`/`limit` (paginasi standar). Sesi WhatsApp (device &
 kunci enkripsi) TIDAK tersimpan di MySQL - lihat `DATABASE.md`.
 
-`/api/v1/admin/users` mengelola akun admin (CRUD penuh, tanpa role/permission
-- semua admin setara, lihat `docs/plan/admin-users/PLAN.md`). `username`
-wajib unik (dicek lewat `GetAdminUserByUsername` sebelum create/update -
-bukan menangkap error MySQL 1062), `password` wajib minimal 6 karakter saat
-create, opsional saat update lewat `PUT /{id}` (kosong = tidak diganti).
+`/api/v1/admin/groups` mengelola group tamu (`docs/plan/guest-groups/PLAN.md`).
+`GET` berpaginasi standar dan setiap baris membawa `guestCount` - diisi dari
+SATU query `GROUP BY`, bukan satu `COUNT` per baris. `name` wajib, maksimal
+100 karakter, dan **unik**; `description` opsional, maksimal 255 karakter.
+`DELETE` **ditolak 400 dengan menyebut jumlah tamunya** ("Group tidak bisa
+dihapus karena masih dipakai N tamu") bila group masih dipakai - frontend
+menampilkan pesan itu apa adanya, tidak menulis ulang kalimatnya.
+`PUT`/`DELETE` pada id yang tidak ada membalas **404**, bukan 200 (service
+memanggil `GetGuestGroupByID` lebih dulu).
+
+`POST`/`PUT` `/api/v1/admin/guests` kini **mewajibkan** `groupId` (> 0) dan
+menolak `404` bila group-nya tidak ada - penegakan di backend, bukan hanya di
+form (pola yang sama dengan `gender` yang wajib meski kolomnya nullable).
+Respons `POST /api/v1/admin/checkin/scan` & `/checkin/{id}` membawa
+`groupName` yang di-resolve DI SERVER: akun petugas tidak bisa memanggil
+`/api/v1/admin/groups` (dijaga `RequireFullAdmin`), jadi ia tidak mungkin
+memetakannya sendiri. Kosong bila tamu belum bergroup - kegagalan membaca
+group **tidak pernah** menggagalkan check-in.
+
+Seluruh `/api/v1/admin/groups*` dijaga `RequireFullAdmin`: petugas gate
+MELIHAT nama group di hasil scan tapi tidak mengelolanya. Route-nya sengaja
+TIDAK didaftarkan di mux root seperti `checkin/*`.
+
+`/api/v1/admin/users` mengelola akun admin (CRUD penuh, lihat
+`docs/plan/admin-users/PLAN.md`). `username` wajib unik (dicek lewat
+`GetAdminUserByUsername` sebelum create/update - bukan menangkap error MySQL
+1062), `password` wajib minimal 6 karakter saat create, opsional saat update
+lewat `PUT /{id}` (kosong = tidak diganti).
+
+Sejak `docs/plan/scan-checkin-gate/PLAN.md` akun **punya peran**: `role`
+bernilai `admin` atau `scanner`, nilai lain ditolak 400. Pada `POST` peran
+kosong berarti `admin`; pada `PUT` peran kosong berarti **tidak diubah**
+(sejalan dengan `password` kosong), supaya klien lama tidak diam-diam
+menurunkan peran akun. Respons `POST /api/v1/auth/login` ikut membawa
+`data.role`.
+
 `DELETE /{id}` menolak 2 kasus: menghapus akun sendiri yang sedang login
-(dicek dari klaim JWT), dan menghapus admin terakhir yang tersisa (`COUNT(*)
-<= 1`) - keduanya mencegah sistem terkunci total.
+(dicek dari klaim JWT), dan menghapus **admin penuh** terakhir. `PUT /{id}`
+menolak menurunkan admin penuh terakhir jadi petugas. Ketiganya mencegah
+sistem terkunci total. Penghitungnya `CountFullAdmins` (`WHERE role='admin'`),
+**bukan** `COUNT(*)` - dengan `COUNT(*)` apa adanya, 1 admin penuh + 3 petugas
+= 4 sehingga admin penuh terakhir lolos dihapus. Lihat `BACKEND.md`.
+
+Tiga endpoint `/api/v1/admin/checkin/*` adalah **satu-satunya** yang bisa
+diakses akun petugas; sisanya `/api/v1/admin/*` membalas **403** untuk mereka.
+`POST /checkin/scan` menerima `{"code": "ELW1:<token>"}` - kode berprefiks lain
+atau tanpa token ditolak **400**, token tak dikenal **404**. `POST /checkin/{id}`
+adalah check-in manual untuk tamu tanpa QR. Keduanya membalas bentuk yang sama,
+dengan `alreadyCheckedIn` membedakan "baru datang" dari "sudah check-in"
+(pemindaian kedua **tidak** menimpa `checkedInAt`, dan tidak dihitung ganda).
+`GET /checkin/search?q=` dibatasi keras **20 baris** dan **tidak berpaginasi**,
+jadi responsnya sengaja **tanpa `meta`**; `q` kosong membalas array kosong,
+bukan 20 tamu pertama. Status RSVP tidak memblokir check-in.
+
+`GET /checkin/arrivals` adalah menu **"Tamu Masuk"**: daftar tamu yang sudah
+tiba, **terbaru di atas**, dan - berbeda dari `/checkin/search` - memang
+**BERPAGINASI** dengan `meta` standar (`page`/`limit`, default 20). Alasannya
+bukan gaya: daftar ini diramban dan tumbuh sepanjang acara sampai sebesar
+daftar tamu, sedangkan pencarian hanya mencari satu orang.
+
+`GET /checkin/summary` mengembalikan angka kartu gate dalam **satu** query
+agregat: `arrivedGroom`, `arrivedBride`, `arrivedTotal`, `arrivedPax`,
+`totalGuests`. **Perhatikan satuannya** - `arrived*` dan `totalGuests`
+menghitung BARIS TAMU (undangan) sehingga "12 dari 80" selalu apple-to-apple,
+sedangkan `arrivedPax` menghitung ORANG dari `attending_count`, yaitu jumlah
+yang DIJANJIKAN tamu saat RSVP. Sistem ini tidak merekam hitung kepala di
+pintu (§3.2 menolak kolom `checked_in_count`), jadi `arrivedPax` adalah
+perkiraan dan label di UI wajib mengatakannya. Jangan menyamakan keduanya.
+
+Respons kelima endpoint check-in sengaja **tidak memuat** `phone`, `email`,
+`address`, `notes`, maupun `token` - lihat `BACKEND.md`.

@@ -23,8 +23,16 @@ const SIZE_CLASS: Record<ModalSize, string> = {
 export function Modal({ open, onClose, title, children, footer, size = 'lg' }: ModalProps) {
   const dialogRef = useRef<HTMLDivElement>(null)
   const onCloseRef = useRef(onClose)
-  onCloseRef.current = onClose
   const pointerDownOnBackdropRef = useRef(false)
+
+  // Pola "latest ref": onClose disimpan agar listener Escape di bawah tidak
+  // perlu memasang ulang tiap render (pemanggil hampir selalu mengoper arrow
+  // function baru). Penugasannya WAJIB di dalam efek, bukan saat render -
+  // render boleh dibuang React (StrictMode/concurrent) sehingga ref bisa
+  // tertinggal menunjuk callback dari render yang tidak pernah tampil.
+  useEffect(() => {
+    onCloseRef.current = onClose
+  })
 
   useEffect(() => {
     if (!open) return
