@@ -177,6 +177,9 @@
 
 .wpass .wpass__qr {
   width: fit-content;
+  /* Jaring pengaman untuk layar paling sempit: tanpa ini `fit-content` bisa
+     melebihi lebar kartu dan kotak putihnya kembali terjepit mendatar. */
+  max-width: 100%;
   margin: 0 auto;
   padding: 14px;
   /* Putih, BUKAN krem: pemindai butuh kontras tinggi dan zona tenang yang
@@ -187,11 +190,14 @@
   border-radius: 10px;
 }
 
+/* UKURAN KANVAS TIDAK DIATUR DI SINI - lihat prop `style` pada QRCodeCanvas
+   di RsvpConfirmation.tsx.
+   qrcode.react menempelkan `height`/`width` INLINE ke <canvas>, dan style
+   inline mengalahkan selector class, jadi aturan ukuran apa pun di berkas ini
+   tidak akan pernah berlaku (itulah sebab kotak QR sempat tampil sebagai
+   persegi panjang di ponsel). Jangan kembalikan width/height ke sini. */
 .wpass .wpass__qr canvas {
   display: block;
-  width: 100%;
-  max-width: 200px;
-  height: auto;
 }
 
 .wpass .wpass__hint {

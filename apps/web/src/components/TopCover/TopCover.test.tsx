@@ -18,6 +18,10 @@ const BASE_SESSION: GuestSessionState = {
   token: null,
   attendingCount: 1,
   resolved: false,
+  // TopCover tidak membaca `access` (undangannya hanya dirender saat akses
+  // sudah diberikan) - field ini ada semata agar literalnya memenuhi kontrak
+  // GuestSessionState.
+  access: 'granted',
 }
 
 const content = { brideName: 'Ariana', groomName: 'Adrian' } as InvitationContent

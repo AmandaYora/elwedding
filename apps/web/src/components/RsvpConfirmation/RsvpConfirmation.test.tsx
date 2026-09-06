@@ -178,3 +178,51 @@ test('PATCH gagal -> QR tetap tampil (fallback lokal), dengan indikator error', 
   await waitFor(() => expect(document.getElementById('rsvp-qr-canvas')).toBeInTheDocument())
   await waitFor(() => expect(screen.getByText(/belum tersimpan/)).toBeInTheDocument())
 })
+
+// --- rasio QR ---
+// QR SELALU kotak. Sebelum ini ukurannya dicoba diatur lewat rsvp-pass.css
+// (`width:100%; max-width:200px; height:auto`), padahal qrcode.react menempelkan
+// `height`/`width` INLINE ke <canvas> dan style inline mengalahkan selector
+// class - jadi aturan CSS itu tidak pernah berlaku dan kanvasnya tetap 320px.
+// Di ponsel, 320px lebih lebar daripada ruang kartu (~292px), sehingga kotak
+// putih pembungkusnya terjepit mendatar sementara tingginya tetap: QR-nya
+// tampil sebagai persegi panjang.
+//
+// Yang dikunci di sini adalah PENYEBABNYA, bukan sekadar "kanvas ada": bahwa
+// gaya inline yang benar-benar sampai ke elemen memang responsif dan berasio
+// 1:1.
+
+async function renderKartuQr() {
+  render(<RsvpConfirmation content={content} />)
+  fireEvent.click(screen.getByRole('button', { name: 'Akan Hadir' }))
+  fireEvent.click(screen.getByRole('button', { name: '2 Tamu' }))
+  await waitFor(() => expect(document.getElementById('rsvp-qr-canvas')).toBeInTheDocument())
+  return document.getElementById('rsvp-qr-canvas') as HTMLCanvasElement
+}
+
+test('kanvas QR memakai gaya inline responsif berasio 1:1, bukan lebar tetap 320px', async () => {
+  const canvas = await renderKartuQr()
+
+  // aspect-ratio inilah penjaga sesungguhnya: berapa pun lebar yang tersisa,
+  // tingginya mengikuti lebarnya.
+  expect(canvas.style.aspectRatio).toBe('1 / 1')
+  expect(canvas.style.width).toBe('100%')
+  expect(canvas.style.height).toBe('auto')
+  expect(canvas.style.maxWidth).toBe('200px')
+
+  // Regresi langsung: qrcode.react menulis `height: 320px; width: 320px` lebih
+  // dulu, dan prop `style` harus menimpanya. Kalau salah satu nilai px ini
+  // muncul kembali, bug persegi panjangnya kembali juga.
+  expect(canvas.style.width).not.toBe('320px')
+  expect(canvas.style.height).not.toBe('320px')
+})
+
+test('bitmap QR tetap 320px agar hasil unduhan tidak ikut mengecil', async () => {
+  const canvas = await renderKartuQr()
+
+  // `size` mengatur RESOLUSI bitmap (dipakai toDataURL saat "Unduh QR"),
+  // terpisah dari ukuran tampil di atas. Mengecilkan ini demi tampilan akan
+  // membuat berkas unduhan tamu ikut buram.
+  expect(canvas.getAttribute('width')).toBe('320')
+  expect(canvas.getAttribute('height')).toBe('320')
+})

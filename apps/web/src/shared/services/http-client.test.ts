@@ -39,7 +39,7 @@ afterAll(() => {
 
 beforeEach(() => {
   assign.mockReset()
-  useAuthStore.getState().setSession('token-lama', 'admin')
+  useAuthStore.getState().setSession('token-lama', 'admin', 'admin')
 })
 
 test('401 di route admin -> sesi dibuang & dialihkan ke login', async () => {

@@ -10,6 +10,28 @@ const DEFAULT_SESSION: GuestSession = {
   attendingCount: 1,
 }
 
+/** Keputusan akses undangan untuk pembuka halaman ini.
+ *
+ * Dipisah dari `resolved` dan TIDAK boleh disederhanakan jadi boolean: empat
+ * keadaan ini menuntut empat perlakuan yang berbeda di layar.
+ *
+ * - `checking`   - token ada, jawabannya belum tiba. Undangan MAUPUN layar
+ *                  penolakan sama-sama belum boleh tampil; menebak salah satu
+ *                  berarti mengedipkan isi undangan ke orang yang belum tentu
+ *                  berhak, atau menuduh tamu sah yang jaringannya lambat.
+ * - `granted`    - token cocok dengan satu baris tamu. Undangan dibuka.
+ * - `denied`     - tidak ada token sama sekali, ATAU server menjawab 404
+ *                  (token tidak dikenal). Inilah satu-satunya keadaan yang
+ *                  boleh berbunyi "Anda tidak terdaftar".
+ * - `unavailable`- permintaannya TIDAK SAMPAI, atau server sedang bermasalah
+ *                  (5xx). Tamunya boleh jadi sangat sah - yang gagal adalah
+ *                  jaringannya. Menyamakan ini dengan `denied` berarti
+ *                  menuduh tamu undangan sebagai penyusup hanya karena sinyal
+ *                  putus sesaat. Pembedaan yang sama sudah dipakai ScanPage
+ *                  di gate ("Tidak terkirim" vs "Tidak dikenali").
+ */
+export type GuestAccess = 'checking' | 'granted' | 'denied' | 'unavailable'
+
 /** Hasil resolve sesi tamu ditambah state klien `resolved`.
  *
  * `resolved` DISENGAJA tidak ditaruh di `GuestSession` (types/api.ts):
@@ -24,6 +46,7 @@ const DEFAULT_SESSION: GuestSession = {
  * selama fetch belum selesai. */
 export interface GuestSessionState extends GuestSession {
   resolved: boolean
+  access: GuestAccess
 }
 
 interface ResolvedGuest {
@@ -80,9 +103,32 @@ function resolveGuest(token: string): Promise<ResolvedGuest> {
  * ("Tamu Undangan", `resolved: false`, tanpa persist) supaya link generik
  * tetap berfungsi.
  */
+/** Menerjemahkan kegagalan fetch jadi keputusan akses.
+ *
+ * HANYA 404 yang berarti "tidak terdaftar". 404 itu jawaban TEGAS dari server
+ * bahwa tokennya tidak cocok dengan baris tamu mana pun (lihat
+ * `guest.Service.ResolveByToken`). Segala kegagalan lain - permintaan tidak
+ * terkirim, DNS gagal, 500, gateway timeout - TIDAK membuktikan apa pun
+ * tentang undangan si pembuka, jadi tidak boleh berujung tuduhan.
+ *
+ * Sengaja tanpa `instanceof AxiosError`: hook ini juga dipanggil di test
+ * dengan galat tiruan, dan bentuk `response.status` sudah cukup menentukan.
+ */
+function accessFromError(err: unknown): GuestAccess {
+  const status = (err as { response?: { status?: number } })?.response?.status
+  return status === 404 ? 'denied' : 'unavailable'
+}
+
 export function useGuestSession(): GuestSessionState {
   const [token] = useState(() => new URLSearchParams(window.location.search).get('guest'))
-  const [session, setSession] = useState<GuestSessionState>({ ...DEFAULT_SESSION, token, resolved: false })
+  const [session, setSession] = useState<GuestSessionState>({
+    ...DEFAULT_SESSION,
+    token,
+    resolved: false,
+    // Tanpa token TIDAK ada yang perlu ditunggu: keputusannya sudah final
+    // sejak render pertama, tanpa satu pun permintaan jaringan.
+    access: token ? 'checking' : 'denied',
+  })
 
   useEffect(() => {
     if (!token) return
@@ -91,11 +137,17 @@ export function useGuestSession(): GuestSessionState {
     resolveGuest(token)
       .then(({ name, side, rsvpStatus, attendingCount }) => {
         if (cancelled) return
-        setSession({ name, side, status: rsvpStatus, token, attendingCount: attendingCount || 1, resolved: true })
+        setSession({
+          name, side, status: rsvpStatus, token,
+          attendingCount: attendingCount || 1, resolved: true, access: 'granted',
+        })
       })
-      .catch(() => {
-        // Token tidak valid -> biarkan fallback default (nama generik,
-        // resolved tetap false, tanpa persist saat RSVP diisi).
+      .catch((err: unknown) => {
+        if (cancelled) return
+        // Identitas TIDAK diisi apa pun - nama tetap fallback generik dan
+        // `resolved` tetap false, persis perilaku lama. Yang bertambah hanya
+        // keputusan aksesnya.
+        setSession((prev) => ({ ...prev, access: accessFromError(err) }))
       })
 
     return () => {

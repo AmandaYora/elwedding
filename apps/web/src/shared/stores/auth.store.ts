@@ -5,7 +5,13 @@ import type { AdminRole } from '@/modules/admin/auth/services/auth.service'
 interface AuthState {
   token: string | null
   role: AdminRole | null
-  setSession: (token: string, role: AdminRole) => void
+  /** Username akun yang sedang login, dipakai AdminLayout untuk menampilkan
+   * SIAPA yang login. Diisi dari form login (bukan dari respons backend, yang
+   * memang tidak mengirimnya) - nilainya sama persis karena login baru
+   * berhasil dengan username itu. `null` untuk sesi LAMA yang sudah tersimpan
+   * sebelum field ini ada; AdminLayout menyediakan teks cadangan. */
+  username: string | null
+  setSession: (token: string, role: AdminRole, username: string) => void
   logout: () => void
 }
 
@@ -22,8 +28,9 @@ export const useAuthStore = create<AuthState>()(
     (set) => ({
       token: null,
       role: null,
-      setSession: (token, role) => set({ token, role }),
-      logout: () => set({ token: null, role: null }),
+      username: null,
+      setSession: (token, role, username) => set({ token, role, username }),
+      logout: () => set({ token: null, role: null, username: null }),
     }),
     { name: 'admin-auth' },
   ),

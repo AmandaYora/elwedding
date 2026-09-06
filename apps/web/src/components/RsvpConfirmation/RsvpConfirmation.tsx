@@ -250,10 +250,30 @@ export default function RsvpConfirmation({ content }: RsvpConfirmationProps) {
                         <QRCodeCanvas
                           ref={qrCanvasRef}
                           value={displayQrPayload}
-                          // Dirender 320 lalu dikecilkan lewat CSS: tajam di
+                          // Dirender 320 lalu dikecilkan saat TAMPIL: tajam di
                           // layar retina, dan berkas unduhannya ikut resolusi
                           // penuh ini, bukan ukuran tampilnya.
                           size={320}
+                          // Ukuran tampil WAJIB lewat prop `style`, BUKAN lewat
+                          // rsvp-pass.css. qrcode.react menyusun gayanya sendiri
+                          // sebagai `{ height: size, width: size, ...style }`
+                          // lalu menempelkannya INLINE ke <canvas>, dan style
+                          // inline mengalahkan selector class mana pun - aturan
+                          // `width:100%; max-width:200px` di CSS karena itu tidak
+                          // pernah berlaku, kanvasnya selalu 320px. Di ponsel
+                          // 320px lebih lebar daripada ruang kartu (~292px),
+                          // sehingga kotak putih pembungkusnya (`width:fit-content`)
+                          // terjepit mendatar sementara tingginya tetap - itulah
+                          // yang membuatnya terlihat persegi panjang.
+                          //
+                          // `style` di-spread PALING AKHIR oleh pustakanya, jadi
+                          // nilai di bawah ini yang menang.
+                          //
+                          // aspectRatio 1/1 adalah penjaga sesungguhnya: berapa
+                          // pun lebar yang tersisa di layar sempit, tingginya
+                          // selalu mengikuti lebarnya. QR memang selalu kotak,
+                          // jadi rasionya tidak boleh bergantung pada ruang.
+                          style={{ width: '100%', maxWidth: 200, height: 'auto', aspectRatio: '1 / 1' }}
                           // Zona tenang 4 modul sesuai spesifikasi QR. Tanpa
                           // ini PNG hasil unduhan tidak punya margin putih dan
                           // bisa gagal dipindai saat ditempel di chat/cetak.

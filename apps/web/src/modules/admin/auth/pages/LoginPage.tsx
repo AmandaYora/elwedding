@@ -35,7 +35,7 @@ export default function LoginPage() {
     setSubmitting(true)
     try {
       const { token, role } = await login(parsed.data.username, parsed.data.password)
-      setSession(token, role)
+      setSession(token, role, parsed.data.username)
       // Petugas gate diarahkan langsung ke Scan - dashboard tidak bisa
       // dibukanya (docs/plan/scan-checkin-gate T12/T13).
       navigate(role === 'scanner' ? ROUTE_PATHS.scan : ROUTE_PATHS.dashboard, { replace: true })

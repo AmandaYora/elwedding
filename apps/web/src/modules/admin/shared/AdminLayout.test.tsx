@@ -19,7 +19,7 @@ function renderAt(path: string) {
   )
 }
 
-afterEach(() => useAuthStore.setState({ token: null, role: null }))
+afterEach(() => useAuthStore.setState({ token: null, role: null, username: null }))
 
 // Regresi T2 (admin-ui-redesign/PLAN.md §2.4): NavLink to="/" tanpa `end`
 // aktif di SEMUA rute. Harus tepat 1 item nav aktif per rute.
@@ -72,4 +72,38 @@ test('peran admin -> seluruh menu dirender, termasuk Scan', () => {
   expect(screen.getByText('Tamu Masuk')).toBeInTheDocument()
   expect(screen.getByText('Tamu', { exact: true })).toBeInTheDocument()
   expect(screen.getByText('Pengguna')).toBeInTheDocument()
+})
+
+// --- kotak identitas akun di atas tombol Keluar ---
+// Sebelumnya kotak ini mencetak "Administrator / admin@wedding.id" hardcode,
+// sehingga petugas gate pun melihat dirinya disebut Administrator. Satu-satunya
+// tempat yang menyebut siapa yang login menyebut orang yang salah.
+
+test('kotak akun menampilkan username & peran petugas, bukan "Administrator"', () => {
+  useAuthStore.setState({ token: 'tok', role: 'scanner', username: 'petugas1' })
+  renderAt('/scan')
+
+  expect(screen.getByText('petugas1')).toBeInTheDocument()
+  expect(screen.getByText('Petugas gate')).toBeInTheDocument()
+  expect(screen.queryByText('Administrator')).not.toBeInTheDocument()
+  expect(screen.queryByText('admin@wedding.id')).not.toBeInTheDocument()
+})
+
+test('kotak akun menampilkan username & peran admin penuh', () => {
+  useAuthStore.setState({ token: 'tok', role: 'admin', username: 'dimas' })
+  renderAt('/')
+
+  expect(screen.getByText('dimas')).toBeInTheDocument()
+  expect(screen.getByText('Admin penuh')).toBeInTheDocument()
+})
+
+// Sesi LAMA yang tersimpan di localStorage sebelum field `username` ada
+// ter-rehydrate sebagai null - kotaknya tidak boleh kosong atau menampilkan
+// "null".
+test('sesi lama tanpa username tetap menampilkan teks cadangan', () => {
+  useAuthStore.setState({ token: 'tok', role: 'admin', username: null })
+  renderAt('/')
+
+  expect(screen.getByText('Akun admin')).toBeInTheDocument()
+  expect(screen.getByText('Admin penuh')).toBeInTheDocument()
 })
