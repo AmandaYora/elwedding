@@ -32,7 +32,7 @@ sedangkan group harus bisa dibuat dan dihapus admin kapan saja.
 |---|---|---|
 | K1 | Kardinalitas | **Tepat satu group per tamu.** Satu kolom `guests.group_id`, bukan tabel penghubung. Layar scan butuh SATU jawaban yang terbaca sekilas di pintu. |
 | K2 | Wajib/opsional & baris lama | **Kolom nullable di DB, WAJIB saat isi data tamu.** Tamu lama tidak dikarang-karangkan masuk group palsu; mereka bergroup kosong sampai disunting. |
-| K3 | Isi satu Group | **Nama + deskripsi saja.** Tanpa warna, nomor meja, maupun kuota. |
+| K3 | Isi satu Group | ~~**Nama + deskripsi saja.** Tanpa warna, nomor meja, maupun kuota.~~ → **SEBAGIAN DIBALIK** oleh [guest-pax-quota D2](../guest-pax-quota/PLAN.md): kolom `default_pax` ditambahkan migration `000017`. Warna & nomor meja **tetap** ditolak. Alasan pembalikan: K3 diputuskan ketika belum ada requirement pax sama sekali — kuota waktu itu fitur spekulatif tanpa pemakai, dan menolaknya benar. `default_pax` juga bukan kuota yang mengikat anggota group; yang mengikat `guests.pax_quota` per tamu. |
 | K4 | Hapus group yang masih dipakai | **Ditolak, dengan menyebut jumlah tamunya** ("masih dipakai N tamu"). Tidak ada data yang diam-diam berubah. |
 | D1 | Pemilik tabel `guest_groups` | **Modul `guest`** (jadi memiliki 2 tabel), bukan modul baru. |
 | D2 | Sumber nama group di daftar Tamu | **Dipetakan di frontend** dari daftar group yang memang sudah dimuat halaman itu. Backend cukup mengirim `groupId`. |
@@ -211,7 +211,9 @@ disunting, form mewajibkan memilih group. Perilaku ini identik dengan kolom
   memindahkan. Tidak ada UI pemindahan.
 - **Backfill tamu lama ke group** — ditolak di K2. Tidak ada seed, tidak ada
   group "Umum".
-- **Warna / nomor meja / kuota group** — ditolak di K3.
+- **Warna / nomor meja** — ditolak di K3, dan tetap ditolak.
+- ~~**Kuota group**~~ — ditolak di K3, lalu **dibalik** oleh
+  [guest-pax-quota D2](../guest-pax-quota/PLAN.md). Lihat catatan di K3.
 - **Pencarian & filter di halaman Group** — jumlah group puluhan, satu
   halaman paginasi sudah cukup. Pola yang sama dipakai UsersPage.
 

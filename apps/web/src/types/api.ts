@@ -130,6 +130,10 @@ export interface GuestSession {
   // tamu yang membuka ulang link setelah RSVP 'attending' tidak tahu
   // jumlah tamu yang sudah dikonfirmasi untuk menyusun ulang QR.
   attendingCount: number
+  // Jatah kursi undangan ini (docs/plan/guest-pax-quota/PLAN.md D5). Menentukan
+  // BENTUK pertanyaan di RsvpConfirmation: 1 = tidak ditanya sama sekali,
+  // 2 = dua tombol seperti sebelumnya, >=3 = daftar tombol sampai batas jatah.
+  paxQuota: number
 }
 
 // RsvpUpdateResponse - respons PATCH /public/guests/by-token/:token/rsvp

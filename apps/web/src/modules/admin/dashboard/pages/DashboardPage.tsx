@@ -170,7 +170,12 @@ export default function DashboardPage() {
             <CardBody className="p-6">
               <dl className="grid grid-cols-2 sm:grid-cols-4 gap-4">
                 <div>
-                  <dt className="text-xs font-semibold uppercase tracking-wider text-slate-500">Total tamu</dt>
+                  {/* "Total undangan", bukan "Total tamu" (docs/plan/
+                      guest-pax-quota/PLAN.md T23): `summary.total` menghitung
+                      BARIS, dan satu baris bisa bernilai banyak orang. Label
+                      lama inilah sumber kebingungan yang memicu seluruh fitur
+                      jatah kursi - angka orang ada di kartu proyeksi di bawah. */}
+                  <dt className="text-xs font-semibold uppercase tracking-wider text-slate-500">Total undangan</dt>
                   <dd className="font-mono text-2xl sm:text-3xl font-bold text-slate-900 mt-1.5">{summary.total}</dd>
                 </div>
                 <div>
@@ -203,6 +208,68 @@ export default function DashboardPage() {
                   ) : null,
                 )}
               </div>
+            </CardBody>
+          </Card>
+
+          {/* Proyeksi catering (docs/plan/guest-pax-quota/PLAN.md T23/§5).
+              Satuannya ORANG, bukan undangan - itu sebabnya ia kartu sendiri
+              dan tidak dicampur ke KPI di atas yang menghitung baris.
+
+              TIGA baris, bukan satu angka: yang teratas FAKTA (tamu sudah
+              menjawab), yang tengah TEBAKAN (belum menjawab, dipakai
+              jatahnya). Digabung jadi satu angka telanjang, admin tidak bisa
+              menilai seberapa besar risikonya saat memesan katering. */}
+          <Card className="shadow-sm">
+            <CardBody className="p-5">
+              <div className="flex items-baseline justify-between gap-3 mb-4">
+                <h2 className="text-sm font-semibold text-slate-900">Proyeksi catering</h2>
+                <span className="text-xs text-slate-400">satuan: orang</span>
+              </div>
+
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm min-w-[20rem]">
+                  <thead>
+                    <tr className="text-xs font-semibold uppercase tracking-wider text-slate-500">
+                      <th className="text-left font-semibold pb-2" />
+                      <th className="text-right font-semibold pb-2 px-3">Pria</th>
+                      <th className="text-right font-semibold pb-2 px-3">Wanita</th>
+                      <th className="text-right font-semibold pb-2 pl-3">Total</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr className="border-t border-slate-100">
+                      <td className="py-2 text-slate-600">Sudah konfirmasi hadir</td>
+                      <td className="py-2 px-3 text-right font-mono tabular-nums text-slate-900">{summary.confirmedPaxGroom}</td>
+                      <td className="py-2 px-3 text-right font-mono tabular-nums text-slate-900">{summary.confirmedPaxBride}</td>
+                      <td className="py-2 pl-3 text-right font-mono tabular-nums font-semibold text-slate-900">{summary.confirmedPaxTotal}</td>
+                    </tr>
+                    <tr className="border-t border-slate-100">
+                      <td className="py-2 text-slate-600">
+                        Belum jawab, diperkirakan
+                        <span className="block text-xs text-slate-400">dihitung dari jatah kursinya</span>
+                      </td>
+                      <td className="py-2 px-3 text-right font-mono tabular-nums text-slate-500">{summary.expectedPaxGroom}</td>
+                      <td className="py-2 px-3 text-right font-mono tabular-nums text-slate-500">{summary.expectedPaxBride}</td>
+                      <td className="py-2 pl-3 text-right font-mono tabular-nums font-semibold text-slate-500">{summary.expectedPaxTotal}</td>
+                    </tr>
+                    <tr className="border-t-2 border-slate-300">
+                      <td className="pt-2.5 font-semibold text-slate-900">Proyeksi pax</td>
+                      <td className="pt-2.5 px-3 text-right font-mono tabular-nums font-bold text-slate-900">{summary.projectedPaxGroom}</td>
+                      <td className="pt-2.5 px-3 text-right font-mono tabular-nums font-bold text-slate-900">{summary.projectedPaxBride}</td>
+                      <td className="pt-2.5 pl-3 text-right font-mono tabular-nums text-lg font-bold text-slate-900">{summary.projectedPaxTotal}</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+
+              {/* Baris "tidak dihitung" mencegah tamu hilang diam-diam dari
+                  total: kalau angkanya terasa terlalu besar, admin langsung
+                  curiga ada yang salah set. Satuannya UNDANGAN, dan itu
+                  disebutkan supaya tidak dikira orang. */}
+              <p className="text-xs text-slate-400 mt-3.5 pt-3 border-t border-slate-100">
+                Tidak dihitung: {summary.excludedNotAttending} undangan tidak hadir ·{' '}
+                {summary.excludedNotExpected} tidak diperkirakan hadir
+              </p>
             </CardBody>
           </Card>
 

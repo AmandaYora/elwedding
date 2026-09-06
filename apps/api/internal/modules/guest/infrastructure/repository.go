@@ -35,6 +35,21 @@ func (r *Repository) UpdateRsvpStatusByToken(ctx context.Context, arg sqlc.Updat
 	return r.q.UpdateGuestRsvpStatusByToken(ctx, arg)
 }
 
+// ResetRsvp mengosongkan JAWABAN tamu, bukan barisnya (docs/plan/
+// reservation-reset-contacted-flag/PLAN.md K1) - dipakai tombol Hapus di menu
+// Reservasi. Bedakan dari Delete di bawah, yang benar-benar menghapus tamunya.
+func (r *Repository) ResetRsvp(ctx context.Context, id uint64) error {
+	return r.q.ResetGuestRsvpByID(ctx, id)
+}
+
+func (r *Repository) MarkContacted(ctx context.Context, id uint64) error {
+	return r.q.MarkGuestContacted(ctx, id)
+}
+
+func (r *Repository) UnmarkContacted(ctx context.Context, id uint64) error {
+	return r.q.UnmarkGuestContacted(ctx, id)
+}
+
 // MarkCheckedIn meneruskan ROWS AFFECTED, bukan error saja (docs/plan/
 // scan-checkin-gate/PLAN.md D5): 1 = tamu baru saja check-in, 0 = sudah
 // pernah check-in sebelumnya. Itulah yang membedakan kedua keadaan tanpa

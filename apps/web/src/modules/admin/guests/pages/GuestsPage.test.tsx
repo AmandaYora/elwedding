@@ -1,6 +1,6 @@
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import GuestsPage from './GuestsPage'
-import { listGuests, createGuest, deleteGuest } from '@/modules/admin/guests/services/guests.service'
+import { listGuests, createGuest, deleteGuest, setContacted } from '@/modules/admin/guests/services/guests.service'
 import { getConfig } from '@/modules/admin/whatsapp/services/whatsapp.service'
 import { getContent } from '@/modules/admin/content/services/content.service'
 import { listAllGroups } from '@/modules/admin/groups/services/groups.service'
@@ -19,6 +19,7 @@ vi.mock('@/modules/admin/guests/services/guests.service', () => ({
   createGuest: vi.fn(),
   updateGuest: vi.fn(),
   deleteGuest: vi.fn(),
+  setContacted: vi.fn(),
 }))
 
 // Tombol "Kirim Undangan" memuat dua singleton di samping daftar tamu
@@ -43,6 +44,7 @@ const mockedCreate = vi.mocked(createGuest)
 const mockedGetConfig = vi.mocked(getConfig)
 const mockedGetContent = vi.mocked(getContent)
 const mockedListAllGroups = vi.mocked(listAllGroups)
+const mockedSetContacted = vi.mocked(setContacted)
 
 const sampleGuest = {
   id: 1,
@@ -62,11 +64,15 @@ const sampleGuest = {
   attendingCount: 1,
   isExpectedAttending: true,
   groupId: 3,
+  paxQuota: 2,
+  contactedAt: null,
 }
 
+// defaultPax sengaja BERBEDA antar group (2 vs 4) - kalau sama, test prefill
+// di bawah tidak membuktikan apa pun.
 const sampleGroups = [
-  { id: 3, name: 'Teman Kantor', description: '', guestCount: 1, createdAt: '2026-01-01T00:00:00Z' },
-  { id: 4, name: 'Keluarga', description: '', guestCount: 0, createdAt: '2026-01-01T00:00:00Z' },
+  { id: 3, name: 'Teman Kantor', description: '', guestCount: 1, defaultPax: 2, createdAt: '2026-01-01T00:00:00Z' },
+  { id: 4, name: 'Keluarga', description: '', guestCount: 0, defaultPax: 4, createdAt: '2026-01-01T00:00:00Z' },
 ]
 
 const sampleConfig = {
@@ -95,6 +101,7 @@ afterEach(() => {
   mockedGetConfig.mockReset()
   mockedGetContent.mockReset()
   mockedListAllGroups.mockReset()
+  mockedSetContacted.mockReset()
 })
 
 test('daftar kosong -> EmptyState', async () => {
@@ -370,4 +377,124 @@ test('daftar group gagal dimuat -> pesan berbeda + daftar tamu tetap tampil', as
       expect(btn).toBeDisabled()
     }
   })
+})
+
+// --- Jatah kursi (docs/plan/guest-pax-quota/PLAN.md T20/D8/D9) ---
+//
+// Dua test di bawah menjaga jebakan paling mahal di fitur ini. Keduanya
+// menguji SATU perilaku yang sama dari dua arah berlawanan: prefill HARUS
+// jalan saat memilih group, dan HARUS DIAM saat membuka tamu lama.
+
+test('pilih group pada tamu baru -> jatah kursi terisi dari defaultPax group', async () => {
+  mockedList.mockResolvedValue({ data: [], meta: { page: 1, limit: 20, total: 0, totalPages: 1 } })
+  mockedListAllGroups.mockResolvedValue(sampleGroups)
+
+  renderPage()
+  await waitFor(() => expect(mockedListAllGroups).toHaveBeenCalled())
+
+  fireEvent.click(screen.getAllByRole('button', { name: /Tambah tamu/ })[0])
+
+  const jatah = await screen.findByLabelText('Jatah kursi')
+  // EMPTY_FORM.paxQuota = 2, mengikuti DEFAULT kolomnya.
+  expect(jatah).toHaveValue(2)
+
+  // Pilih "Keluarga" (defaultPax 4) -> jatah ikut jadi 4.
+  fireEvent.change(screen.getByLabelText('Group'), { target: { value: '4' } })
+  await waitFor(() => expect(jatah).toHaveValue(4))
+
+  // Pindah ke "Teman Kantor" (defaultPax 2) -> ikut turun lagi. Prefill
+  // bekerja dua arah, bukan cuma menaikkan.
+  fireEvent.change(screen.getByLabelText('Group'), { target: { value: '3' } })
+  await waitFor(() => expect(jatah).toHaveValue(2))
+})
+
+// D9 - inilah yang paling mudah rusak dan paling sulit ketahuan: kalau prefill
+// ikut jalan saat openEdit, menyunting nama Paman Budi diam-diam mengembalikan
+// jatahnya dari 6 ke 4 (defaultPax group Keluarga) dan angka catering rusak
+// tanpa jejak.
+test('buka edit tamu -> jatah kursi memakai nilai TERSIMPAN, bukan defaultPax group', async () => {
+  const pamanBudi = { ...sampleGuest, id: 9, name: 'Paman Budi', groupId: 4, paxQuota: 6 }
+  mockedList.mockResolvedValue({ data: [pamanBudi], meta: { page: 1, limit: 20, total: 1, totalPages: 1 } })
+  mockedListAllGroups.mockResolvedValue(sampleGroups)
+
+  renderPage()
+  await screen.findByText('Paman Budi')
+
+  fireEvent.click(screen.getAllByRole('button', { name: 'Ubah' })[0])
+
+  // 6 (tersimpan), BUKAN 4 (defaultPax group Keluarga yang ia tempati).
+  const jatah = await screen.findByLabelText('Jatah kursi')
+  expect(jatah).toHaveValue(6)
+
+  // Menyunting field LAIN tidak boleh menyentuh jatahnya.
+  fireEvent.change(screen.getByLabelText('Nama'), { target: { value: 'Paman Budi Santoso' } })
+  expect(jatah).toHaveValue(6)
+})
+
+// --- Penanda "sudah dihubungi" (docs/plan/reservation-reset-contacted-flag/PLAN.md T10) ---
+
+test('klik "Kirim Undangan" -> menandai dihubungi TANPA merusak link wa.me', async () => {
+  mockedList.mockResolvedValue({ data: [sampleGuest], meta: { page: 1, limit: 20, total: 1, totalPages: 1 } })
+  mockedSetContacted.mockResolvedValueOnce(undefined)
+
+  renderPage()
+  await screen.findByText('Budi Santoso')
+
+  const link = await screen.findByRole('link', { name: /Kirim Undangan/ })
+  // D9: tetap <a> ber-href wa.me. Kalau penandanya dipasang lewat
+  // preventDefault + window.open, Ctrl/Cmd-klik dan popup blocker rusak.
+  expect(link).toHaveAttribute('href', expect.stringContaining('wa.me'))
+
+  fireEvent.click(link)
+
+  await waitFor(() => expect(mockedSetContacted).toHaveBeenCalledWith(1, true))
+  expect(link).toHaveAttribute('href', expect.stringContaining('wa.me'))
+  // Badge muncul dari respons yang SUKSES, bukan optimistis.
+  expect(await screen.findByRole('button', { name: /Dihubungi/ })).toBeInTheDocument()
+})
+
+test('klik badge "Dihubungi" -> membatalkan penanda', async () => {
+  const sudahDihubungi = { ...sampleGuest, contactedAt: '2026-01-01T00:00:00Z' }
+  mockedList.mockResolvedValue({ data: [sudahDihubungi], meta: { page: 1, limit: 20, total: 1, totalPages: 1 } })
+  mockedSetContacted.mockResolvedValueOnce(undefined)
+
+  renderPage()
+  const badge = await screen.findByRole('button', { name: /Dihubungi/ })
+
+  fireEvent.click(badge)
+
+  await waitFor(() => expect(mockedSetContacted).toHaveBeenCalledWith(1, false))
+  await waitFor(() => expect(screen.queryByRole('button', { name: /Dihubungi/ })).not.toBeInTheDocument())
+})
+
+// D10 - gagal DIAM-DIAM lebih berbahaya daripada gagal: admin mengira tamu
+// sudah tertandai lalu melewatinya. Tapi kegagalannya juga tidak boleh
+// menahan apa pun; WhatsApp tetap terbuka.
+test('penanda gagal disimpan -> badge tidak muncul, tidak melempar', async () => {
+  mockedList.mockResolvedValue({ data: [sampleGuest], meta: { page: 1, limit: 20, total: 1, totalPages: 1 } })
+  mockedSetContacted.mockRejectedValueOnce(new Error('500'))
+
+  renderPage()
+  await screen.findByText('Budi Santoso')
+
+  fireEvent.click(await screen.findByRole('link', { name: /Kirim Undangan/ }))
+
+  await waitFor(() => expect(mockedSetContacted).toHaveBeenCalledWith(1, true))
+  expect(screen.queryByRole('button', { name: /Dihubungi/ })).not.toBeInTheDocument()
+  // Link-nya tetap utuh - kirim undangan tidak boleh ikut gagal.
+  expect(screen.getByRole('link', { name: /Kirim Undangan/ })).toBeInTheDocument()
+})
+
+test('tamu tanpa nomor HP -> tidak ada penanda karena tombolnya nonaktif', async () => {
+  const tanpaHp = { ...sampleGuest, phone: '' }
+  mockedList.mockResolvedValue({ data: [tanpaHp], meta: { page: 1, limit: 20, total: 1, totalPages: 1 } })
+
+  renderPage()
+  await screen.findByText('Budi Santoso')
+
+  const btn = await screen.findByRole('button', { name: /Kirim Undangan/ })
+  expect(btn).toBeDisabled()
+  fireEvent.click(btn)
+
+  expect(mockedSetContacted).not.toHaveBeenCalled()
 })

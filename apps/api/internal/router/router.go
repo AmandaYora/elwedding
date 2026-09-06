@@ -118,6 +118,17 @@ func New(d Deps) http.Handler {
 	admin.HandleFunc("PUT /api/v1/admin/guests/{id}", d.GuestHandler.UpdateGuest)
 	admin.HandleFunc("DELETE /api/v1/admin/guests/{id}", d.GuestHandler.DeleteGuest)
 
+	// Dua sub-resource tamu (docs/plan/reservation-reset-contacted-flag/PLAN.md
+	// T7). Segmen path-nya lebih panjang daripada PUT/DELETE /guests/{id} di
+	// atas, jadi Go 1.22+ ServeMux memilih yang paling spesifik dan keduanya
+	// tidak bentrok - alasan yang sama dengan /guests/summary di atasnya.
+	//
+	// DELETE .../rsvp menghapus RESERVASI, bukan tamunya: barisnya tetap ada,
+	// hanya jawabannya yang dikosongkan (K1). Jangan tertukar dengan DELETE
+	// /guests/{id} yang benar-benar menghapus tamu.
+	admin.HandleFunc("DELETE /api/v1/admin/guests/{id}/rsvp", d.GuestHandler.ResetRsvp)
+	admin.HandleFunc("PATCH /api/v1/admin/guests/{id}/contacted", d.GuestHandler.SetContacted)
+
 	// --- admin: users (JWT) - kelola akun admin (docs/plan/admin-users/PLAN.md) ---
 	admin.HandleFunc("GET /api/v1/admin/users", d.AuthHandler.ListUsers)
 	admin.HandleFunc("POST /api/v1/admin/users", d.AuthHandler.CreateUser)

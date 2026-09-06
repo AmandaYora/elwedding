@@ -25,6 +25,20 @@ type GuestDTO struct {
 	Notes               string  `json:"notes"`
 	AttendingCount      int     `json:"attendingCount"`
 	IsExpectedAttending bool    `json:"isExpectedAttending"`
+	// PaxQuota - JATAH kursi undangan ini, diisi ADMIN (docs/plan/
+	// guest-pax-quota/PLAN.md D1). Jangan tertukar dengan AttendingCount di
+	// atasnya: itu JANJI tamu, diisi TAMU saat RSVP. Dua kolom, dua pemilik,
+	// dan AttendingCount tidak pernah boleh melebihi PaxQuota.
+	PaxQuota int `json:"paxQuota"`
+	// ContactedAt - kapan admin membuka WhatsApp lewat tombol "Kirim Undangan"
+	// (docs/plan/reservation-reset-contacted-flag/PLAN.md D6). `null` = belum
+	// pernah dihubungi, pola RsvpRespondedAt di atas.
+	//
+	// BUKAN bukti pesan terkirim: wa.me tidak bisa melaporkan balik apa pun,
+	// jadi yang tercatat hanyalah "admin membuka WhatsApp untuk tamu ini" -
+	// itulah sebabnya namanya `contacted`, bukan `sent`. Label di UI wajib
+	// ikut mengatakannya.
+	ContactedAt *string `json:"contactedAt"`
 	// GroupID POINTER (docs/plan/guest-groups/PLAN.md T4/K2): NULL di sini
 	// bermakna "belum ditentukan" - tamu yang dibuat SEBELUM migration 000016
 	// dan belum pernah disunting (§2.6). Pola yang sama persis dengan
@@ -49,6 +63,11 @@ type GuestInput struct {
 	// ditolak validateGroupID, persis seperti string kosong pada enum wajib
 	// (gender/invitationType/souvenirType) yang ditolak validGenders dkk.
 	GroupID uint64 `json:"groupId"`
+	// PaxQuota WAJIB 1..20 (docs/plan/guest-pax-quota/PLAN.md D3), ditegakkan
+	// validatePaxQuota lewat validateProfileFields - jadi Create & Update
+	// memakai penjaga yang sama. 0 = tidak dikirim klien, dan ditolak sama
+	// seperti GroupID 0 di atasnya.
+	PaxQuota int `json:"paxQuota"`
 }
 
 // GuestSessionDTO - kontrak publik GET /public/guests/by-token/:token
@@ -62,11 +81,18 @@ type GuestInput struct {
 // link setelah RSVP 'attending' sebelumnya tidak tahu jumlah tamu yang
 // sudah dikonfirmasi untuk menyusun ulang QR-nya. Bukan data sensitif -
 // milik tamu itu sendiri (beda dengan phone yang sengaja TIDAK disertakan).
+// PaxQuota ikut disertakan (docs/plan/guest-pax-quota/PLAN.md D5): tanpa ini
+// halaman RSVP tidak tahu sampai angka berapa tamu boleh memilih, dan batas
+// jatah tidak bisa ditampilkan ("Undangan ini berlaku untuk N orang", K2).
+// BUKAN data sensitif - ini jatah milik tamu itu sendiri, alasan yang sama
+// persis dengan AttendingCount di atasnya. Phone/email/address tetap TIDAK
+// disertakan.
 type GuestSessionDTO struct {
 	Name           string `json:"name"`
 	Side           string `json:"side"`
 	RsvpStatus     string `json:"rsvpStatus"`
 	AttendingCount int    `json:"attendingCount"`
+	PaxQuota       int    `json:"paxQuota"`
 }
 
 // GuestSummaryDTO - kontrak GET /api/v1/admin/guests/summary, dipakai
@@ -95,6 +121,35 @@ type GuestSummaryDTO struct {
 	GenderMale         int                `json:"genderMale"`
 	GenderFemale       int                `json:"genderFemale"`
 	RecentResponses    []RecentResponseDTO `json:"recentResponses"`
+
+	// --- Proyeksi catering (docs/plan/guest-pax-quota/PLAN.md T14/§5) ---
+	//
+	// Ketiganya berSATUAN ORANG, bukan undangan - beda satuan dengan
+	// Total/SideGroom/SideBride di atas. Jangan pernah menyandingkannya
+	// sebagai "X dari Y" dengan angka undangan.
+	//
+	// ConfirmedPax = FAKTA (tamu sudah menjawab hadir, angkanya dari mulut
+	// tamu sendiri). ExpectedPax = TEBAKAN (tamu belum menjawab, angkanya
+	// jatah yang admin duga akan terpakai). ProjectedPax menjumlahkan
+	// keduanya - dan justru KARENA ia campuran fakta + tebakan, UI WAJIB
+	// menampilkan ketiga baris, bukan cuma ProjectedPax. Satu angka telanjang
+	// membuat admin tidak bisa menilai seberapa besar risikonya.
+	ConfirmedPaxGroom int `json:"confirmedPaxGroom"`
+	ConfirmedPaxBride int `json:"confirmedPaxBride"`
+	ConfirmedPaxTotal int `json:"confirmedPaxTotal"`
+	ExpectedPaxGroom  int `json:"expectedPaxGroom"`
+	ExpectedPaxBride  int `json:"expectedPaxBride"`
+	ExpectedPaxTotal  int `json:"expectedPaxTotal"`
+	ProjectedPaxGroom int `json:"projectedPaxGroom"`
+	ProjectedPaxBride int `json:"projectedPaxBride"`
+	ProjectedPaxTotal int `json:"projectedPaxTotal"`
+
+	// Excluded* berSATUAN UNDANGAN (bukan orang) dan sengaja TIDAK dipecah
+	// per pihak: baris "tidak dihitung" di kartu memang tidak dipecah. Ia ada
+	// supaya tidak ada tamu yang hilang diam-diam dari total - kalau angkanya
+	// terasa terlalu besar, admin langsung curiga ada yang salah set.
+	ExcludedNotAttending int `json:"excludedNotAttending"`
+	ExcludedNotExpected  int `json:"excludedNotExpected"`
 }
 
 // RecentResponseDTO - satu baris kartu "Aktivitas RSVP terbaru" (dashboard-
@@ -108,8 +163,15 @@ type RecentResponseDTO struct {
 }
 
 // GuestGroupDTO & GuestGroupInput - kontrak menu Group
-// (docs/plan/guest-groups/PLAN.md T4). Isi satu group sengaja hanya nama +
-// deskripsi (K3): tanpa warna, nomor meja, maupun kuota.
+// (docs/plan/guest-groups/PLAN.md T4). Isi satu group: nama + deskripsi +
+// DefaultPax. Warna & nomor meja tetap ditolak (K3 guest-groups); kuota TIDAK
+// lagi ditolak sejak docs/plan/guest-pax-quota/PLAN.md D2 - pembalikan K3 yang
+// dicatat, bukan disamarkan (§2 plan itu).
+//
+// DefaultPax bukan kuota yang MENGIKAT anggota group. Ia semata angka awal
+// yang mengisi form saat admin menambah tamu baru di group ini; yang mengikat
+// adalah GuestDTO.PaxQuota per tamu. Group "Keluarga" berdefault 4 tetap bisa
+// berisi Paman Budi (6) dan Bulek Sri (1).
 //
 // GuestCount TIDAK datang dari query group, melainkan diisi Service.ListGroups
 // dari SATU CountGuestsGroupedByGroup yang dipetakan ke map di memori - bukan
@@ -120,12 +182,14 @@ type GuestGroupDTO struct {
 	Name        string `json:"name"`
 	Description string `json:"description"`
 	GuestCount  int    `json:"guestCount"`
+	DefaultPax  int    `json:"defaultPax"`
 	CreatedAt   string `json:"createdAt"`
 }
 
 type GuestGroupInput struct {
 	Name        string `json:"name"`
 	Description string `json:"description"`
+	DefaultPax  int    `json:"defaultPax"`
 }
 
 // CheckinResultDTO & CheckinSearchItemDTO - kontrak menu Scan di gate

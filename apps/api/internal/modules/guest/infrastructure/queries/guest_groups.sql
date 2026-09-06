@@ -9,8 +9,15 @@
 -- CountGuestsGroupedByGroup) TETAP tinggal di guests.sql - berkas ini hanya
 -- untuk tabel guest_groups.
 
+-- default_pax ikut sejak migration 000017 (docs/plan/guest-pax-quota/PLAN.md
+-- T3/D2). Ia hanya ANGKA AWAL untuk tamu baru di group ini - yang mengikat
+-- adalah guests.pax_quota per baris tamu. Membalik K3 guest-groups; lihat §2
+-- PLAN.md.
+--
+-- Query SELECT * di bawah TIDAK perlu diubah: bintangnya otomatis ikut
+-- membawa kolom baru begitu sqlc di-regenerate.
 -- name: CreateGuestGroup :execlastid
-INSERT INTO guest_groups (name, description) VALUES (?, ?);
+INSERT INTO guest_groups (name, description, default_pax) VALUES (?, ?, ?);
 
 -- name: GetGuestGroupByID :one
 SELECT * FROM guest_groups WHERE id = ? LIMIT 1;
@@ -32,7 +39,7 @@ SELECT * FROM guest_groups ORDER BY name ASC LIMIT ? OFFSET ?;
 SELECT COUNT(*) FROM guest_groups;
 
 -- name: UpdateGuestGroup :exec
-UPDATE guest_groups SET name = ?, description = ? WHERE id = ?;
+UPDATE guest_groups SET name = ?, description = ?, default_pax = ? WHERE id = ?;
 
 -- name: DeleteGuestGroup :exec
 DELETE FROM guest_groups WHERE id = ?;

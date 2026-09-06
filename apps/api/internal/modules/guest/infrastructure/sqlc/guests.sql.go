@@ -178,14 +178,59 @@ func (q *Queries) CountGuestsGroupedByInvitationType(ctx context.Context) ([]Cou
 }
 
 const countGuestsGroupedBySide = `-- name: CountGuestsGroupedBySide :many
-SELECT side, COUNT(*) AS total FROM guests GROUP BY side
+SELECT
+  side,
+  COUNT(*) AS total,
+  CAST(COALESCE(SUM(CASE WHEN rsvp_status = 'attending'
+    THEN attending_count ELSE 0 END), 0) AS UNSIGNED) AS confirmed_pax,
+  CAST(COALESCE(SUM(CASE WHEN rsvp_status IN ('pending', 'remind_later')
+    AND is_expected_attending THEN pax_quota ELSE 0 END), 0) AS UNSIGNED) AS expected_pax,
+  CAST(COALESCE(SUM(CASE WHEN rsvp_status = 'not_attending'
+    THEN 1 ELSE 0 END), 0) AS UNSIGNED) AS excluded_not_attending,
+  CAST(COALESCE(SUM(CASE WHEN rsvp_status IN ('pending', 'remind_later')
+    AND NOT is_expected_attending THEN 1 ELSE 0 END), 0) AS UNSIGNED) AS excluded_not_expected
+FROM guests GROUP BY side
 `
 
 type CountGuestsGroupedBySideRow struct {
-	Side  GuestsSide
-	Total int64
+	Side                 GuestsSide
+	Total                int64
+	ConfirmedPax         int64
+	ExpectedPax          int64
+	ExcludedNotAttending int64
+	ExcludedNotExpected  int64
 }
 
+// CountGuestsGroupedBySide memikul SELURUH kartu "Proyeksi catering"
+// (docs/plan/guest-pax-quota/PLAN.md T2/D6) - SATU scan, lima agregat per
+// pihak, BUKAN query terpisah per angka. Pola yang sama persis dengan
+// CountGuestsGroupedByStatus di atas dan GetCheckinSummary di bawah.
+//
+// ATURAN HITUNGNYA (K4 - "jawaban tamu menang atas dugaan admin"):
+//
+//	rsvp_status = 'attending'   -> pakai attending_count (JANJI tamu),
+//	                               is_expected_attending DIABAIKAN
+//	rsvp_status = 'not_attending' -> 0
+//	pending / remind_later      -> pakai pax_quota, TAPI hanya bila
+//	                               is_expected_attending TRUE
+//
+// Kenapa dugaan admin diabaikan begitu tamu menjawab: admin mematikan
+// "diperkirakan hadir" untuk Om Hasan di Surabaya, lalu Om Hasan menjawab
+// "Hadir, 4 orang". Kalau dugaan tetap menang, empat orang datang tanpa
+// porsi. Dugaan dibuat SEBELUM jawaban ada; begitu tamunya menjawab, dugaan
+// itu kedaluwarsa.
+//
+// Ini juga kali PERTAMA is_expected_attending benar-benar dipakai menghitung.
+// Sebelum ini ia hanya disimpan dan ditampilkan sebagai badge - tidak ada satu
+// pun agregasi yang membacanya, meski GLOSSARY.md sejak awal menyebutnya
+// "dipakai memperkirakan".
+//
+// CAST(... AS UNSIGNED) WAJIB: tanpa itu sqlc memetakan hasil SUM() ke tipe
+// yang tidak diinginkan. Sama seperti total_pax di CountGuestsGroupedByStatus.
+//
+// CASE WHEN di dalam SUM() TIDAK menambah scan - ia dievaluasi pada baris yang
+// memang sudah dibaca. `side` ENUM 2 nilai NOT NULL, jadi groom + bride selalu
+// persis sama dengan total; tidak ada sisa yang perlu dijelaskan di UI.
 func (q *Queries) CountGuestsGroupedBySide(ctx context.Context) ([]CountGuestsGroupedBySideRow, error) {
 	rows, err := q.db.QueryContext(ctx, countGuestsGroupedBySide)
 	if err != nil {
@@ -195,7 +240,14 @@ func (q *Queries) CountGuestsGroupedBySide(ctx context.Context) ([]CountGuestsGr
 	var items []CountGuestsGroupedBySideRow
 	for rows.Next() {
 		var i CountGuestsGroupedBySideRow
-		if err := rows.Scan(&i.Side, &i.Total); err != nil {
+		if err := rows.Scan(
+			&i.Side,
+			&i.Total,
+			&i.ConfirmedPax,
+			&i.ExpectedPax,
+			&i.ExcludedNotAttending,
+			&i.ExcludedNotExpected,
+		); err != nil {
 			return nil, err
 		}
 		items = append(items, i)
@@ -278,8 +330,8 @@ func (q *Queries) CountGuestsGroupedByStatus(ctx context.Context) ([]CountGuests
 }
 
 const createGuest = `-- name: CreateGuest :execlastid
-INSERT INTO guests (name, phone, side, group_id, token, rsvp_status, gender, invitation_type, souvenir_type, email, address, notes, is_expected_attending)
-VALUES (?, ?, ?, ?, ?, 'pending', ?, ?, ?, ?, ?, ?, ?)
+INSERT INTO guests (name, phone, side, group_id, token, rsvp_status, gender, invitation_type, souvenir_type, email, address, notes, is_expected_attending, pax_quota)
+VALUES (?, ?, ?, ?, ?, 'pending', ?, ?, ?, ?, ?, ?, ?, ?)
 `
 
 type CreateGuestParams struct {
@@ -295,8 +347,13 @@ type CreateGuestParams struct {
 	Address             sql.NullString
 	Notes               sql.NullString
 	IsExpectedAttending bool
+	PaxQuota            uint8
 }
 
+// pax_quota ikut ditulis di sini (docs/plan/guest-pax-quota/PLAN.md T2/D1),
+// TAPI attending_count TIDAK - kolom itu milik TAMU, diisi lewat
+// UpdateGuestRsvpStatusByToken, dan tetap memakai DEFAULT kolomnya di sini.
+// Dua kolom, dua pemilik (D11): admin menentukan JATAH, tamu menentukan JANJI.
 func (q *Queries) CreateGuest(ctx context.Context, arg CreateGuestParams) (int64, error) {
 	result, err := q.db.ExecContext(ctx, createGuest,
 		arg.Name,
@@ -311,6 +368,7 @@ func (q *Queries) CreateGuest(ctx context.Context, arg CreateGuestParams) (int64
 		arg.Address,
 		arg.Notes,
 		arg.IsExpectedAttending,
+		arg.PaxQuota,
 	)
 	if err != nil {
 		return 0, err
@@ -368,7 +426,7 @@ func (q *Queries) GetCheckinSummary(ctx context.Context) (GetCheckinSummaryRow, 
 }
 
 const getGuestByID = `-- name: GetGuestByID :one
-SELECT id, name, phone, side, token, rsvp_status, rsvp_responded_at, created_at, updated_at, gender, invitation_type, souvenir_type, email, address, notes, attending_count, is_expected_attending, checked_in_at, group_id FROM guests WHERE id = ? LIMIT 1
+SELECT id, name, phone, side, token, rsvp_status, rsvp_responded_at, created_at, updated_at, gender, invitation_type, souvenir_type, email, address, notes, attending_count, is_expected_attending, checked_in_at, group_id, pax_quota, contacted_at FROM guests WHERE id = ? LIMIT 1
 `
 
 func (q *Queries) GetGuestByID(ctx context.Context, id uint64) (Guest, error) {
@@ -394,12 +452,14 @@ func (q *Queries) GetGuestByID(ctx context.Context, id uint64) (Guest, error) {
 		&i.IsExpectedAttending,
 		&i.CheckedInAt,
 		&i.GroupID,
+		&i.PaxQuota,
+		&i.ContactedAt,
 	)
 	return i, err
 }
 
 const getGuestByToken = `-- name: GetGuestByToken :one
-SELECT id, name, phone, side, token, rsvp_status, rsvp_responded_at, created_at, updated_at, gender, invitation_type, souvenir_type, email, address, notes, attending_count, is_expected_attending, checked_in_at, group_id FROM guests WHERE token = ? LIMIT 1
+SELECT id, name, phone, side, token, rsvp_status, rsvp_responded_at, created_at, updated_at, gender, invitation_type, souvenir_type, email, address, notes, attending_count, is_expected_attending, checked_in_at, group_id, pax_quota, contacted_at FROM guests WHERE token = ? LIMIT 1
 `
 
 func (q *Queries) GetGuestByToken(ctx context.Context, token string) (Guest, error) {
@@ -425,6 +485,8 @@ func (q *Queries) GetGuestByToken(ctx context.Context, token string) (Guest, err
 		&i.IsExpectedAttending,
 		&i.CheckedInAt,
 		&i.GroupID,
+		&i.PaxQuota,
+		&i.ContactedAt,
 	)
 	return i, err
 }
@@ -486,7 +548,7 @@ func (q *Queries) ListCheckedInGuests(ctx context.Context, arg ListCheckedInGues
 }
 
 const listGuestsFiltered = `-- name: ListGuestsFiltered :many
-SELECT id, name, phone, side, token, rsvp_status, rsvp_responded_at, created_at, updated_at, gender, invitation_type, souvenir_type, email, address, notes, attending_count, is_expected_attending, checked_in_at, group_id FROM guests
+SELECT id, name, phone, side, token, rsvp_status, rsvp_responded_at, created_at, updated_at, gender, invitation_type, souvenir_type, email, address, notes, attending_count, is_expected_attending, checked_in_at, group_id, pax_quota, contacted_at FROM guests
 WHERE (? IS NULL OR rsvp_status = ?)
   AND (CAST(? AS UNSIGNED) = 0 OR rsvp_status != 'pending')
   AND (? IS NULL OR invitation_type = ?)
@@ -553,6 +615,8 @@ func (q *Queries) ListGuestsFiltered(ctx context.Context, arg ListGuestsFiltered
 			&i.IsExpectedAttending,
 			&i.CheckedInAt,
 			&i.GroupID,
+			&i.PaxQuota,
+			&i.ContactedAt,
 		); err != nil {
 			return nil, err
 		}
@@ -631,8 +695,62 @@ func (q *Queries) MarkGuestCheckedIn(ctx context.Context, id uint64) (int64, err
 	return result.RowsAffected()
 }
 
+const markGuestContacted = `-- name: MarkGuestContacted :exec
+UPDATE guests SET contacted_at = NOW() WHERE id = ?
+`
+
+// Penanda "sudah dihubungi" (T2/D8). Dua query terpisah alih-alih satu dengan
+// parameter nullable: masing-masing sepele dan langsung terbaca maksudnya.
+//
+// NOW() MENIMPA nilai lama dengan sengaja - klik kedua berarti admin
+// menghubungi ulang, dan waktu terbaru lebih berguna daripada yang pertama.
+// Tidak perlu UPDATE bersyarat seperti MarkGuestCheckedIn: di sana syaratnya
+// mencegah dua petugas gate saling menimpa jam kedatangan, sedangkan di sini
+// hanya ada satu admin yang menekan tombolnya.
+func (q *Queries) MarkGuestContacted(ctx context.Context, id uint64) error {
+	_, err := q.db.ExecContext(ctx, markGuestContacted, id)
+	return err
+}
+
+const resetGuestRsvpByID = `-- name: ResetGuestRsvpByID :exec
+UPDATE guests SET rsvp_status = 'pending', attending_count = 1, rsvp_responded_at = NULL
+WHERE id = ?
+`
+
+// ResetGuestRsvpByID mengosongkan JAWABAN tamu, bukan tamunya
+// (docs/plan/reservation-reset-contacted-flag/PLAN.md T2/K1). Dipakai tombol
+// Hapus di menu Reservasi.
+//
+// TIGA kolom dikosongkan bersama-sama, dan ketiganya wajib: membiarkan
+// attending_count/rsvp_responded_at berarti tamu ber-status 'pending' tetap
+// membawa angka janji dan jam jawaban milik jawaban yang sudah dihapus.
+// `1` adalah DEFAULT kolomnya (migration 000007) dan nilai yang sama yang
+// ditetapkan resolveAttendingCount untuk status non-'attending'.
+//
+// YANG SENGAJA TIDAK DISENTUH:
+//
+//	checked_in_at - rsvp_status adalah NIAT, checked_in_at adalah BUKTI
+//	                (GLOSSARY.md). Menghapus niat tidak boleh menghapus bukti
+//	                bahwa seseorang benar-benar tiba di pintu (D1).
+//	pax_quota     - setelan ADMIN, tidak ada hubungannya dengan jawaban tamu (D3).
+//	token         - link & QR tamu tetap sah; ia memang masih diundang, hanya
+//	                jawabannya yang dikosongkan supaya bisa menjawab ulang.
+func (q *Queries) ResetGuestRsvpByID(ctx context.Context, id uint64) error {
+	_, err := q.db.ExecContext(ctx, resetGuestRsvpByID, id)
+	return err
+}
+
+const unmarkGuestContacted = `-- name: UnmarkGuestContacted :exec
+UPDATE guests SET contacted_at = NULL WHERE id = ?
+`
+
+func (q *Queries) UnmarkGuestContacted(ctx context.Context, id uint64) error {
+	_, err := q.db.ExecContext(ctx, unmarkGuestContacted, id)
+	return err
+}
+
 const updateGuest = `-- name: UpdateGuest :exec
-UPDATE guests SET name = ?, phone = ?, side = ?, group_id = ?, gender = ?, invitation_type = ?, souvenir_type = ?, email = ?, address = ?, notes = ?, is_expected_attending = ?
+UPDATE guests SET name = ?, phone = ?, side = ?, group_id = ?, gender = ?, invitation_type = ?, souvenir_type = ?, email = ?, address = ?, notes = ?, is_expected_attending = ?, pax_quota = ?
 WHERE id = ?
 `
 
@@ -648,9 +766,12 @@ type UpdateGuestParams struct {
 	Address             sql.NullString
 	Notes               sql.NullString
 	IsExpectedAttending bool
+	PaxQuota            uint8
 	ID                  uint64
 }
 
+// Sama seperti CreateGuest: pax_quota ikut, attending_count TIDAK PERNAH ikut
+// (D11 - keputusan lama dashboard-wa-rsvp #11 tetap berlaku penuh).
 func (q *Queries) UpdateGuest(ctx context.Context, arg UpdateGuestParams) error {
 	_, err := q.db.ExecContext(ctx, updateGuest,
 		arg.Name,
@@ -664,6 +785,7 @@ func (q *Queries) UpdateGuest(ctx context.Context, arg UpdateGuestParams) error 
 		arg.Address,
 		arg.Notes,
 		arg.IsExpectedAttending,
+		arg.PaxQuota,
 		arg.ID,
 	)
 	return err

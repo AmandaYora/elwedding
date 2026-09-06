@@ -5,6 +5,7 @@ import {
   createGuest,
   deleteGuest,
   listGuests,
+  setContacted,
   updateGuest,
 } from '@/modules/admin/guests/services/guests.service'
 import { guestSchema, type GuestFormValues } from '@/modules/admin/guests/schemas/guest.schema'
@@ -38,6 +39,8 @@ import { EmptyState } from '@/shared/components/feedback/EmptyState'
 import { TableSkeleton } from '@/shared/components/feedback/Skeleton'
 import { ErrorState } from '@/shared/components/feedback/ErrorState'
 import { useToast } from '@/shared/components/toast/ToastProvider'
+import { apiErrorMessage } from '@/shared/lib/api-error'
+import { formatRelativeTime } from '@/shared/utils/relative-time'
 
 const EMPTY_FORM: GuestInput = {
   name: '',
@@ -54,6 +57,10 @@ const EMPTY_FORM: GuestInput = {
   // lewat validateGroupID (D4). Sengaja TIDAK di-default ke group pertama:
   // admin harus memilih secara sadar, bukan menerima tebakan.
   groupId: 0,
+  // 2 mengikuti DEFAULT kolom pax_quota (migration 000017) - batas yang
+  // berlaku hari ini. Begitu admin memilih group, nilainya ditimpa
+  // defaultPax group itu (D8).
+  paxQuota: 2,
 }
 
 type FormErrors = Partial<Record<keyof GuestFormValues, string>>
@@ -83,6 +90,32 @@ export default function GuestsPage() {
   const [detailTarget, setDetailTarget] = useState<Guest | null>(null)
 
   const [copiedId, setCopiedId] = useState<number | null>(null)
+
+  /**
+   * Menyalakan/mematikan penanda "sudah dihubungi"
+   * (docs/plan/reservation-reset-contacted-flag/PLAN.md T10/D10).
+   *
+   * State lokal diperbarui dari respons yang SUKSES saja, bukan optimistis:
+   * penanda ini dipakai admin untuk memutuskan siapa yang masih perlu
+   * dihubungi, jadi menampilkan "sudah" untuk sesuatu yang gagal tersimpan
+   * justru membuat tamu terlewat. Kalau gagal, badge tidak berubah dan
+   * admin diberi tahu.
+   *
+   * Daftar TIDAK dimuat ulang (reloadToken) - itu akan mengembalikan halaman
+   * ke posisi awal dan menghapus filter yang sedang dipakai admin di
+   * tengah-tengah menyisir daftar. Cukup satu baris yang disentuh.
+   */
+  async function toggleContacted(guest: Guest, contacted: boolean) {
+    try {
+      await setContacted(guest.id, contacted)
+      const now = new Date().toISOString()
+      setGuests((prev) =>
+        prev.map((g) => (g.id === guest.id ? { ...g, contactedAt: contacted ? now : null } : g)),
+      )
+    } catch (err) {
+      toast.error(apiErrorMessage(err, 'Penanda gagal disimpan.'))
+    }
+  }
 
   // Dua singleton yang dibutuhkan tombol "Kirim Undangan": template pesannya
   // (menu WhatsApp) dan nama mempelai + tanggal acara (menu Konten).
@@ -207,6 +240,12 @@ export default function GuestsPage() {
       // memilih group sebelum bisa menyimpan. Itu memang perilaku yang
       // diinginkan K2, bukan efek samping.
       groupId: guest.groupId ?? 0,
+      // NILAI TERSIMPAN milik tamu ini, BUKAN defaultPax group-nya (docs/plan/
+      // guest-pax-quota/PLAN.md D9). Ini jebakan paling mahal di fitur ini:
+      // kalau prefill group ikut jalan di sini, menyunting nama Paman Budi
+      // diam-diam mengembalikan jatahnya dari 6 ke 4 dan angka catering rusak
+      // tanpa jejak. Prefill HANYA boleh hidup di onChange dropdown Group.
+      paxQuota: guest.paxQuota,
     })
     setFormErrors({})
     setFormOpen(true)
@@ -486,6 +525,32 @@ export default function GuestsPage() {
                           <div>
                             <div className="flex items-center gap-1.5">
                               <span className="font-semibold text-slate-900">{guest.name}</span>
+                              {/* Penanda "sudah dihubungi" (T10/K2). Sengaja
+                                  hanya muncul saat TERISI: daftar tamu yang
+                                  memberi badge ke setiap baris berhenti
+                                  menonjolkan apa pun. Yang perlu terlihat
+                                  sekilas adalah siapa yang SUDAH, sisanya
+                                  ditandai oleh ketiadaan badge.
+
+                                  Badge-nya <button> karena memang bisa diklik
+                                  untuk membatalkan - wa.me tidak bisa
+                                  memastikan pesan terkirim, jadi penanda yang
+                                  salah harus bisa diperbaiki. Labelnya
+                                  "Dihubungi", BUKAN "Terkirim": yang sistem
+                                  ini tahu hanyalah admin membuka WhatsApp. */}
+                              {guest.contactedAt && (
+                                <button
+                                  type="button"
+                                  onClick={() => void toggleContacted(guest, false)}
+                                  title={`Dihubungi ${formatRelativeTime(guest.contactedAt)} — klik untuk batalkan penanda`}
+                                  className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200 hover:bg-emerald-100 transition-colors cursor-pointer"
+                                >
+                                  <svg className="w-2.5 h-2.5 shrink-0" fill="none" stroke="currentColor" strokeWidth="3" viewBox="0 0 24 24" aria-hidden="true">
+                                    <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                                  </svg>
+                                  Dihubungi
+                                </button>
+                              )}
                               {!guest.isExpectedAttending && (
                                 <span
                                   className="inline-flex items-center px-1.5 py-0.5 rounded-full text-[10px] font-semibold bg-slate-100 text-slate-500 border border-slate-200"
@@ -568,6 +633,16 @@ export default function GuestsPage() {
                                 href={url}
                                 target="_blank"
                                 rel="noopener noreferrer"
+                                // Menandai "sudah dihubungi" (D9). TIDAK
+                                // memanggil preventDefault dan TIDAK di-await:
+                                // navigasi <a> harus tetap jalan apa adanya,
+                                // termasuk Ctrl/Cmd-klik. PATCH-nya berjalan
+                                // di samping, bukan di depan.
+                                //
+                                // Kegagalannya sengaja tidak menahan apa pun -
+                                // WhatsApp tetap terbuka, admin cuma diberi
+                                // tahu penandanya belum tersimpan (D10).
+                                onClick={() => void toggleContacted(guest, true)}
                                 title={`Kirim undangan ke ${guest.name} lewat WhatsApp`}
                                 className="inline-flex items-center h-8 px-2.5 rounded-lg text-xs font-semibold whitespace-nowrap border border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 transition-colors shadow-2xs"
                               >
@@ -692,11 +767,26 @@ export default function GuestsPage() {
               supaya "belum dipilih" adalah keadaan yang TERLIHAT, bukan group
               pertama yang diam-diam terpilih. Tamu lama yang belum bergroup
               (2.6) juga masuk ke keadaan ini saat disunting. */}
+          {/* SATU-SATUNYA tempat prefill jatah kursi hidup (docs/plan/
+              guest-pax-quota/PLAN.md D8/D9). Jangan pernah memindahkannya ke
+              openEdit atau ke useEffect - lihat komentar di openEdit.
+
+              `groups` sudah dimuat halaman ini untuk mengisi dropdown (D2
+              guest-groups), jadi ini lookup array di memori: nol request
+              tambahan, bukan bentuk N+1.
+
+              Fallback `?? f.paxQuota` menjaga nilai yang sedang diketik admin
+              kalau ia memilih "Pilih group..." (id 0, tidak ada di `groups`) -
+              lebih baik daripada diam-diam mereset ke angka lain. */}
           <Select
             label="Group"
             value={String(form.groupId)}
             error={formErrors.groupId}
-            onChange={(e) => setForm((f) => ({ ...f, groupId: Number(e.target.value) }))}
+            onChange={(e) => {
+              const id = Number(e.target.value)
+              const picked = groups.find((g) => g.id === id)
+              setForm((f) => ({ ...f, groupId: id, paxQuota: picked?.defaultPax ?? f.paxQuota }))
+            }}
           >
             <option value="0">Pilih group...</option>
             {groups.map((g) => (
@@ -705,6 +795,19 @@ export default function GuestsPage() {
               </option>
             ))}
           </Select>
+          {/* Diletakkan TEPAT setelah Group karena nilainya berasal dari sana -
+              admin melihat angkanya berubah saat memilih group, sehingga
+              hubungan keduanya jelas tanpa perlu dijelaskan. */}
+          <Input
+            label="Jatah kursi"
+            type="number"
+            min={1}
+            max={20}
+            value={String(form.paxQuota)}
+            error={formErrors.paxQuota}
+            onChange={(e) => setForm((f) => ({ ...f, paxQuota: Number(e.target.value) }))}
+            hint="Terisi otomatis dari group. Ubah bila tamu ini berbeda."
+          />
           <Select
             label="Souvenir"
             value={form.souvenirType}
@@ -784,6 +887,21 @@ export default function GuestsPage() {
             <div className="pt-3 border-t border-slate-100">
               <dt className="text-xs font-semibold text-slate-500 uppercase tracking-wide">{EXPECTED_ATTENDING_LABEL}</dt>
               <dd className="text-slate-800 mt-0.5">{detailTarget.isExpectedAttending ? 'Ya' : 'Tidak'}</dd>
+            </div>
+            {/* Jatah (admin) berdampingan dengan konfirmasi (tamu) supaya
+                keduanya bisa dibandingkan sekali lihat - itu satu-satunya cara
+                admin tahu tamu ini masih menyisakan kursi atau sudah penuh.
+                Konfirmasi hanya bermakna untuk tamu yang sudah menjawab hadir;
+                untuk sisanya angkanya cuma nilai default kolom, jadi tidak
+                ditampilkan supaya tidak dikira janji. */}
+            <div>
+              <dt className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Jatah kursi</dt>
+              <dd className="text-slate-800 mt-0.5">
+                {detailTarget.paxQuota} orang
+                {detailTarget.rsvpStatus === 'attending' && (
+                  <span className="text-slate-500"> · dikonfirmasi {detailTarget.attendingCount} orang</span>
+                )}
+              </dd>
             </div>
           </dl>
         )}

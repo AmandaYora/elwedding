@@ -23,8 +23,21 @@ var (
 	ErrInvalidGender         = errors.New("gender must be 'male' or 'female'")
 	ErrInvalidInvitationType = errors.New("invitation type must be 'online' or 'physical'")
 	ErrInvalidSouvenirType   = errors.New("souvenir type must be 'regular' or 'vip'")
-	ErrInvalidAttendingCount = errors.New("attending count must be 1 or 2")
+	// Pesannya tidak lagi menyebut "1 or 2": batas atasnya kini pax_quota per
+	// tamu (docs/plan/guest-pax-quota/PLAN.md D4), jadi angka tetap di pesan
+	// akan berbohong untuk tamu yang jatahnya 6.
+	ErrInvalidAttendingCount = errors.New("jumlah tamu melebihi jatah undangan ini")
 	ErrInvalidCheckinCode    = errors.New("QR tidak dikenali")
+
+	// Jatah kursi (docs/plan/guest-pax-quota/PLAN.md T6). Berbahasa Indonesia
+	// dan LAYAK DIBACA ADMIN - alasan yang sama dengan blok group di bawah.
+	//
+	// KEDUANYA WAJIB terdaftar di cabang 400 StatusHTTPCode. Error domain yang
+	// lupa didaftarkan jatuh ke `default` dan dibalas 500, sehingga salah ketik
+	// admin tampak seperti server rusak - tanpa gejala lain yang menunjukkan
+	// penyebabnya.
+	ErrInvalidPaxQuota        = errors.New("Jatah kursi harus antara 1 sampai 20")
+	ErrPaxQuotaBelowConfirmed = errors.New("Jatah kursi tidak bisa diturunkan")
 
 	// Group tamu (docs/plan/guest-groups/PLAN.md T5/T6). Pesannya berbahasa
 	// Indonesia dan LAYAK DIBACA ADMIN - GroupsPage menampilkan pesan dari
@@ -96,6 +109,14 @@ func toDTO(g sqlc.Guest) GuestDTO {
 		s := g.RsvpRespondedAt.Time.Format("2006-01-02T15:04:05Z07:00")
 		respondedAt = &s
 	}
+	// Pola yang sama persis dengan respondedAt di atas - NULL jadi nil, bukan
+	// string kosong: "belum pernah dihubungi" adalah ketiadaan waktu, bukan
+	// waktu kosong.
+	var contactedAt *string
+	if g.ContactedAt.Valid {
+		s := g.ContactedAt.Time.Format("2006-01-02T15:04:05Z07:00")
+		contactedAt = &s
+	}
 	var gender *string
 	if g.Gender.Valid {
 		s := string(g.Gender.GuestsGender)
@@ -130,6 +151,8 @@ func toDTO(g sqlc.Guest) GuestDTO {
 		Notes:               notes,
 		AttendingCount:      int(g.AttendingCount),
 		IsExpectedAttending: g.IsExpectedAttending,
+		PaxQuota:            int(g.PaxQuota),
+		ContactedAt:         contactedAt,
 		GroupID:             groupID,
 	}
 }
@@ -150,7 +173,10 @@ func validateProfileFields(in GuestInput) error {
 	if !validSouvenirTypes[in.SouvenirType] {
 		return ErrInvalidSouvenirType
 	}
-	return nil
+	// Jatah kursi ikut di sini, BUKAN dipanggil terpisah di Create & Update
+	// (docs/plan/guest-pax-quota/PLAN.md T7) - itulah alasan fungsi ini ada:
+	// satu tempat, dua jalur, tidak bisa lupa di salah satunya.
+	return validatePaxQuota(in.PaxQuota)
 }
 
 func nullableText(s string) sql.NullString {
@@ -186,6 +212,7 @@ func (s *Service) Create(ctx context.Context, in GuestInput) (GuestDTO, error) {
 		Address:             nullableText(in.Address),
 		Notes:               nullableText(in.Notes),
 		IsExpectedAttending: in.IsExpectedAttending,
+		PaxQuota:            uint8(in.PaxQuota),
 	})
 	if err != nil {
 		return GuestDTO{}, err
@@ -203,10 +230,22 @@ func (s *Service) Update(ctx context.Context, id uint64, in GuestInput) error {
 	// Keberadaan barisnya dicek PALING DULU: id di URL yang tidak ada harus
 	// dibalas "guest not found", bukan keluhan tentang isi body (mis. "Group
 	// tidak ditemukan") yang menyesatkan admin ke masalah yang salah.
-	if err := s.requireGuestExists(ctx, id); err != nil {
+	//
+	// URUTAN INI TIDAK BOLEH DITUKAR (docs/plan/guest-pax-quota/PLAN.md §6.5).
+	// Menyisipkan validasi jatah di depan sini membuat admin yang menyunting
+	// tamu yang sudah dihapus orang lain menerima "Jatah kursi harus antara 1
+	// sampai 20" alih-alih "guest not found" - persis kesesatan yang komentar
+	// di atas dibuat untuk mencegah.
+	row, err := s.requireGuestExists(ctx, id)
+	if err != nil {
 		return err
 	}
 	if err := validateProfileFields(in); err != nil {
+		return err
+	}
+	// D10: jatah tidak boleh turun di bawah jumlah yang SUDAH dijanjikan tamu.
+	// Memakai `row` yang barusan dibaca - tidak ada query tambahan.
+	if err := canLowerPaxQuota(string(row.RsvpStatus), int(row.AttendingCount), in.PaxQuota); err != nil {
 		return err
 	}
 	// Sama seperti Create - D4 berlaku di KEDUA jalur, kalau tidak, tamu bisa
@@ -226,15 +265,52 @@ func (s *Service) Update(ctx context.Context, id uint64, in GuestInput) error {
 		Address:             nullableText(in.Address),
 		Notes:               nullableText(in.Notes),
 		IsExpectedAttending: in.IsExpectedAttending,
+		PaxQuota:            uint8(in.PaxQuota),
 		ID:                  id,
 	})
 }
 
 func (s *Service) Delete(ctx context.Context, id uint64) error {
-	if err := s.requireGuestExists(ctx, id); err != nil {
+	if _, err := s.requireGuestExists(ctx, id); err != nil {
 		return err
 	}
 	return s.repo.Delete(ctx, id)
+}
+
+// ResetRsvp mengosongkan jawaban RSVP tamu tanpa menghapus tamunya
+// (docs/plan/reservation-reset-contacted-flag/PLAN.md T6/K1) - tombol Hapus di
+// menu Reservasi. Token & QR tamu tetap sah; ia memang masih diundang, hanya
+// jawabannya yang dikosongkan supaya bisa menjawab ulang.
+//
+// SENGAJA IDEMPOTEN (D5): tamu yang statusnya sudah 'pending' tidak ditolak.
+// Admin bisa saja bekerja dari daftar basi (tab lain sudah mereset lebih dulu),
+// dan membalas sukses untuk keadaan yang memang sudah sesuai permintaan lebih
+// benar daripada melempar error.
+//
+// requireGuestExists tetap dipanggil lebih dulu supaya id yang tidak ada
+// dibalas 404, bukan 200 atas UPDATE yang menyentuh 0 baris - alasan yang sama
+// persis dengan Update & Delete di atas.
+func (s *Service) ResetRsvp(ctx context.Context, id uint64) error {
+	if _, err := s.requireGuestExists(ctx, id); err != nil {
+		return err
+	}
+	return s.repo.ResetRsvp(ctx, id)
+}
+
+// SetContacted menyalakan/mematikan penanda "sudah dihubungi" (T6/K2).
+//
+// Dinyalakan OTOMATIS saat admin menekan "Kirim Undangan", dan bisa dimatikan
+// admin - karena wa.me tidak bisa memastikan pesannya benar-benar terkirim,
+// penanda yang salah (WhatsApp terbuka lalu ditutup) harus bisa diperbaiki
+// dari dalam aplikasi.
+func (s *Service) SetContacted(ctx context.Context, id uint64, contacted bool) error {
+	if _, err := s.requireGuestExists(ctx, id); err != nil {
+		return err
+	}
+	if contacted {
+		return s.repo.MarkContacted(ctx, id)
+	}
+	return s.repo.UnmarkContacted(ctx, id)
 }
 
 // requireGuestExists memastikan barisnya ADA sebelum Update/Delete menyentuh
@@ -246,14 +322,19 @@ func (s *Service) Delete(ctx context.Context, id uint64) error {
 // diberi tahu bahwa perubahannya tersimpan padahal tidak ada yang berubah.
 // Alasan dan pola yang sama persis dengan UpdateGroup/DeleteGroup di
 // service_groups.go dan Delete di modul auth.
-func (s *Service) requireGuestExists(ctx context.Context, id uint64) error {
-	if _, err := s.repo.GetByID(ctx, id); err != nil {
+// Barisnya IKUT DIKEMBALIKAN (docs/plan/guest-pax-quota/PLAN.md T9), bukan
+// dibuang seperti sebelumnya: penjaga canLowerPaxQuota di Update butuh
+// rsvp_status & attending_count milik baris yang SAMA. Mengembalikannya di
+// sini membuat Update tidak perlu query kedua untuk data yang sudah dibaca.
+func (s *Service) requireGuestExists(ctx context.Context, id uint64) (sqlc.Guest, error) {
+	row, err := s.repo.GetByID(ctx, id)
+	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
-			return ErrNotFound
+			return sqlc.Guest{}, ErrNotFound
 		}
-		return err
+		return sqlc.Guest{}, err
 	}
-	return nil
+	return row, nil
 }
 
 // List mengembalikan tamu dgn paginasi wajib (PLAN.md admin-backend §3),
@@ -419,14 +500,38 @@ func buildSummaryDTO(
 			out.SouvenirVip = n
 		}
 	}
+	// sideRows memikul DUA hal sekaligus: hitungan undangan per pihak (lama)
+	// dan seluruh angka proyeksi catering (docs/plan/guest-pax-quota/PLAN.md
+	// T14). Satu query, satu loop.
+	//
+	// PERINGATAN di atas berlaku PENUH di sini: out.Total TIDAK ikut
+	// bertambah dari loop ini. sideRows menghitung BARIS YANG SAMA dengan
+	// statusRows dari sudut pandang lain - menambahkannya akan melipatduakan
+	// total tamu.
 	for _, row := range sideRows {
 		n := int(row.Total)
+		confirmed, expected := int(row.ConfirmedPax), int(row.ExpectedPax)
 		switch row.Side {
 		case sqlc.GuestsSideGroom:
 			out.SideGroom = n
+			out.ConfirmedPaxGroom = confirmed
+			out.ExpectedPaxGroom = expected
+			out.ProjectedPaxGroom = confirmed + expected
 		case sqlc.GuestsSideBride:
 			out.SideBride = n
+			out.ConfirmedPaxBride = confirmed
+			out.ExpectedPaxBride = expected
+			out.ProjectedPaxBride = confirmed + expected
 		}
+		// Total DIAKUMULASI dari seluruh baris, bukan dijumlahkan dari
+		// Groom+Bride di luar loop: `side` memang ENUM 2 nilai hari ini, tapi
+		// mengakumulasi di sini membuat angka totalnya tetap benar tanpa perlu
+		// disentuh andai suatu saat ada nilai ketiga.
+		out.ConfirmedPaxTotal += confirmed
+		out.ExpectedPaxTotal += expected
+		out.ProjectedPaxTotal += confirmed + expected
+		out.ExcludedNotAttending += int(row.ExcludedNotAttending)
+		out.ExcludedNotExpected += int(row.ExcludedNotExpected)
 	}
 	for _, row := range genderRows {
 		if !row.Gender.Valid {
@@ -472,20 +577,32 @@ func (s *Service) ResolveByToken(ctx context.Context, token string) (GuestSessio
 		}
 		return GuestSessionDTO{}, err
 	}
-	return GuestSessionDTO{Name: row.Name, Side: string(row.Side), RsvpStatus: string(row.RsvpStatus), AttendingCount: int(row.AttendingCount)}, nil
+	return GuestSessionDTO{
+		Name: row.Name, Side: string(row.Side), RsvpStatus: string(row.RsvpStatus),
+		AttendingCount: int(row.AttendingCount), PaxQuota: int(row.PaxQuota),
+	}, nil
 }
 
 // resolveAttendingCount memvalidasi & menormalisasi jumlah tamu (dashboard-
 // wa-rsvp keputusan #2/§9.3) - fungsi murni, diuji tanpa DB
-// (service_test.go). attending_count hanya bermakna untuk status
-// 'attending' (harus 1 atau 2); status lain diabaikan dan dinetralkan ke 1
-// (default kolom) - tidak pernah ikut dihitung pax manapun karena
-// buildSummaryDTO hanya membaca TotalPax dari baris rsvp_status='attending'.
-func resolveAttendingCount(status string, requested int) (int, error) {
+// (resolve_attending_count_test.go). attending_count hanya bermakna untuk
+// status 'attending'; status lain diabaikan dan dinetralkan ke 1 (default
+// kolom) - tidak pernah ikut dihitung pax manapun karena buildSummaryDTO
+// hanya membaca angka dari baris rsvp_status='attending'.
+//
+// BATAS ATASNYA KINI `quota`, bukan lagi angka mati 2 (docs/plan/
+// guest-pax-quota/PLAN.md T11/D4). Cap lama 1-2 berlaku ke SEMUA tamu
+// termasuk keluarga - itulah bug-nya: undangan "paman + istri + 2 anak"
+// tercatat 2 orang, dan angka catering selalu kurang. Sekarang batas 2 hanya
+// mengikat tamu yang jatahnya memang 2.
+//
+// `quota` datang dari baris tamu, jadi pemanggil WAJIB membaca barisnya lebih
+// dulu - lihat UpdateRsvpStatus.
+func resolveAttendingCount(status string, requested, quota int) (int, error) {
 	if status != "attending" {
 		return 1, nil
 	}
-	if requested != 1 && requested != 2 {
+	if requested < 1 || requested > quota {
 		return 0, ErrInvalidAttendingCount
 	}
 	return requested, nil
@@ -536,16 +653,20 @@ func parseCheckinCode(code string) (string, bool) {
 // UpdateRsvpStatus adalah endpoint publik (PLAN.md §5.4/fitur #6, diperluas
 // dashboard-wa-rsvp §6.5/§9.3) yang dipanggil RsvpConfirmation saat tamu
 // memilih salah satu dari 3 status. Untuk status 'attending', attendingCount
-// WAJIB 1 atau 2 (opsi 1/2 tamu - keputusan #2), qrPayload dikembalikan, dan
+// WAJIB 1..pax_quota tamu itu (docs/plan/guest-pax-quota/PLAN.md D4 -
+// menggantikan batas mati 1/2 dari keputusan #2), qrPayload dikembalikan, dan
 // pengiriman WhatsApp dipicu di GOROUTINE terpisah (keputusan #7 - RSVP
 // TIDAK menunggu WhatsApp).
+//
+// URUTAN BERUBAH (D4): GetByToken kini dipanggil SEBELUM
+// resolveAttendingCount, karena quota-nya hidup di baris tamu dan mustahil
+// divalidasi sebelum barisnya dibaca. Konsekuensi yang disengaja: token tidak
+// dikenal + jumlah salah kini dibalas 404, bukan 400. Itu justru lebih benar -
+// identitas divalidasi sebelum isi - tapi ia PERUBAHAN PERILAKU, bukan
+// kebetulan.
 func (s *Service) UpdateRsvpStatus(ctx context.Context, token, status string, attendingCount int) (string, error) {
 	if !validStatuses[status] || status == "pending" {
 		return "", ErrInvalidStatus
-	}
-	finalCount, err := resolveAttendingCount(status, attendingCount)
-	if err != nil {
-		return "", err
 	}
 
 	row, err := s.repo.GetByToken(ctx, token)
@@ -553,6 +674,11 @@ func (s *Service) UpdateRsvpStatus(ctx context.Context, token, status string, at
 		if errors.Is(err, sql.ErrNoRows) {
 			return "", ErrNotFound
 		}
+		return "", err
+	}
+
+	finalCount, err := resolveAttendingCount(status, attendingCount, int(row.PaxQuota))
+	if err != nil {
 		return "", err
 	}
 
@@ -808,6 +934,7 @@ func StatusHTTPCode(err error) int {
 	case errors.Is(err, ErrInvalidSide), errors.Is(err, ErrInvalidStatus),
 		errors.Is(err, ErrInvalidGender), errors.Is(err, ErrInvalidInvitationType), errors.Is(err, ErrInvalidSouvenirType),
 		errors.Is(err, ErrInvalidAttendingCount), errors.Is(err, ErrInvalidCheckinCode),
+		errors.Is(err, ErrInvalidPaxQuota), errors.Is(err, ErrPaxQuotaBelowConfirmed),
 		errors.Is(err, ErrGroupNameRequired), errors.Is(err, ErrGroupNameTooLong),
 		errors.Is(err, ErrGroupDescriptionTooLong), errors.Is(err, ErrGroupNameTaken),
 		errors.Is(err, ErrGroupInUse), errors.Is(err, ErrInvalidGroupID):

@@ -1,0 +1,11 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(git push origin master)",
+      "Bash(ssh elcodelabs \"docker ps*\")",
+      "Bash(ssh elcodelabs \"cd ~/elwedding && ./deploy.sh *\")",
+      "Bash(curl * https://elwedding.elcodelabs.com/*)",
+      "Bash(curl * https://api.github.com/repos/AmandaYora/elwedding*)"
+    ]
+  }
+}

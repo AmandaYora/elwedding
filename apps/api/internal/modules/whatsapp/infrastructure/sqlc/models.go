@@ -354,6 +354,8 @@ type Guest struct {
 	IsExpectedAttending bool
 	CheckedInAt         sql.NullTime
 	GroupID             sql.NullInt64
+	PaxQuota            uint8
+	ContactedAt         sql.NullTime
 }
 
 type GuestGroup struct {
@@ -362,6 +364,7 @@ type GuestGroup struct {
 	Description string
 	CreatedAt   time.Time
 	UpdatedAt   time.Time
+	DefaultPax  uint8
 }
 
 type InvitationContent struct {

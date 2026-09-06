@@ -8,6 +8,11 @@ const DEFAULT_SESSION: GuestSession = {
   status: 'pending',
   token: null,
   attendingCount: 1,
+  // 2 DISENGAJA, bukan 1 (docs/plan/guest-pax-quota/PLAN.md T21): nilai ini
+  // yang dipakai mode pratinjau (`/` tanpa ?guest=), yang tidak punya baris
+  // tamu untuk dibaca. 2 mempertahankan tampilan dua tombol yang berlaku
+  // sebelum fitur jatah kursi ada - pratinjau tidak boleh ikut berubah.
+  paxQuota: 2,
 }
 
 /** Keputusan akses undangan untuk pembuka halaman ini.
@@ -54,6 +59,7 @@ interface ResolvedGuest {
   side: 'groom' | 'bride'
   rsvpStatus: GuestSession['status']
   attendingCount: number
+  paxQuota: number
 }
 
 /** Cache PROMISE (bukan hasilnya) per token, level modul.
@@ -135,11 +141,16 @@ export function useGuestSession(): GuestSessionState {
     let cancelled = false
 
     resolveGuest(token)
-      .then(({ name, side, rsvpStatus, attendingCount }) => {
+      .then(({ name, side, rsvpStatus, attendingCount, paxQuota }) => {
         if (cancelled) return
         setSession({
           name, side, status: rsvpStatus, token,
-          attendingCount: attendingCount || 1, resolved: true, access: 'granted',
+          attendingCount: attendingCount || 1,
+          // `|| 2` mengikuti pola `attendingCount || 1` di atasnya: respons
+          // lama/tak lengkap tidak boleh menghasilkan jatah 0, yang akan
+          // membuat tamu tidak bisa memilih angka apa pun.
+          paxQuota: paxQuota || 2,
+          resolved: true, access: 'granted',
         })
       })
       .catch((err: unknown) => {

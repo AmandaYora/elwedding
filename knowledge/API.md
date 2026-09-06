@@ -20,6 +20,8 @@ Kolom **Auth**: `publik` tanpa token; `JWT (admin)` = butuh token berperan
 | POST | `/api/v1/admin/uploads/base64` | JWT (admin) | content |
 | GET/POST/PUT/DELETE | `/api/v1/admin/guests[/{id}]` | JWT (admin) | guest |
 | GET | `/api/v1/admin/guests/summary` | JWT (admin) | guest |
+| DELETE | `/api/v1/admin/guests/{id}/rsvp` | JWT (admin) | guest |
+| PATCH | `/api/v1/admin/guests/{id}/contacted` | JWT (admin) | guest |
 | GET/POST/PUT/DELETE | `/api/v1/admin/groups[/{id}]` | JWT (admin) | guest |
 | GET | `/api/v1/admin/whatsapp/status` | JWT (admin) | whatsapp |
 | POST | `/api/v1/admin/whatsapp/pair/start` | JWT (admin) | whatsapp |
@@ -102,6 +104,18 @@ memanggil `GetGuestGroupByID` lebih dulu).
 `POST`/`PUT` `/api/v1/admin/guests` kini **mewajibkan** `groupId` (> 0) dan
 menolak `404` bila group-nya tidak ada - penegakan di backend, bukan hanya di
 form (pola yang sama dengan `gender` yang wajib meski kolomnya nullable).
+`DELETE /api/v1/admin/guests/{id}/rsvp` menghapus **RESERVASI**, bukan tamunya
+(`docs/plan/reservation-reset-contacted-flag/PLAN.md`): `rsvp_status` balik ke
+`pending`, `attending_count` ke 1, `rsvp_responded_at` jadi NULL — sementara
+baris tamu, `token`, `pax_quota`, dan `checked_in_at` semuanya **tetap**.
+Jangan tertukar dengan `DELETE /api/v1/admin/guests/{id}` yang menghapus
+tamunya. Bersifat idempoten (tamu yang sudah `pending` tetap dibalas 200); id
+yang tidak ada membalas **404**.
+
+`PATCH /api/v1/admin/guests/{id}/contacted` menerima `{ "contacted": bool }` -
+menyalakan/mematikan penanda "sudah dihubungi". Satu endpoint untuk dua arah,
+karena perbedaannya cuma satu nilai boolean.
+
 Respons `POST /api/v1/admin/checkin/scan` & `/checkin/{id}` membawa
 `groupName` yang di-resolve DI SERVER: akun petugas tidak bisa memanggil
 `/api/v1/admin/groups` (dijaga `RequireFullAdmin`), jadi ia tidak mungkin

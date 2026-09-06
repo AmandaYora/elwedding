@@ -26,6 +26,59 @@ const (
 	groupDescriptionMaxLen = 255
 )
 
+// Batas jatah kursi (docs/plan/guest-pax-quota/PLAN.md D3), dipakai BERSAMA
+// oleh guests.pax_quota dan guest_groups.default_pax.
+//
+// Kolomnya TINYINT UNSIGNED yang muat sampai 255. Batas atas 20 bukan
+// keterbatasan teknis melainkan penjaga salah ketik: tanpa itu, mengetik 200
+// alih-alih 20 diam-diam meledakkan proyeksi catering dan tidak ada yang
+// menyadarinya sampai vendor menagih. 20 sudah sangat longgar untuk "keluarga
+// besar" di pernikahan intimate.
+//
+// KEMBAR LINTAS BAHASA dengan guest.schema.ts & group.schema.ts di frontend -
+// browser tidak bisa memanggil konstanta Go. Yang di frontend hanya memberi
+// pesan lebih cepat; penegakan sebenarnya di sini. Ubah keduanya bersamaan.
+const (
+	paxQuotaMin = 1
+	paxQuotaMax = 20
+)
+
+// validatePaxQuota FUNGSI MURNI (diuji tanpa DB - pax_quota_test.go), pola
+// validateGroupName di bawah. Dipakai DUA jalur: validateProfileFields untuk
+// guests.pax_quota, dan CreateGroup/UpdateGroup untuk guest_groups.default_pax.
+//
+// 0 = field tidak dikirim klien, ditolak sama seperti GroupID 0 dan seperti
+// string kosong pada enum wajib.
+func validatePaxQuota(quota int) error {
+	if quota < paxQuotaMin || quota > paxQuotaMax {
+		return ErrInvalidPaxQuota
+	}
+	return nil
+}
+
+// canLowerPaxQuota FUNGSI MURNI (D10), dipisahkan dari Update supaya penjaga
+// ini bisa diuji tanpa DB - pola canDeleteGroup di bawah.
+//
+// Tamu yang sudah berjanji 6 orang lalu jatahnya diturunkan admin jadi 4
+// menghasilkan baris yang TIDAK KOHEREN: proyeksi catering tetap menghitung 6
+// (karena jawaban tamu yang dipakai untuk status 'attending'), sementara
+// jatahnya berkata 4. Ditolak lebih baik daripada menyimpan keadaan yang tidak
+// bisa dijelaskan ke siapa pun.
+//
+// Angkanya IKUT di pesan, sama seperti canDeleteGroup yang menyebut "masih
+// dipakai N tamu": admin ditolak sambil diberi tahu angka yang harus ia hadapi,
+// bukan sekadar "gagal".
+//
+// HANYA berlaku untuk status 'attending'. Tamu 'pending'/'remind_later' belum
+// berjanji apa pun, dan 'not_attending' tidak menempati kursi - jatah keduanya
+// bebas diturunkan.
+func canLowerPaxQuota(status string, attendingCount, newQuota int) error {
+	if status == "attending" && newQuota < attendingCount {
+		return fmt.Errorf("%w karena tamu sudah mengonfirmasi %d orang", ErrPaxQuotaBelowConfirmed, attendingCount)
+	}
+	return nil
+}
+
 // validateGroupName FUNGSI MURNI (diuji tanpa DB - group_test.go). Trim
 // dilakukan di dalam supaya nama berisi spasi saja ditolak sama seperti nama
 // kosong; pemanggil menyimpan versi ter-trim yang sama.
@@ -70,6 +123,7 @@ func toGroupDTO(g sqlc.GuestGroup, guestCount int) GuestGroupDTO {
 		Name:        g.Name,
 		Description: g.Description,
 		GuestCount:  guestCount,
+		DefaultPax:  int(g.DefaultPax),
 		CreatedAt:   g.CreatedAt.Format("2006-01-02T15:04:05Z07:00"),
 	}
 }
@@ -122,13 +176,18 @@ func (s *Service) CreateGroup(ctx context.Context, in GuestGroupInput) (GuestGro
 	if err := validateGroupDescription(description); err != nil {
 		return GuestGroupDTO{}, err
 	}
+	if err := validatePaxQuota(in.DefaultPax); err != nil {
+		return GuestGroupDTO{}, err
+	}
 	if _, err := s.repo.GetGroupByName(ctx, name); err == nil {
 		return GuestGroupDTO{}, ErrGroupNameTaken
 	} else if !errors.Is(err, sql.ErrNoRows) {
 		return GuestGroupDTO{}, err
 	}
 
-	id, err := s.repo.CreateGroup(ctx, sqlc.CreateGuestGroupParams{Name: name, Description: description})
+	id, err := s.repo.CreateGroup(ctx, sqlc.CreateGuestGroupParams{
+		Name: name, Description: description, DefaultPax: uint8(in.DefaultPax),
+	})
 	if err != nil {
 		return GuestGroupDTO{}, err
 	}
@@ -155,6 +214,9 @@ func (s *Service) UpdateGroup(ctx context.Context, id uint64, in GuestGroupInput
 	if err := validateGroupDescription(description); err != nil {
 		return err
 	}
+	if err := validatePaxQuota(in.DefaultPax); err != nil {
+		return err
+	}
 	if _, err := s.repo.GetGroupByID(ctx, id); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return ErrGroupNotFound
@@ -168,7 +230,9 @@ func (s *Service) UpdateGroup(ctx context.Context, id uint64, in GuestGroupInput
 	} else if !errors.Is(err, sql.ErrNoRows) {
 		return err
 	}
-	return s.repo.UpdateGroup(ctx, sqlc.UpdateGuestGroupParams{Name: name, Description: description, ID: id})
+	return s.repo.UpdateGroup(ctx, sqlc.UpdateGuestGroupParams{
+		Name: name, Description: description, DefaultPax: uint8(in.DefaultPax), ID: id,
+	})
 }
 
 // DeleteGroup - urutannya WAJIB: GetGroupByID -> CountGuestsByGroupID ->

@@ -16,12 +16,19 @@ export interface GuestGroup {
   /** Diisi server dari SATU query GROUP BY, bukan satu COUNT per baris.
    * Dialah yang menjelaskan kenapa sebuah group tidak bisa dihapus (K4). */
   guestCount: number
+  /** Angka AWAL jatah kursi untuk tamu baru di group ini (docs/plan/
+   * guest-pax-quota/PLAN.md D2/D8). Dipakai GuestsPage untuk mengisi field
+   * "Jumlah tamu" saat admin memilih group - lookup di memori dari daftar
+   * group yang memang sudah dimuat halaman itu, jadi TANPA request tambahan.
+   * Bukan batas keras: yang mengikat adalah `paxQuota` milik tamu. */
+  defaultPax: number
   createdAt: string
 }
 
 export interface GroupInput {
   name: string
   description: string
+  defaultPax: number
 }
 
 interface ApiListResponse {

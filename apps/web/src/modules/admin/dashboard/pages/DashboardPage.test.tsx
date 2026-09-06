@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from '@testing-library/react'
+import { render, screen, waitFor, within } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
 import DashboardPage from './DashboardPage'
 import { getGuestSummary } from '@/modules/admin/guests/services/guests.service'
@@ -43,6 +43,21 @@ test('KPI, proporsi, breakdown, dan aktivitas terbaru sesuai data', async () => 
     sideBride: 22,
     genderMale: 23,
     genderFemale: 24,
+    // Angka SENGAJA dijauhkan dari 21/22/23/24 milik breakdown Pihak/Gender
+    // yang diasersi di bawah - kalau bertabrakan, getByText jadi ambigu dan
+    // yang gagal adalah test, bukan kodenya. Angka proyeksi yang sebenarnya
+    // diuji di test khusus kartu proyeksi, paling bawah berkas ini.
+    confirmedPaxGroom: 101,
+    confirmedPaxBride: 102,
+    confirmedPaxTotal: 203,
+    expectedPaxGroom: 104,
+    expectedPaxBride: 105,
+    expectedPaxTotal: 209,
+    projectedPaxGroom: 205,
+    projectedPaxBride: 207,
+    projectedPaxTotal: 412,
+    excludedNotAttending: 111,
+    excludedNotExpected: 112,
     recentResponses: [{ name: 'Budi', rsvpStatus: 'attending', attendingCount: 2, respondedAt: new Date().toISOString() }],
   })
 
@@ -50,7 +65,7 @@ test('KPI, proporsi, breakdown, dan aktivitas terbaru sesuai data', async () => 
 
   await waitFor(() => expect(screen.getAllByRole('definition')).toHaveLength(4))
   const kpiValues = screen.getAllByRole('definition').map((el) => el.textContent)
-  // Urutan: Total tamu, Sudah konfirmasi (total-pending), Akan hadir (undangan/orang), Belum jawab.
+  // Urutan: Total undangan, Sudah konfirmasi (total-pending), Akan hadir (undangan/orang), Belum jawab.
   expect(kpiValues).toEqual(['10', '10', '6/9', '0'])
 
   // Panel breakdown Pihak/Gender/Jenis undangan/Jenis souvenir.
@@ -86,6 +101,17 @@ test('semua nol -> kartu tetap tampil dengan nilai 0, tanpa NaN', async () => {
     sideBride: 0,
     genderMale: 0,
     genderFemale: 0,
+    confirmedPaxGroom: 0,
+    confirmedPaxBride: 0,
+    confirmedPaxTotal: 0,
+    expectedPaxGroom: 0,
+    expectedPaxBride: 0,
+    expectedPaxTotal: 0,
+    projectedPaxGroom: 0,
+    projectedPaxBride: 0,
+    projectedPaxTotal: 0,
+    excludedNotAttending: 0,
+    excludedNotExpected: 0,
     recentResponses: [],
   })
 
@@ -108,4 +134,58 @@ test('gagal muat -> ErrorState dengan tombol coba lagi', async () => {
 
   await waitFor(() => expect(screen.getByText('Gagal memuat ringkasan.')).toBeInTheDocument())
   expect(screen.getByRole('button', { name: 'Coba lagi' })).toBeInTheDocument()
+})
+
+// --- Kartu proyeksi catering (docs/plan/guest-pax-quota/PLAN.md T23/§5) ---
+
+test('kartu proyeksi menampilkan tiga baris per pihak + baris tidak dihitung', async () => {
+  mockedSummary.mockResolvedValueOnce({
+    total: 65, attending: 30, notAttending: 9, remindLater: 5, pending: 21,
+    invitationOnline: 0, invitationPhysical: 0, souvenirRegular: 0, souvenirVip: 0,
+    attendingPax: 82, sideGroom: 30, sideBride: 35, genderMale: 0, genderFemale: 0,
+    confirmedPaxGroom: 38, confirmedPaxBride: 44, confirmedPaxTotal: 82,
+    expectedPaxGroom: 15, expectedPaxBride: 21, expectedPaxTotal: 36,
+    projectedPaxGroom: 53, projectedPaxBride: 65, projectedPaxTotal: 118,
+    excludedNotAttending: 9, excludedNotExpected: 4,
+    recentResponses: [],
+  })
+
+  renderPage()
+
+  const kartu = (await screen.findByText('Proyeksi catering')).closest('div')!.parentElement!
+
+  // Ketiga baris HARUS tampil, bukan cuma angka akhirnya: 82 fakta + 36
+  // tebakan. Digabung jadi satu angka telanjang, admin tidak bisa menilai
+  // seberapa besar risikonya saat memesan.
+  expect(within(kartu).getByText('Sudah konfirmasi hadir')).toBeInTheDocument()
+  expect(within(kartu).getByText(/Belum jawab, diperkirakan/)).toBeInTheDocument()
+  expect(within(kartu).getByText('Proyeksi pax')).toBeInTheDocument()
+
+  for (const angka of ['38', '44', '82', '15', '21', '36', '53', '65', '118']) {
+    expect(within(kartu).getByText(angka)).toBeInTheDocument()
+  }
+
+  // Baris "tidak dihitung" mencegah tamu hilang diam-diam dari total.
+  expect(within(kartu).getByText(/9 undangan tidak hadir/)).toBeInTheDocument()
+  expect(within(kartu).getByText(/4 tidak diperkirakan hadir/)).toBeInTheDocument()
+})
+
+// Label KPI teratas diperbaiki bersamaan (T23): nilainya menghitung BARIS,
+// dan satu baris bisa bernilai banyak orang.
+test('KPI teratas berlabel "Total undangan", bukan "Total tamu"', async () => {
+  mockedSummary.mockResolvedValueOnce({
+    total: 65, attending: 30, notAttending: 9, remindLater: 5, pending: 21,
+    invitationOnline: 0, invitationPhysical: 0, souvenirRegular: 0, souvenirVip: 0,
+    attendingPax: 82, sideGroom: 30, sideBride: 35, genderMale: 0, genderFemale: 0,
+    confirmedPaxGroom: 38, confirmedPaxBride: 44, confirmedPaxTotal: 82,
+    expectedPaxGroom: 15, expectedPaxBride: 21, expectedPaxTotal: 36,
+    projectedPaxGroom: 53, projectedPaxBride: 65, projectedPaxTotal: 118,
+    excludedNotAttending: 9, excludedNotExpected: 4,
+    recentResponses: [],
+  })
+
+  renderPage()
+
+  expect(await screen.findByText('Total undangan')).toBeInTheDocument()
+  expect(screen.queryByText('Total tamu')).not.toBeInTheDocument()
 })

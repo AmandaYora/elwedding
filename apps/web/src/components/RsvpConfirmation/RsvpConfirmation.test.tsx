@@ -226,3 +226,88 @@ test('bitmap QR tetap 320px agar hasil unduhan tidak ikut mengecil', async () =>
   expect(canvas.getAttribute('width')).toBe('320')
   expect(canvas.getAttribute('height')).toBe('320')
 })
+
+// --- Jatah kursi (docs/plan/guest-pax-quota/PLAN.md T22/K2) ---
+//
+// Tiga cabang, satu per bentuk pertanyaan. Yang menentukan bentuknya adalah
+// paxQuota dari sesi tamu, bukan angka mati di komponen.
+
+function mockSession(paxQuota: number) {
+  setSearch('?guest=abc123')
+  mockedGet.mockResolvedValueOnce({
+    data: {
+      success: true,
+      data: { name: 'Paman Budi', side: 'groom', rsvpStatus: 'pending', attendingCount: 1, paxQuota },
+    },
+  } as never)
+}
+
+// Jatah 1 (mis. Bulek Sri): menanyakan "berapa orang?" ke orang yang jatahnya
+// satu adalah pertanyaan jebakan - satu-satunya jawaban sah sudah diketahui.
+test('jatah 1 -> klik "Akan Hadir" langsung konfirmasi, tanpa penanya jumlah', async () => {
+  mockSession(1)
+  mockedPatch.mockResolvedValueOnce({ data: { success: true, data: { qrPayload: 'ELW1:abc123' } } } as never)
+
+  render(<RsvpConfirmation content={content} />)
+  await screen.findByText(/Halo Paman Budi/)
+
+  fireEvent.click(screen.getByRole('button', { name: 'Akan Hadir' }))
+
+  await waitFor(() =>
+    expect(mockedPatch).toHaveBeenCalledWith('/api/v1/public/guests/by-token/abc123/rsvp', {
+      status: 'attending',
+      attendingCount: 1,
+    }),
+  )
+  expect(screen.queryByText('Berapa orang yang akan hadir?')).not.toBeInTheDocument()
+})
+
+// Jatah 2 = tamu umum. Perilaku HARUS identik dengan sebelum fitur ini ada -
+// mereka tidak boleh merasakan perubahan apa pun.
+test('jatah 2 -> dua tombol, persis seperti sebelumnya', async () => {
+  mockSession(2)
+
+  render(<RsvpConfirmation content={content} />)
+  await screen.findByText(/Halo Paman Budi/)
+
+  fireEvent.click(screen.getByRole('button', { name: 'Akan Hadir' }))
+
+  expect(await screen.findByText('Berapa orang yang akan hadir?')).toBeInTheDocument()
+  expect(screen.getByRole('button', { name: '1 Tamu' })).toBeInTheDocument()
+  expect(screen.getByRole('button', { name: '2 Tamu' })).toBeInTheDocument()
+  expect(screen.queryByRole('button', { name: '3 Tamu' })).not.toBeInTheDocument()
+})
+
+// Jatah >= 3 = inti fitur ini. Undangan "paman + istri + 4 anak" akhirnya bisa
+// menjawab jujur, dan jatahnya disebutkan (K2).
+test('jatah 6 -> enam tombol + jatahnya disebutkan ke tamu', async () => {
+  mockSession(6)
+
+  render(<RsvpConfirmation content={content} />)
+  await screen.findByText(/Halo Paman Budi/)
+
+  fireEvent.click(screen.getByRole('button', { name: 'Akan Hadir' }))
+
+  expect(await screen.findByText(/Undangan ini berlaku untuk 6 orang/)).toBeInTheDocument()
+  for (const n of [1, 2, 3, 4, 5, 6]) {
+    expect(screen.getByRole('button', { name: `${n} Tamu` })).toBeInTheDocument()
+  }
+  // Batasnya berhenti tepat di jatah - tidak ada tombol ke-7.
+  expect(screen.queryByRole('button', { name: '7 Tamu' })).not.toBeInTheDocument()
+})
+
+// Mode pratinjau (`/` tanpa ?guest=) tidak punya baris tamu untuk dibaca.
+// DEFAULT_SESSION.paxQuota = 2 menjaga tampilannya persis seperti dulu.
+test('mode pratinjau tanpa ?guest= -> dua tombol, tanpa PATCH', async () => {
+  render(<RsvpConfirmation content={content} />)
+
+  fireEvent.click(screen.getByRole('button', { name: 'Akan Hadir' }))
+
+  expect(await screen.findByText('Berapa orang yang akan hadir?')).toBeInTheDocument()
+  expect(screen.getByRole('button', { name: '2 Tamu' })).toBeInTheDocument()
+  expect(screen.queryByRole('button', { name: '3 Tamu' })).not.toBeInTheDocument()
+
+  fireEvent.click(screen.getByRole('button', { name: '2 Tamu' }))
+  await waitFor(() => expect(document.getElementById('rsvp-qr-canvas')).toBeInTheDocument())
+  expect(mockedPatch).not.toHaveBeenCalled()
+})

@@ -31,8 +31,8 @@ const mockedCreate = vi.mocked(createGroup)
 const mockedUpdate = vi.mocked(updateGroup)
 const mockedDelete = vi.mocked(deleteGroup)
 
-const groupKosong = { id: 4, name: 'Keluarga', description: 'Keluarga inti', guestCount: 0, createdAt: '2026-01-01T00:00:00Z' }
-const groupTerpakai = { id: 3, name: 'Teman Kantor', description: '', guestCount: 12, createdAt: '2026-01-01T00:00:00Z' }
+const groupKosong = { id: 4, name: 'Keluarga', description: 'Keluarga inti', guestCount: 0, defaultPax: 4, createdAt: '2026-01-01T00:00:00Z' }
+const groupTerpakai = { id: 3, name: 'Teman Kantor', description: '', guestCount: 12, defaultPax: 2, createdAt: '2026-01-01T00:00:00Z' }
 
 /** Meniru error Axios: pesan penolakan datang dari `response.data.message` -
  * itulah yang dibaca apiErrorMessage. */
@@ -121,7 +121,7 @@ test('isi form valid -> createGroup terpanggil dengan nilai ter-trim', async () 
   fireEvent.change(screen.getByPlaceholderText('Keterangan singkat (opsional)'), { target: { value: 'Keluarga inti' } })
   fireEvent.click(screen.getByRole('button', { name: 'Simpan' }))
 
-  await waitFor(() => expect(mockedCreate).toHaveBeenCalledWith({ name: 'Keluarga', description: 'Keluarga inti' }))
+  await waitFor(() => expect(mockedCreate).toHaveBeenCalledWith({ name: 'Keluarga', description: 'Keluarga inti', defaultPax: 2 }))
 })
 
 test('ubah group -> updateGroup terpanggil dengan id barisnya', async () => {
@@ -138,7 +138,7 @@ test('ubah group -> updateGroup terpanggil dengan id barisnya', async () => {
   fireEvent.click(screen.getByRole('button', { name: 'Simpan' }))
 
   await waitFor(() =>
-    expect(mockedUpdate).toHaveBeenCalledWith(4, { name: 'Keluarga Besar', description: 'Keluarga inti' }),
+    expect(mockedUpdate).toHaveBeenCalledWith(4, { name: 'Keluarga Besar', description: 'Keluarga inti', defaultPax: 4 }),
   )
 })
 
@@ -229,4 +229,44 @@ test('daftar gagal dimuat -> ErrorState dengan tombol coba lagi', async () => {
   renderPage()
 
   expect(await screen.findByText('Gagal memuat data group.')).toBeInTheDocument()
+})
+
+// --- Jatah kursi default (docs/plan/guest-pax-quota/PLAN.md T18) ---
+
+test('form group punya field jatah kursi, terisi 2 untuk group baru', async () => {
+  mockedList.mockResolvedValue({ data: [], meta: { page: 1, limit: 20, total: 0, totalPages: 1 } })
+
+  renderPage()
+  await waitFor(() => expect(screen.getByText('Belum ada group')).toBeInTheDocument())
+
+  fireEvent.click(screen.getAllByRole('button', { name: '+ Tambah group' })[0])
+  await screen.findByText('Tambah group')
+
+  // 2 mengikuti DEFAULT kolomnya di migration 000017.
+  expect(screen.getByLabelText('Jatah kursi default')).toHaveValue(2)
+  expect(screen.getByText(/Bisa diubah per tamu/)).toBeInTheDocument()
+})
+
+test('jatah kursi di luar 1..20 -> ditolak sebelum menyentuh service', async () => {
+  mockedList.mockResolvedValue({ data: [], meta: { page: 1, limit: 20, total: 0, totalPages: 1 } })
+
+  renderPage()
+  await waitFor(() => expect(screen.getByText('Belum ada group')).toBeInTheDocument())
+
+  fireEvent.click(screen.getAllByRole('button', { name: '+ Tambah group' })[0])
+  await screen.findByText('Tambah group')
+  fireEvent.change(screen.getByPlaceholderText('mis. Teman Kantor'), { target: { value: 'Keluarga' } })
+
+  // 21 lewat batas atas.
+  fireEvent.change(screen.getByLabelText('Jatah kursi default'), { target: { value: '21' } })
+  fireEvent.click(screen.getByRole('button', { name: 'Simpan' }))
+  expect(await screen.findByText('Jumlah tamu maksimal 20')).toBeInTheDocument()
+  expect(mockedCreate).not.toHaveBeenCalled()
+
+  // Dikosongkan -> Number('') = 0, ditolak batas bawah. Field yang dikosongkan
+  // tidak boleh diam-diam tersimpan.
+  fireEvent.change(screen.getByLabelText('Jatah kursi default'), { target: { value: '' } })
+  fireEvent.click(screen.getByRole('button', { name: 'Simpan' }))
+  expect(await screen.findByText('Jumlah tamu minimal 1')).toBeInTheDocument()
+  expect(mockedCreate).not.toHaveBeenCalled()
 })

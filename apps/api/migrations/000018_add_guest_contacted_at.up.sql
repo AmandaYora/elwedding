@@ -1,0 +1,30 @@
+-- Penanda "sudah dihubungi" - docs/plan/reservation-reset-contacted-flag/PLAN.md
+-- T1/D6/D7.
+--
+-- MEMBALIK K6 og-share-image-dinamis ("Pelacakan pengiriman: TIDAK dilacak...
+-- nol kolom baru di tabel guests... admin melacak sendiri siapa yang sudah
+-- dikirimi di luar aplikasi"), yang bahkan menyebut persis "tidak ada kolom
+-- invitation_sent_at". Konsekuensi itu ternyata merepotkan dalam pemakaian
+-- nyata dan user meminta dibalik. Preseden pembalikan tercatat: migration
+-- 000015 membalik "semua admin setara/tanpa role".
+--
+-- NAMANYA `contacted_at`, BUKAN `invitation_sent_at` (D6). Ini bukan
+-- perbedaan gaya. Tombol "Kirim Undangan" hanya MEMBUKA WhatsApp lewat wa.me,
+-- dan wa.me secara desain tidak bisa melaporkan balik apakah pesannya benar-
+-- benar terkirim - keterbatasan teknis yang mendasari K6 itu TIDAK berubah
+-- sedikit pun. Yang sistem ini tahu hanyalah "admin membuka WhatsApp untuk
+-- tamu ini". Menamainya `sent` akan mengklaim lebih dari yang bisa dibuktikan,
+-- kesalahan yang sama dengan menyebut arrivedPax sebagai jumlah terverifikasi.
+-- `contacted_at` juga cukup luas kalau admin menghubungi lewat jalur lain.
+--
+-- DATETIME NULL, bukan BOOLEAN (D7): pola checked_in_at (migration 000014).
+-- NULL bermakna "belum dihubungi", dan timestamp-nya sendiri berguna
+-- ("dihubungi 3 hari lalu"). Boolean membuang informasi itu tanpa menghemat
+-- apa pun.
+--
+-- TANPA INDEX (disengaja), alasan sama dengan checked_in_at: kolom ini hanya
+-- dibaca per baris di daftar tamu yang sudah dipaginasi, tidak pernah jadi
+-- kunci WHERE maupun ORDER BY. Kalau kelak ada filter "belum dihubungi",
+-- index-nya ditambahkan bersama filter itu - bukan sekarang atas dasar duga.
+ALTER TABLE guests
+  ADD COLUMN contacted_at DATETIME NULL AFTER checked_in_at;

@@ -22,12 +22,13 @@ func (q *Queries) CountGuestGroups(ctx context.Context) (int64, error) {
 
 const createGuestGroup = `-- name: CreateGuestGroup :execlastid
 
-INSERT INTO guest_groups (name, description) VALUES (?, ?)
+INSERT INTO guest_groups (name, description, default_pax) VALUES (?, ?, ?)
 `
 
 type CreateGuestGroupParams struct {
 	Name        string
 	Description string
+	DefaultPax  uint8
 }
 
 // Query tabel guest_groups - docs/plan/guest-groups/PLAN.md T2.
@@ -40,8 +41,15 @@ type CreateGuestGroupParams struct {
 // Query yang menyentuh tabel `guests` (CountGuestsByGroupID,
 // CountGuestsGroupedByGroup) TETAP tinggal di guests.sql - berkas ini hanya
 // untuk tabel guest_groups.
+// default_pax ikut sejak migration 000017 (docs/plan/guest-pax-quota/PLAN.md
+// T3/D2). Ia hanya ANGKA AWAL untuk tamu baru di group ini - yang mengikat
+// adalah guests.pax_quota per baris tamu. Membalik K3 guest-groups; lihat §2
+// PLAN.md.
+//
+// Query SELECT * di bawah TIDAK perlu diubah: bintangnya otomatis ikut
+// membawa kolom baru begitu sqlc di-regenerate.
 func (q *Queries) CreateGuestGroup(ctx context.Context, arg CreateGuestGroupParams) (int64, error) {
-	result, err := q.db.ExecContext(ctx, createGuestGroup, arg.Name, arg.Description)
+	result, err := q.db.ExecContext(ctx, createGuestGroup, arg.Name, arg.Description, arg.DefaultPax)
 	if err != nil {
 		return 0, err
 	}
@@ -58,7 +66,7 @@ func (q *Queries) DeleteGuestGroup(ctx context.Context, id uint64) error {
 }
 
 const getGuestGroupByID = `-- name: GetGuestGroupByID :one
-SELECT id, name, description, created_at, updated_at FROM guest_groups WHERE id = ? LIMIT 1
+SELECT id, name, description, created_at, updated_at, default_pax FROM guest_groups WHERE id = ? LIMIT 1
 `
 
 func (q *Queries) GetGuestGroupByID(ctx context.Context, id uint64) (GuestGroup, error) {
@@ -70,12 +78,13 @@ func (q *Queries) GetGuestGroupByID(ctx context.Context, id uint64) (GuestGroup,
 		&i.Description,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.DefaultPax,
 	)
 	return i, err
 }
 
 const getGuestGroupByName = `-- name: GetGuestGroupByName :one
-SELECT id, name, description, created_at, updated_at FROM guest_groups WHERE name = ? LIMIT 1
+SELECT id, name, description, created_at, updated_at, default_pax FROM guest_groups WHERE name = ? LIMIT 1
 `
 
 // GetGuestGroupByName adalah penjaga UNIQUE di sisi service (D5) - dicek
@@ -91,12 +100,13 @@ func (q *Queries) GetGuestGroupByName(ctx context.Context, name string) (GuestGr
 		&i.Description,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.DefaultPax,
 	)
 	return i, err
 }
 
 const listGuestGroups = `-- name: ListGuestGroups :many
-SELECT id, name, description, created_at, updated_at FROM guest_groups ORDER BY name ASC LIMIT ? OFFSET ?
+SELECT id, name, description, created_at, updated_at, default_pax FROM guest_groups ORDER BY name ASC LIMIT ? OFFSET ?
 `
 
 type ListGuestGroupsParams struct {
@@ -122,6 +132,7 @@ func (q *Queries) ListGuestGroups(ctx context.Context, arg ListGuestGroupsParams
 			&i.Description,
 			&i.CreatedAt,
 			&i.UpdatedAt,
+			&i.DefaultPax,
 		); err != nil {
 			return nil, err
 		}
@@ -137,16 +148,22 @@ func (q *Queries) ListGuestGroups(ctx context.Context, arg ListGuestGroupsParams
 }
 
 const updateGuestGroup = `-- name: UpdateGuestGroup :exec
-UPDATE guest_groups SET name = ?, description = ? WHERE id = ?
+UPDATE guest_groups SET name = ?, description = ?, default_pax = ? WHERE id = ?
 `
 
 type UpdateGuestGroupParams struct {
 	Name        string
 	Description string
+	DefaultPax  uint8
 	ID          uint64
 }
 
 func (q *Queries) UpdateGuestGroup(ctx context.Context, arg UpdateGuestGroupParams) error {
-	_, err := q.db.ExecContext(ctx, updateGuestGroup, arg.Name, arg.Description, arg.ID)
+	_, err := q.db.ExecContext(ctx, updateGuestGroup,
+		arg.Name,
+		arg.Description,
+		arg.DefaultPax,
+		arg.ID,
+	)
 	return err
 }

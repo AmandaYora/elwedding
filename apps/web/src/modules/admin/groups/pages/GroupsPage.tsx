@@ -18,7 +18,10 @@ import { TableSkeleton } from '@/shared/components/feedback/Skeleton'
 import { ErrorState } from '@/shared/components/feedback/ErrorState'
 import { useToast } from '@/shared/components/toast/ToastProvider'
 
-const EMPTY_FORM: GroupInput = { name: '', description: '' }
+// defaultPax 2 mengikuti DEFAULT kolomnya di migration 000017 - group baru
+// mewarisi batas yang berlaku hari ini, dan admin menaikkannya hanya untuk
+// group yang memang perlu (mis. "Keluarga" jadi 4).
+const EMPTY_FORM: GroupInput = { name: '', description: '', defaultPax: 2 }
 
 type FormErrors = Partial<Record<keyof GroupFormValues, string>>
 
@@ -81,7 +84,7 @@ export default function GroupsPage() {
    * (pola openEdit di UsersPage). */
   function openEdit(group: GuestGroup) {
     setEditingId(group.id)
-    setForm({ name: group.name, description: group.description })
+    setForm({ name: group.name, description: group.description, defaultPax: group.defaultPax })
     setFormErrors({})
     setFormOpen(true)
   }
@@ -180,6 +183,11 @@ export default function GroupsPage() {
                 <Tr>
                   <Th>Nama</Th>
                   <Th>Deskripsi</Th>
+                  {/* DUA kolom yang mudah tertukar, sengaja bersebelahan:
+                      "Jatah kursi" = setelan (default_pax, berapa orang per
+                      undangan), "Jumlah tamu" = kenyataan (guestCount, berapa
+                      undangan di group ini). */}
+                  <Th>Jatah kursi</Th>
                   <Th>Jumlah tamu</Th>
                   <Th>Dibuat pada</Th>
                   <Th className="text-right pr-6">Aksi</Th>
@@ -193,6 +201,13 @@ export default function GroupsPage() {
                     </Td>
                     <Td>
                       <span className="text-sm text-slate-600">{group.description || '—'}</span>
+                    </Td>
+                    {/* Jatah kursi default group ini - setelan, bukan
+                        kenyataan. Ditampilkan supaya admin bisa memeriksa
+                        seluruh group sekaligus tanpa membuka modal satu per
+                        satu. */}
+                    <Td>
+                      <span className="text-sm text-slate-700 tabular-nums">{group.defaultPax} org</span>
                     </Td>
                     {/* Kolom "Jumlah tamu" WAJIB ada (T13): dialah yang
                         menjelaskan ke admin kenapa sebuah group tidak bisa
@@ -280,6 +295,33 @@ export default function GroupsPage() {
             onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))}
             error={formErrors.description}
             placeholder="Keterangan singkat (opsional)"
+          />
+          {/* Label "Jatah kursi default", BUKAN "Maks. tamu" dan BUKAN "Jumlah
+              tamu" (docs/plan/guest-pax-quota/PLAN.md T18, dengan koreksi saat
+              implementasi):
+
+              - "Maks." ditolak karena membuat admin mengira ini batas keras
+                yang mengunci seluruh anggota group, padahal yang mengikat
+                adalah angka per tamu.
+              - "Jumlah tamu" ditolak karena BENTROK dengan kolom tabel di atas
+                yang sudah bernama itu untuk `guestCount` (banyaknya tamu di
+                group). Dua arti untuk satu label di satu layar.
+
+              "Jatah kursi" adalah istilah yang dipakai konsisten di PLAN.md,
+              migration 000017, dan GLOSSARY.md.
+
+              Number(e.target.value) pada input kosong menghasilkan 0, dan 0
+              memang ditolak groupSchema - sengaja, supaya field yang
+              dikosongkan tidak diam-diam tersimpan. */}
+          <Input
+            label="Jatah kursi default"
+            type="number"
+            min={1}
+            max={20}
+            value={String(form.defaultPax)}
+            onChange={(e) => setForm((f) => ({ ...f, defaultPax: Number(e.target.value) }))}
+            error={formErrors.defaultPax}
+            hint="Nilai awal untuk tamu baru di group ini. Bisa diubah per tamu."
           />
         </form>
       </Modal>

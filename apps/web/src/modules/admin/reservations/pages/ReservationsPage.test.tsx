@@ -1,12 +1,27 @@
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import ReservationsPage from './ReservationsPage'
-import { listGuests } from '@/modules/admin/guests/services/guests.service'
+import { listGuests, resetRsvp } from '@/modules/admin/guests/services/guests.service'
+import { ToastProvider } from '@/shared/components/toast/ToastProvider'
 
 vi.mock('@/modules/admin/guests/services/guests.service', () => ({
   listGuests: vi.fn(),
+  resetRsvp: vi.fn(),
 }))
 
 const mockedList = vi.mocked(listGuests)
+const mockedReset = vi.mocked(resetRsvp)
+
+// Halaman ini memanggil useToast sejak tombol Hapus reservasi ditambahkan
+// (docs/plan/reservation-reset-contacted-flag/PLAN.md T9). Di produksi
+// ToastProvider membungkus SELURUH router admin (AdminApp.tsx), jadi
+// pembungkus di sini menirukan keadaan sebenarnya, bukan menambal test.
+function renderPage() {
+  return render(
+    <ToastProvider>
+      <ReservationsPage />
+    </ToastProvider>,
+  )
+}
 
 const sampleGuest = {
   id: 1,
@@ -26,16 +41,19 @@ const sampleGuest = {
   attendingCount: 2,
   isExpectedAttending: true,
   groupId: 3,
+  paxQuota: 2,
+  contactedAt: null,
 }
 
 afterEach(() => {
   mockedList.mockReset()
+  mockedReset.mockReset()
 })
 
 test('mount awal -> memanggil listGuests dengan respondedOnly true', async () => {
   mockedList.mockResolvedValue({ data: [], meta: { page: 1, limit: 20, total: 0, totalPages: 1 } })
 
-  render(<ReservationsPage />)
+  renderPage()
 
   await waitFor(() =>
     expect(mockedList).toHaveBeenCalledWith({ page: 1, status: '', q: '', invitationType: '', souvenirType: '', groupId: '', respondedOnly: true }),
@@ -45,7 +63,7 @@ test('mount awal -> memanggil listGuests dengan respondedOnly true', async () =>
 test('tamu berstatus attending -> menampilkan badge & jumlah tamu', async () => {
   mockedList.mockResolvedValue({ data: [sampleGuest], meta: { page: 1, limit: 20, total: 1, totalPages: 1 } })
 
-  render(<ReservationsPage />)
+  renderPage()
 
   await waitFor(() => expect(screen.getByText('Budi Santoso')).toBeInTheDocument())
   const row = screen.getByText('Budi Santoso').closest('tr') as HTMLElement
@@ -56,7 +74,7 @@ test('tamu berstatus attending -> menampilkan badge & jumlah tamu', async () => 
 test('memilih sub-filter status -> listGuests dipanggil ulang dengan status terpilih', async () => {
   mockedList.mockResolvedValue({ data: [], meta: { page: 1, limit: 20, total: 0, totalPages: 1 } })
 
-  render(<ReservationsPage />)
+  renderPage()
   await waitFor(() =>
     expect(mockedList).toHaveBeenCalledWith({ page: 1, status: '', q: '', invitationType: '', souvenirType: '', groupId: '', respondedOnly: true }),
   )
@@ -79,7 +97,7 @@ test('memilih sub-filter status -> listGuests dipanggil ulang dengan status terp
 test('daftar kosong -> EmptyState "Belum ada tamu yang merespons"', async () => {
   mockedList.mockResolvedValue({ data: [], meta: { page: 1, limit: 20, total: 0, totalPages: 1 } })
 
-  render(<ReservationsPage />)
+  renderPage()
 
   await waitFor(() => expect(screen.getByText('Belum ada tamu yang merespons')).toBeInTheDocument())
 })
@@ -87,7 +105,7 @@ test('daftar kosong -> EmptyState "Belum ada tamu yang merespons"', async () => 
 test('gagal memuat -> ErrorState dengan tombol coba lagi', async () => {
   mockedList.mockRejectedValue(new Error('network error'))
 
-  render(<ReservationsPage />)
+  renderPage()
 
   await waitFor(() => expect(screen.getByText('Gagal memuat data reservasi.')).toBeInTheDocument())
   expect(screen.getByRole('button', { name: 'Coba lagi' })).toBeInTheDocument()
@@ -96,7 +114,7 @@ test('gagal memuat -> ErrorState dengan tombol coba lagi', async () => {
 test('klik Detail -> modal menampilkan info kontak & status RSVP', async () => {
   mockedList.mockResolvedValue({ data: [sampleGuest], meta: { page: 1, limit: 20, total: 1, totalPages: 1 } })
 
-  render(<ReservationsPage />)
+  renderPage()
   await waitFor(() => expect(screen.getByText('Budi Santoso')).toBeInTheDocument())
 
   fireEvent.click(screen.getByRole('button', { name: 'Detail' }))
@@ -105,14 +123,54 @@ test('klik Detail -> modal menampilkan info kontak & status RSVP', async () => {
   expect(screen.getByText('2 orang')).toBeInTheDocument()
 })
 
-test('tidak ada tombol Tambah, Ubah, Hapus, atau Salin link', async () => {
+// Read-only halaman ini dibalik SEBAGIAN saja (docs/plan/
+// reservation-reset-contacted-flag/PLAN.md §2.1): tombol Hapus masuk, tapi
+// Tambah/Ubah/Salin link TETAP tidak ada. Alasan aslinya masih berlaku untuk
+// ketiganya - admin tidak boleh bisa MENGARANG jawaban tamu, ia hanya boleh
+// mengosongkannya. Assertion 'Hapus' sengaja DICABUT dari daftar ini, bukan
+// dibiarkan gagal.
+test('tidak ada tombol Tambah, Ubah, atau Salin link', async () => {
   mockedList.mockResolvedValue({ data: [sampleGuest], meta: { page: 1, limit: 20, total: 1, totalPages: 1 } })
 
-  render(<ReservationsPage />)
+  renderPage()
   await waitFor(() => expect(screen.getByText('Budi Santoso')).toBeInTheDocument())
 
   expect(screen.queryByRole('button', { name: /Tambah tamu/ })).not.toBeInTheDocument()
   expect(screen.queryByRole('button', { name: 'Ubah' })).not.toBeInTheDocument()
-  expect(screen.queryByRole('button', { name: 'Hapus' })).not.toBeInTheDocument()
   expect(screen.queryByRole('button', { name: /Salin link/ })).not.toBeInTheDocument()
+})
+
+// --- Hapus reservasi (T9/K1) ---
+
+test('klik Hapus -> konfirmasi muncul dan TIDAK menghapus sebelum dikonfirmasi', async () => {
+  mockedList.mockResolvedValue({ data: [sampleGuest], meta: { page: 1, limit: 20, total: 1, totalPages: 1 } })
+
+  renderPage()
+  await waitFor(() => expect(screen.getByText('Budi Santoso')).toBeInTheDocument())
+
+  fireEvent.click(screen.getByRole('button', { name: 'Hapus' }))
+
+  // Konfirmasinya WAJIB menyatakan tamunya tidak ikut terhapus - itu satu-
+  // satunya tempat perbedaan "hapus reservasi" vs "hapus tamu" dijelaskan.
+  expect(await screen.findByText(/tidak ikut terhapus/)).toBeInTheDocument()
+  expect(mockedReset).not.toHaveBeenCalled()
+
+  fireEvent.click(screen.getByRole('button', { name: 'Batal' }))
+  expect(mockedReset).not.toHaveBeenCalled()
+})
+
+test('konfirmasi hapus -> memanggil resetRsvp, bukan deleteGuest', async () => {
+  mockedList.mockResolvedValue({ data: [sampleGuest], meta: { page: 1, limit: 20, total: 1, totalPages: 1 } })
+  mockedReset.mockResolvedValueOnce(undefined)
+
+  renderPage()
+  await waitFor(() => expect(screen.getByText('Budi Santoso')).toBeInTheDocument())
+
+  fireEvent.click(screen.getByRole('button', { name: 'Hapus' }))
+  await screen.findByText(/tidak ikut terhapus/)
+
+  const dangerButtons = screen.getAllByRole('button', { name: 'Hapus' })
+  fireEvent.click(dangerButtons[dangerButtons.length - 1])
+
+  await waitFor(() => expect(mockedReset).toHaveBeenCalledWith(1))
 })

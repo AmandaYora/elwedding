@@ -114,6 +114,50 @@ func (h *Handler) DeleteGuest(w http.ResponseWriter, r *http.Request) {
 	response.OK(w, "Guest deleted successfully", nil)
 }
 
+// ResetRsvp menangani DELETE /api/v1/admin/guests/{id}/rsvp - tombol Hapus di
+// menu Reservasi (docs/plan/reservation-reset-contacted-flag/PLAN.md T7).
+//
+// DELETE pada sub-resource `rsvp`, bukan pada tamunya: yang dihapus adalah
+// RESERVASI, tamunya tetap ada (K1). Tidak bentrok dengan DELETE
+// /guests/{id} karena jumlah segmen path-nya berbeda.
+func (h *Handler) ResetRsvp(w http.ResponseWriter, r *http.Request) {
+	id, err := strconv.ParseUint(r.PathValue("id"), 10, 64)
+	if err != nil {
+		response.BadRequest(w, "Invalid id", nil)
+		return
+	}
+	if err := h.service.ResetRsvp(r.Context(), id); err != nil {
+		writeServiceError(w, err)
+		return
+	}
+	response.OK(w, "Reservasi dihapus", nil)
+}
+
+// SetContacted menangani PATCH /api/v1/admin/guests/{id}/contacted.
+//
+// Body memuat `contacted` bool - SATU endpoint untuk menyalakan dan mematikan,
+// bukan dua. Penanda ini punya dua arah yang sama sahnya (dinyalakan otomatis
+// saat kirim undangan, dimatikan admin bila salah), jadi memecahnya jadi dua
+// endpoint hanya menggandakan jalur untuk perbedaan satu nilai boolean.
+func (h *Handler) SetContacted(w http.ResponseWriter, r *http.Request) {
+	id, err := strconv.ParseUint(r.PathValue("id"), 10, 64)
+	if err != nil {
+		response.BadRequest(w, "Invalid id", nil)
+		return
+	}
+	var body struct {
+		Contacted bool `json:"contacted"`
+	}
+	if !decodeJSON(w, r, &body) {
+		return
+	}
+	if err := h.service.SetContacted(r.Context(), id, body.Contacted); err != nil {
+		writeServiceError(w, err)
+		return
+	}
+	response.OK(w, "Penanda tersimpan", nil)
+}
+
 // --- admin: check-in di gate (docs/plan/scan-checkin-gate/PLAN.md T8) ---
 // Ketiganya boleh diakses akun petugas MAUPUN admin penuh - lihat router.go,
 // yang mendaftarkannya di belakang RequireAdmin (bukan RequireFullAdmin).

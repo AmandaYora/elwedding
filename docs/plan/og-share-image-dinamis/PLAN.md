@@ -72,7 +72,7 @@ terisi.
 | # | Keputusan | Jawaban user |
 |---|---|---|
 | K5 | Placeholder Template Pesan Undangan | **`{nama}`, `{mempelai}`, `{tanggal}`, `{link}`** — **tanpa** `{jumlah}`, karena saat undangan dikirim tamu belum RSVP sehingga angkanya selalu menyesatkan. |
-| K6 | Pelacakan pengiriman | **Tidak dilacak.** Tombol hanya membuka `wa.me`, tanpa menyimpan apa pun. Konsekuensi yang diterima sadar: nol kolom baru di tabel `guests`, nol endpoint baru, dan admin melacak sendiri siapa yang sudah dikirimi di luar aplikasi. |
+| K6 | Pelacakan pengiriman | ~~**Tidak dilacak.**~~ -> **DIBALIK** oleh [reservation-reset-contacted-flag](../reservation-reset-contacted-flag/PLAN.md): kolom `guests.contacted_at` ditambahkan migration `000018`, dan daftar tamu kini menampilkan penanda "Dihubungi". Alasan pembalikan: konsekuensi yang diterima sadar di bawah ("admin melacak sendiri di luar aplikasi") ternyata merepotkan dalam pemakaian nyata. **Batas K6 yang TETAP berlaku:** yang dicatat adalah "dihubungi", BUKAN "terkirim" - keterbatasan `wa.me` yang mendasari keputusan ini tidak berubah sedikit pun. Teks asli: **Tidak dilacak.** Tombol hanya membuka `wa.me`, tanpa menyimpan apa pun. Konsekuensi yang diterima sadar: nol kolom baru di tabel `guests`, nol endpoint baru, dan admin melacak sendiri siapa yang sudah dikirimi di luar aplikasi. |
 | K7 | Tamu tanpa nomor HP | **Tombol dinonaktifkan** (disabled) dengan keterangan bahwa nomor HP belum diisi — bukan membuka `wa.me` tanpa nomor. |
 
 ### 1.3 Keputusan desain (Step 4)
@@ -304,7 +304,7 @@ kehilangan tombol Kirim Undangan tanpa penjelasan apa pun.
 - **`resetGuestSessionCache`, pipeline galeri, form gift** — tidak tersentuh.
 **Bagian B:**
 
-- **Pelacakan "undangan terkirim"** — ditolak user di K6. Konsekuensi yang
+- ~~**Pelacakan "undangan terkirim"**~~ — ditolak user di K6, lalu **dibalik**; lihat catatan di K6. Teks asli: ditolak user di K6. Konsekuensi yang
   diterima sadar: tidak ada kolom `invitation_sent_at`, tidak ada penanda di
   daftar tamu, dan admin melacak sendiri siapa yang sudah dikirimi.
 - **Kirim massal / broadcast** — user meminta **satu** tombol per tamu. `wa.me`

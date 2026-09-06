@@ -91,6 +91,14 @@ export default function RsvpConfirmation({ content }: RsvpConfirmationProps) {
   }
 
   function handleAttend() {
+    // Jatah 1 -> JANGAN tanya apa pun (docs/plan/guest-pax-quota/PLAN.md T22).
+    // Menanyakan "berapa orang yang akan hadir?" kepada tamu yang jatahnya
+    // satu adalah pertanyaan jebakan: satu-satunya jawaban yang sah sudah
+    // diketahui sistem. Langsung konfirmasi.
+    if (session.paxQuota <= 1) {
+      void handleConfirmAttending(1)
+      return
+    }
     setPickingCount(true)
   }
 
@@ -184,26 +192,30 @@ export default function RsvpConfirmation({ content }: RsvpConfirmationProps) {
                 {choice === 'pending' && pickingCount && (
                   <div className="rsvp-message-wrap">
                     <p className="rsvp-message-title">Berapa orang yang akan hadir?</p>
+                    {/* Jatahnya DISEBUTKAN ke tamu (K2): itu cara paling sopan
+                        menegakkan batas, dan menghindarkan tamu bertanya-tanya
+                        "boleh bawa berapa ya?". Kalimat lama yang berasumsi
+                        "memungkinkan berpasangan" tidak lagi benar - jatahnya
+                        kini bisa 1, 2, atau lebih. */}
                     <p className="rsvp-message-content">
-                      1 undangan yang datang memungkinkan berpasangan - pilih jumlah tamu untuk kebutuhan konsumsi.
+                      Undangan ini berlaku untuk {session.paxQuota} orang. Pilih jumlah yang hadir untuk kebutuhan konsumsi.
                     </p>
                     <div className="rsvp-confirm-wrap">
-                      <button
-                        type="button"
-                        className="rsvp-confirm-btn"
-                        disabled={confirming}
-                        onClick={() => void handleConfirmAttending(1)}
-                      >
-                        1 Tamu
-                      </button>
-                      <button
-                        type="button"
-                        className="rsvp-confirm-btn"
-                        disabled={confirming}
-                        onClick={() => void handleConfirmAttending(2)}
-                      >
-                        2 Tamu
-                      </button>
+                      {/* Tombol dibangkitkan sampai batas jatah, bukan dua
+                          tombol keras. Untuk tamu berjatah 2 hasilnya IDENTIK
+                          dengan sebelumnya - tamu umum tidak merasakan
+                          perubahan apa pun. */}
+                      {Array.from({ length: session.paxQuota }, (_, i) => i + 1).map((n) => (
+                        <button
+                          key={n}
+                          type="button"
+                          className="rsvp-confirm-btn"
+                          disabled={confirming}
+                          onClick={() => void handleConfirmAttending(n)}
+                        >
+                          {n} Tamu
+                        </button>
+                      ))}
                       <button
                         type="button"
                         className="rsvp-confirm-btn"

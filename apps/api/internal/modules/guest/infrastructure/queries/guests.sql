@@ -1,6 +1,10 @@
+-- pax_quota ikut ditulis di sini (docs/plan/guest-pax-quota/PLAN.md T2/D1),
+-- TAPI attending_count TIDAK - kolom itu milik TAMU, diisi lewat
+-- UpdateGuestRsvpStatusByToken, dan tetap memakai DEFAULT kolomnya di sini.
+-- Dua kolom, dua pemilik (D11): admin menentukan JATAH, tamu menentukan JANJI.
 -- name: CreateGuest :execlastid
-INSERT INTO guests (name, phone, side, group_id, token, rsvp_status, gender, invitation_type, souvenir_type, email, address, notes, is_expected_attending)
-VALUES (?, ?, ?, ?, ?, 'pending', ?, ?, ?, ?, ?, ?, ?);
+INSERT INTO guests (name, phone, side, group_id, token, rsvp_status, gender, invitation_type, souvenir_type, email, address, notes, is_expected_attending, pax_quota)
+VALUES (?, ?, ?, ?, ?, 'pending', ?, ?, ?, ?, ?, ?, ?, ?);
 
 -- name: GetGuestByID :one
 SELECT * FROM guests WHERE id = ? LIMIT 1;
@@ -8,13 +12,50 @@ SELECT * FROM guests WHERE id = ? LIMIT 1;
 -- name: GetGuestByToken :one
 SELECT * FROM guests WHERE token = ? LIMIT 1;
 
+-- Sama seperti CreateGuest: pax_quota ikut, attending_count TIDAK PERNAH ikut
+-- (D11 - keputusan lama dashboard-wa-rsvp #11 tetap berlaku penuh).
 -- name: UpdateGuest :exec
-UPDATE guests SET name = ?, phone = ?, side = ?, group_id = ?, gender = ?, invitation_type = ?, souvenir_type = ?, email = ?, address = ?, notes = ?, is_expected_attending = ?
+UPDATE guests SET name = ?, phone = ?, side = ?, group_id = ?, gender = ?, invitation_type = ?, souvenir_type = ?, email = ?, address = ?, notes = ?, is_expected_attending = ?, pax_quota = ?
 WHERE id = ?;
 
 -- name: UpdateGuestRsvpStatusByToken :exec
 UPDATE guests SET rsvp_status = ?, attending_count = ?, rsvp_responded_at = NOW()
 WHERE token = ?;
+
+-- ResetGuestRsvpByID mengosongkan JAWABAN tamu, bukan tamunya
+-- (docs/plan/reservation-reset-contacted-flag/PLAN.md T2/K1). Dipakai tombol
+-- Hapus di menu Reservasi.
+--
+-- TIGA kolom dikosongkan bersama-sama, dan ketiganya wajib: membiarkan
+-- attending_count/rsvp_responded_at berarti tamu ber-status 'pending' tetap
+-- membawa angka janji dan jam jawaban milik jawaban yang sudah dihapus.
+-- `1` adalah DEFAULT kolomnya (migration 000007) dan nilai yang sama yang
+-- ditetapkan resolveAttendingCount untuk status non-'attending'.
+--
+-- YANG SENGAJA TIDAK DISENTUH:
+--   checked_in_at - rsvp_status adalah NIAT, checked_in_at adalah BUKTI
+--                   (GLOSSARY.md). Menghapus niat tidak boleh menghapus bukti
+--                   bahwa seseorang benar-benar tiba di pintu (D1).
+--   pax_quota     - setelan ADMIN, tidak ada hubungannya dengan jawaban tamu (D3).
+--   token         - link & QR tamu tetap sah; ia memang masih diundang, hanya
+--                   jawabannya yang dikosongkan supaya bisa menjawab ulang.
+-- name: ResetGuestRsvpByID :exec
+UPDATE guests SET rsvp_status = 'pending', attending_count = 1, rsvp_responded_at = NULL
+WHERE id = ?;
+
+-- Penanda "sudah dihubungi" (T2/D8). Dua query terpisah alih-alih satu dengan
+-- parameter nullable: masing-masing sepele dan langsung terbaca maksudnya.
+--
+-- NOW() MENIMPA nilai lama dengan sengaja - klik kedua berarti admin
+-- menghubungi ulang, dan waktu terbaru lebih berguna daripada yang pertama.
+-- Tidak perlu UPDATE bersyarat seperti MarkGuestCheckedIn: di sana syaratnya
+-- mencegah dua petugas gate saling menimpa jam kedatangan, sedangkan di sini
+-- hanya ada satu admin yang menekan tombolnya.
+-- name: MarkGuestContacted :exec
+UPDATE guests SET contacted_at = NOW() WHERE id = ?;
+
+-- name: UnmarkGuestContacted :exec
+UPDATE guests SET contacted_at = NULL WHERE id = ?;
 
 -- name: DeleteGuest :exec
 DELETE FROM guests WHERE id = ?;
@@ -51,8 +92,49 @@ SELECT invitation_type, COUNT(*) AS total FROM guests GROUP BY invitation_type;
 -- name: CountGuestsGroupedBySouvenirType :many
 SELECT souvenir_type, COUNT(*) AS total FROM guests GROUP BY souvenir_type;
 
+-- CountGuestsGroupedBySide memikul SELURUH kartu "Proyeksi catering"
+-- (docs/plan/guest-pax-quota/PLAN.md T2/D6) - SATU scan, lima agregat per
+-- pihak, BUKAN query terpisah per angka. Pola yang sama persis dengan
+-- CountGuestsGroupedByStatus di atas dan GetCheckinSummary di bawah.
+--
+-- ATURAN HITUNGNYA (K4 - "jawaban tamu menang atas dugaan admin"):
+--
+--   rsvp_status = 'attending'   -> pakai attending_count (JANJI tamu),
+--                                  is_expected_attending DIABAIKAN
+--   rsvp_status = 'not_attending' -> 0
+--   pending / remind_later      -> pakai pax_quota, TAPI hanya bila
+--                                  is_expected_attending TRUE
+--
+-- Kenapa dugaan admin diabaikan begitu tamu menjawab: admin mematikan
+-- "diperkirakan hadir" untuk Om Hasan di Surabaya, lalu Om Hasan menjawab
+-- "Hadir, 4 orang". Kalau dugaan tetap menang, empat orang datang tanpa
+-- porsi. Dugaan dibuat SEBELUM jawaban ada; begitu tamunya menjawab, dugaan
+-- itu kedaluwarsa.
+--
+-- Ini juga kali PERTAMA is_expected_attending benar-benar dipakai menghitung.
+-- Sebelum ini ia hanya disimpan dan ditampilkan sebagai badge - tidak ada satu
+-- pun agregasi yang membacanya, meski GLOSSARY.md sejak awal menyebutnya
+-- "dipakai memperkirakan".
+--
+-- CAST(... AS UNSIGNED) WAJIB: tanpa itu sqlc memetakan hasil SUM() ke tipe
+-- yang tidak diinginkan. Sama seperti total_pax di CountGuestsGroupedByStatus.
+--
+-- CASE WHEN di dalam SUM() TIDAK menambah scan - ia dievaluasi pada baris yang
+-- memang sudah dibaca. `side` ENUM 2 nilai NOT NULL, jadi groom + bride selalu
+-- persis sama dengan total; tidak ada sisa yang perlu dijelaskan di UI.
 -- name: CountGuestsGroupedBySide :many
-SELECT side, COUNT(*) AS total FROM guests GROUP BY side;
+SELECT
+  side,
+  COUNT(*) AS total,
+  CAST(COALESCE(SUM(CASE WHEN rsvp_status = 'attending'
+    THEN attending_count ELSE 0 END), 0) AS UNSIGNED) AS confirmed_pax,
+  CAST(COALESCE(SUM(CASE WHEN rsvp_status IN ('pending', 'remind_later')
+    AND is_expected_attending THEN pax_quota ELSE 0 END), 0) AS UNSIGNED) AS expected_pax,
+  CAST(COALESCE(SUM(CASE WHEN rsvp_status = 'not_attending'
+    THEN 1 ELSE 0 END), 0) AS UNSIGNED) AS excluded_not_attending,
+  CAST(COALESCE(SUM(CASE WHEN rsvp_status IN ('pending', 'remind_later')
+    AND NOT is_expected_attending THEN 1 ELSE 0 END), 0) AS UNSIGNED) AS excluded_not_expected
+FROM guests GROUP BY side;
 
 -- name: CountGuestsGroupedByGender :many
 SELECT gender, COUNT(*) AS total FROM guests WHERE gender IS NOT NULL GROUP BY gender;

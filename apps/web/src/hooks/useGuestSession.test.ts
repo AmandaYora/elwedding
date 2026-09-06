@@ -25,8 +25,11 @@ test('tanpa ?guest= -> fallback "Tamu Undangan", tanpa network call', () => {
   const { result } = renderHook(() => useGuestSession())
 
   expect(result.current).toEqual({
+    // paxQuota 2, bukan 1 (docs/plan/guest-pax-quota/PLAN.md T21): inilah
+    // nilai mode pratinjau, dan 2 mempertahankan dua tombol seperti sebelum
+    // fitur jatah kursi ada.
     name: 'Tamu Undangan', side: null, status: 'pending', token: null,
-    attendingCount: 1, resolved: false, access: 'denied',
+    attendingCount: 1, paxQuota: 2, resolved: false, access: 'denied',
   })
   expect(mockedGet).not.toHaveBeenCalled()
 })
@@ -34,7 +37,10 @@ test('tanpa ?guest= -> fallback "Tamu Undangan", tanpa network call', () => {
 test('dengan token valid -> resolve nama, status, & jumlah tamu dari API', async () => {
   setSearch('?guest=abc123')
   mockedGet.mockResolvedValueOnce({
-    data: { success: true, data: { name: 'Budi Santoso', side: 'groom', rsvpStatus: 'attending', attendingCount: 2 } },
+    data: {
+      success: true,
+      data: { name: 'Budi Santoso', side: 'groom', rsvpStatus: 'attending', attendingCount: 2, paxQuota: 4 },
+    },
   })
 
   const { result } = renderHook(() => useGuestSession())
@@ -42,7 +48,7 @@ test('dengan token valid -> resolve nama, status, & jumlah tamu dari API', async
   await waitFor(() => expect(result.current.name).toBe('Budi Santoso'))
   expect(result.current).toEqual({
     name: 'Budi Santoso', side: 'groom', status: 'attending', token: 'abc123',
-    attendingCount: 2, resolved: true, access: 'granted',
+    attendingCount: 2, paxQuota: 4, resolved: true, access: 'granted',
   })
   expect(mockedGet).toHaveBeenCalledWith('/api/v1/public/guests/by-token/abc123')
 })
