@@ -14,19 +14,19 @@ import (
 	"strings"
 	"time"
 
-	authPresentation "undangan-ariana-adrian/internal/modules/auth/presentation"
+	authPresentation "undangan-digital/internal/modules/auth/presentation"
 	// contracts/ adalah permukaan PUBLIK modul content - satu-satunya yang
 	// boleh diimpor modul lain (.claude/rules/backend-modular-monolith.md).
 	// Internal content (application/infrastructure/domain) tetap terlarang;
 	// lihat juga contentTypeByExt di bawah yang sengaja disalin, bukan
 	// diimpor, karena tidak ada di contracts.
-	contentContracts "undangan-ariana-adrian/internal/modules/content/contracts"
-	contentPresentation "undangan-ariana-adrian/internal/modules/content/presentation"
-	guestPresentation "undangan-ariana-adrian/internal/modules/guest/presentation"
-	whatsappPresentation "undangan-ariana-adrian/internal/modules/whatsapp/presentation"
-	"undangan-ariana-adrian/internal/shared/authmw"
-	"undangan-ariana-adrian/internal/shared/response"
-	"undangan-ariana-adrian/internal/shared/storage"
+	contentContracts "undangan-digital/internal/modules/content/contracts"
+	contentPresentation "undangan-digital/internal/modules/content/presentation"
+	guestPresentation "undangan-digital/internal/modules/guest/presentation"
+	whatsappPresentation "undangan-digital/internal/modules/whatsapp/presentation"
+	"undangan-digital/internal/shared/authmw"
+	"undangan-digital/internal/shared/response"
+	"undangan-digital/internal/shared/storage"
 )
 
 type Deps struct {

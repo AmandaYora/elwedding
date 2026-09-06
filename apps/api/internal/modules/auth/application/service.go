@@ -8,9 +8,9 @@ import (
 
 	"golang.org/x/crypto/bcrypt"
 
-	"undangan-ariana-adrian/internal/modules/auth/infrastructure"
-	"undangan-ariana-adrian/internal/shared/jwtutil"
-	"undangan-ariana-adrian/internal/shared/pagination"
+	"undangan-digital/internal/modules/auth/infrastructure"
+	"undangan-digital/internal/shared/jwtutil"
+	"undangan-digital/internal/shared/pagination"
 )
 
 var ErrInvalidCredentials = errors.New("invalid username or password")
@@ -174,6 +174,21 @@ func (s *Service) Update(ctx context.Context, id uint64, in UpdateUserInput) err
 	if in.Role != "" && !validRoles[in.Role] {
 		return ErrInvalidRole
 	}
+	// Keberadaan akunnya dicek PALING DULU, tanpa syarat.
+	//
+	// Cabang `in.Role != ""` di bawah sudah memanggil GetByID dan membalas
+	// ErrUserNotFound - tapi HANYA saat peran ikut dikirim. Dengan peran
+	// kosong (mengganti nama/kata sandi saja, jalur yang paling sering
+	// dipakai), UPDATE pada id yang tidak ada cuma menyentuh 0 baris dan
+	// endpoint membalas 200 seolah tersimpan. Pola yang sama dengan Delete di
+	// bawah dan dengan requireGuestExists di modul guest.
+	target, err := s.repo.GetByID(ctx, id)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return ErrUserNotFound
+		}
+		return err
+	}
 	if existing, err := s.repo.GetByUsername(ctx, in.Username); err == nil {
 		if existing.ID != id {
 			return ErrUsernameTaken
@@ -183,15 +198,8 @@ func (s *Service) Update(ctx context.Context, id uint64, in UpdateUserInput) err
 	}
 
 	// Role kosong = tidak diubah (sejalan dengan Password kosong), jadi tidak
-	// ada yang perlu dijaga.
+	// ada yang perlu dijaga. `target` sudah dibaca di atas.
 	if in.Role != "" {
-		target, err := s.repo.GetByID(ctx, id)
-		if err != nil {
-			if errors.Is(err, sql.ErrNoRows) {
-				return ErrUserNotFound
-			}
-			return err
-		}
 		currentRole := string(target.Role)
 		if currentRole != in.Role {
 			fullAdmins, err := s.repo.CountFullAdmins(ctx)

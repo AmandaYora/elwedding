@@ -3,11 +3,11 @@ package guest
 import (
 	"database/sql"
 
-	contentContracts "undangan-ariana-adrian/internal/modules/content/contracts"
-	"undangan-ariana-adrian/internal/modules/guest/application"
-	"undangan-ariana-adrian/internal/modules/guest/infrastructure"
-	"undangan-ariana-adrian/internal/modules/guest/presentation"
-	waContracts "undangan-ariana-adrian/internal/modules/whatsapp/contracts"
+	contentContracts "undangan-digital/internal/modules/content/contracts"
+	"undangan-digital/internal/modules/guest/application"
+	"undangan-digital/internal/modules/guest/infrastructure"
+	"undangan-digital/internal/modules/guest/presentation"
+	waContracts "undangan-digital/internal/modules/whatsapp/contracts"
 )
 
 // New merangkai modul guest: repository -> service -> handler. sender &

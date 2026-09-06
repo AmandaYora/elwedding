@@ -4,7 +4,7 @@
 Accepted
 
 ## Context
-undangan-ariana-adrian uses a single repository for the frontend (`apps/web`) and backend (`apps/api`)
+undangan-digital uses a single repository for the frontend (`apps/web`) and backend (`apps/api`)
 plus shared packages.
 
 ## Decision

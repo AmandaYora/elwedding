@@ -5,11 +5,11 @@ import (
 	"database/sql"
 	"time"
 
-	"undangan-ariana-adrian/internal/modules/content/contracts"
-	"undangan-ariana-adrian/internal/modules/content/infrastructure"
-	"undangan-ariana-adrian/internal/modules/content/infrastructure/sqlc"
-	"undangan-ariana-adrian/internal/shared/idate"
-	"undangan-ariana-adrian/internal/shared/storage"
+	"undangan-digital/internal/modules/content/contracts"
+	"undangan-digital/internal/modules/content/infrastructure"
+	"undangan-digital/internal/modules/content/infrastructure/sqlc"
+	"undangan-digital/internal/shared/idate"
+	"undangan-digital/internal/shared/storage"
 )
 
 var jakarta *time.Location
@@ -229,22 +229,23 @@ func (s *Service) ListSectionsAdmin(ctx context.Context) ([]SectionAdminDTO, err
 // UpdateSections menerapkan toggle enable/disable & reorder (fitur #2/#3
 // PLAN.md) untuk satu batch section sekaligus, supaya urutan drag-reorder
 // di admin tersimpan konsisten dalam satu request.
+//
+// "Konsisten dalam satu request" itu kini DITEGAKKAN, bukan sekadar
+// diniatkan: loop-nya pindah ke repo.ApplySectionUpdates yang membungkusnya
+// dalam satu transaksi. Versi sebelumnya menulis baris satu per satu di sini,
+// sehingga batch yang gagal di tengah (mis. satu key tak dikenal) menyisakan
+// entri sebelumnya tersimpan sementara handler membalas "Failed to update
+// sections" - layar dan database berbeda isi sampai halaman dimuat ulang.
+//
+// JANGAN mengembalikan loop-nya ke sini.
 func (s *Service) UpdateSections(ctx context.Context, updates []SectionUpdateInput) error {
+	batch := make([]infrastructure.SectionUpdate, 0, len(updates))
 	for _, u := range updates {
-		existing, err := s.repo.GetSectionByKey(ctx, u.Key)
-		if err != nil {
-			return err
-		}
-		if err := s.repo.UpdateSection(ctx, sqlc.UpdateSectionParams{
-			Label:      existing.Label,
-			IsEnabled:  u.IsEnabled,
-			SortOrder:  u.SortOrder,
-			SectionKey: u.Key,
-		}); err != nil {
-			return err
-		}
+		batch = append(batch, infrastructure.SectionUpdate{
+			Key: u.Key, IsEnabled: u.IsEnabled, SortOrder: u.SortOrder,
+		})
 	}
-	return nil
+	return s.repo.ApplySectionUpdates(ctx, batch)
 }
 
 // listEnabledSectionsNormalized mengambil section yang enabled, terurut

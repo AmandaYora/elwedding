@@ -5,9 +5,9 @@ import (
 	"net/http"
 	"strconv"
 
-	"undangan-ariana-adrian/internal/modules/whatsapp/application"
-	"undangan-ariana-adrian/internal/shared/pagination"
-	"undangan-ariana-adrian/internal/shared/response"
+	"undangan-digital/internal/modules/whatsapp/application"
+	"undangan-digital/internal/shared/pagination"
+	"undangan-digital/internal/shared/response"
 )
 
 type Handler struct {
@@ -37,11 +37,40 @@ func writeServiceError(w http.ResponseWriter, err error) {
 	}
 }
 
+// unavailable adalah penjaga MODUL MATI (bukan sekadar cek defensif).
+//
+// main.go SENGAJA melanjutkan boot ketika whatsapp.New gagal - misalnya
+// WA_STORE_DIR tidak bisa ditulis atau berkas SQLite sesinya rusak - supaya
+// RSVP tetap berjalan tanpa kirim QR otomatis. Yang dikembalikannya saat itu
+// adalah handler NIL, dan router tetap mendaftarkan seluruh route
+// /api/v1/admin/whatsapp/* dari nilai nil tersebut (mendaftarkan method value
+// dari pointer nil sah di Go; yang panic adalah saat dipanggil). Tanpa
+// penjaga ini, admin yang membuka menu WhatsApp menerima koneksi terputus
+// karena nil pointer dereference, bukan pesan yang bisa dibaca - degradasi
+// yang dirancang main.go justru berubah jadi crash per request.
+//
+// Penerimanya boleh nil: method di bawah TIDAK mendereferensi h sebelum
+// perbandingan ini selesai.
+func (h *Handler) unavailable(w http.ResponseWriter) bool {
+	if h != nil && h.service != nil {
+		return false
+	}
+	response.Error(w, http.StatusServiceUnavailable,
+		"Modul WhatsApp tidak aktif di server ini. Periksa WA_STORE_DIR lalu jalankan ulang API.", nil)
+	return true
+}
+
 func (h *Handler) GetStatus(w http.ResponseWriter, r *http.Request) {
+	if h.unavailable(w) {
+		return
+	}
 	response.OK(w, "WhatsApp status retrieved successfully", h.service.Status(r.Context()))
 }
 
 func (h *Handler) StartPairing(w http.ResponseWriter, r *http.Request) {
+	if h.unavailable(w) {
+		return
+	}
 	if err := h.service.StartPairing(r.Context()); err != nil {
 		writeServiceError(w, err)
 		return
@@ -50,6 +79,9 @@ func (h *Handler) StartPairing(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) Logout(w http.ResponseWriter, r *http.Request) {
+	if h.unavailable(w) {
+		return
+	}
 	if err := h.service.Logout(r.Context()); err != nil {
 		writeServiceError(w, err)
 		return
@@ -58,6 +90,9 @@ func (h *Handler) Logout(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) GetConfig(w http.ResponseWriter, r *http.Request) {
+	if h.unavailable(w) {
+		return
+	}
 	cfg, err := h.service.GetConfig(r.Context())
 	if err != nil {
 		writeServiceError(w, err)
@@ -67,6 +102,9 @@ func (h *Handler) GetConfig(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) UpdateConfig(w http.ResponseWriter, r *http.Request) {
+	if h.unavailable(w) {
+		return
+	}
 	var in application.WhatsAppConfigDTO
 	if !decodeJSON(w, r, &in) {
 		return
@@ -79,6 +117,9 @@ func (h *Handler) UpdateConfig(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) ListLogs(w http.ResponseWriter, r *http.Request) {
+	if h.unavailable(w) {
+		return
+	}
 	p := pagination.Parse(r)
 	logs, total, err := h.service.ListLogs(r.Context(), p)
 	if err != nil {
@@ -89,6 +130,9 @@ func (h *Handler) ListLogs(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) ResendLog(w http.ResponseWriter, r *http.Request) {
+	if h.unavailable(w) {
+		return
+	}
 	id, err := strconv.ParseUint(r.PathValue("id"), 10, 64)
 	if err != nil {
 		response.BadRequest(w, "Invalid id", nil)

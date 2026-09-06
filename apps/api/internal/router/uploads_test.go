@@ -12,7 +12,7 @@ import (
 	"testing"
 	"time"
 
-	"undangan-ariana-adrian/internal/shared/storage"
+	"undangan-digital/internal/shared/storage"
 )
 
 // fakeS3 meniru endpoint S3: melayani GetBucketLocation, lalu GET/HEAD objek

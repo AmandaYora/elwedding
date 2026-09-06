@@ -6,10 +6,10 @@ import (
 	"net/http"
 	"strconv"
 
-	"undangan-ariana-adrian/internal/modules/auth/application"
-	"undangan-ariana-adrian/internal/shared/authmw"
-	"undangan-ariana-adrian/internal/shared/pagination"
-	"undangan-ariana-adrian/internal/shared/response"
+	"undangan-digital/internal/modules/auth/application"
+	"undangan-digital/internal/shared/authmw"
+	"undangan-digital/internal/shared/pagination"
+	"undangan-digital/internal/shared/response"
 )
 
 type Handler struct {

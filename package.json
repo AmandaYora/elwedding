@@ -1,8 +1,8 @@
 {
-  "name": "undangan-ariana-adrian",
+  "name": "undangan-digital",
   "private": true,
   "version": "0.1.0",
-  "description": "undangan-ariana-adrian — monorepo (Dimas standard)",
+  "description": "undangan-digital — monorepo (Dimas standard)",
   "workspaces": [
     "apps/web",
     "packages/*"

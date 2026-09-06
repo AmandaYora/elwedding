@@ -2,16 +2,22 @@ package infrastructure
 
 import (
 	"context"
+	"database/sql"
 
-	"undangan-ariana-adrian/internal/modules/content/infrastructure/sqlc"
+	"undangan-digital/internal/modules/content/infrastructure/sqlc"
 )
 
+// db disimpan BERDAMPINGAN dengan q - bukan menggantikannya. Seluruh method
+// lain tetap lewat q (satu pernyataan, tanpa transaksi); hanya
+// ApplySectionUpdates di bawah yang butuh membuka transaksi sendiri, dan
+// BeginTx hanya ada di *sql.DB, tidak di antarmuka sqlc.DBTX.
 type Repository struct {
-	q *sqlc.Queries
+	db *sql.DB
+	q  *sqlc.Queries
 }
 
-func NewRepository(db sqlc.DBTX) *Repository {
-	return &Repository{q: sqlc.New(db)}
+func NewRepository(db *sql.DB) *Repository {
+	return &Repository{db: db, q: sqlc.New(db)}
 }
 
 // --- invitation_content (singleton) ---
@@ -127,4 +133,63 @@ func (r *Repository) GetSectionByKey(ctx context.Context, key string) (sqlc.Sect
 }
 func (r *Repository) UpdateSection(ctx context.Context, arg sqlc.UpdateSectionParams) error {
 	return r.q.UpdateSection(ctx, arg)
+}
+
+// SectionUpdate adalah satu perubahan section di dalam batch
+// ApplySectionUpdates. Sengaja tipe milik infrastructure (bukan sqlc.
+// UpdateSectionParams): `label` TIDAK datang dari pemanggil melainkan dibaca
+// ulang di dalam transaksi, jadi bentuk ini yang jujur menggambarkan apa yang
+// boleh diubah admin - enabled & urutan saja.
+type SectionUpdate struct {
+	Key       string
+	IsEnabled bool
+	SortOrder int32
+}
+
+// ApplySectionUpdates menerapkan SELURUH perubahan section dalam SATU
+// transaksi - atau tidak sama sekali.
+//
+// Sebelumnya loop-nya ada di service tanpa transaksi, dan itu bisa menulis
+// separuh batch lalu membalas "Failed to update sections": satu key yang
+// tidak dikenal di tengah daftar membuat entri sebelumnya SUDAH tersimpan
+// sementara admin diberi tahu bahwa penyimpanan gagal, sehingga layar dan
+// database berbeda isi sampai halaman dimuat ulang. Untuk drag-reorder yang
+// mengirim seluruh section sekaligus, separuh urutan yang tersimpan lebih
+// buruk daripada tidak tersimpan sama sekali.
+//
+// Transaksi ini SAH menurut backend-modular-monolith.md: `sections` dimiliki
+// modul content dan tidak ada tabel modul lain yang disentuh di sini.
+func (r *Repository) ApplySectionUpdates(ctx context.Context, updates []SectionUpdate) error {
+	if len(updates) == 0 {
+		return nil
+	}
+
+	tx, err := r.db.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	// Rollback SETELAH Commit sukses adalah no-op (sql.ErrTxDone) - defer ini
+	// aman dan menjamin transaksi tidak pernah menggantung di jalur error
+	// mana pun, termasuk yang ditambahkan kelak.
+	defer func() { _ = tx.Rollback() }()
+
+	q := r.q.WithTx(tx)
+	for _, u := range updates {
+		// Dibaca ULANG di dalam transaksi, bukan dipercaya dari pemanggil:
+		// label bukan milik admin (tidak ada di form), dan key yang tidak
+		// dikenal harus menggagalkan SELURUH batch di sini.
+		existing, err := q.GetSectionByKey(ctx, u.Key)
+		if err != nil {
+			return err
+		}
+		if err := q.UpdateSection(ctx, sqlc.UpdateSectionParams{
+			Label:      existing.Label,
+			IsEnabled:  u.IsEnabled,
+			SortOrder:  u.SortOrder,
+			SectionKey: u.Key,
+		}); err != nil {
+			return err
+		}
+	}
+	return tx.Commit()
 }

@@ -6,8 +6,8 @@ import (
 	"log"
 	"net/http"
 
-	"undangan-ariana-adrian/internal/modules/content/application"
-	"undangan-ariana-adrian/internal/shared/response"
+	"undangan-digital/internal/modules/content/application"
+	"undangan-digital/internal/shared/response"
 )
 
 type Handler struct {

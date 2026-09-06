@@ -3,7 +3,7 @@ package infrastructure
 import (
 	"context"
 
-	"undangan-ariana-adrian/internal/modules/whatsapp/infrastructure/sqlc"
+	"undangan-digital/internal/modules/whatsapp/infrastructure/sqlc"
 )
 
 type Repository struct {

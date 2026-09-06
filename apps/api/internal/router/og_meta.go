@@ -13,7 +13,7 @@ import (
 	"path"
 	"strings"
 
-	contentContracts "undangan-ariana-adrian/internal/modules/content/contracts"
+	contentContracts "undangan-digital/internal/modules/content/contracts"
 )
 
 // Marker yang membungkus blok <meta> statis di apps/web/index.html. Injeksi

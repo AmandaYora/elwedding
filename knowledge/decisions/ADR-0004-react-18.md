@@ -1,4 +1,4 @@
-# ADR-0001: `apps/web` tetap React 18.3.1, bukan React 19
+# ADR-0004: `apps/web` tetap React 18.3.1, bukan React 19
 
 **Status:** Diterima. **Konteks:** implementasi `docs/plan/admin-backend/PLAN.md`.
 

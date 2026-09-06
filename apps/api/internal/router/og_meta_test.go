@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	contentContracts "undangan-ariana-adrian/internal/modules/content/contracts"
+	contentContracts "undangan-digital/internal/modules/content/contracts"
 )
 
 // TEST REGRESI D8 (docs/plan/og-share-image-dinamis/PLAN.md).

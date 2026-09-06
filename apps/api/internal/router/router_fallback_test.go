@@ -10,7 +10,7 @@ import (
 	"strings"
 	"testing"
 
-	contentContracts "undangan-ariana-adrian/internal/modules/content/contracts"
+	contentContracts "undangan-digital/internal/modules/content/contracts"
 )
 
 // Menguji keputusan #17/F17/F20 (PLAN.md): SPA fallback HANYA untuk GET.

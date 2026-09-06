@@ -4,7 +4,7 @@ import (
 	"testing"
 	"time"
 
-	"undangan-ariana-adrian/internal/modules/content/infrastructure/sqlc"
+	"undangan-digital/internal/modules/content/infrastructure/sqlc"
 )
 
 // Menguji keputusan #16/F18 (PLAN.md): weddingDateUnix harus epoch DETIK

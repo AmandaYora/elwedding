@@ -13,10 +13,10 @@ import (
 
 	"github.com/skip2/go-qrcode"
 
-	"undangan-ariana-adrian/internal/modules/whatsapp/contracts"
-	"undangan-ariana-adrian/internal/modules/whatsapp/infrastructure"
-	"undangan-ariana-adrian/internal/modules/whatsapp/infrastructure/sqlc"
-	"undangan-ariana-adrian/internal/shared/pagination"
+	"undangan-digital/internal/modules/whatsapp/contracts"
+	"undangan-digital/internal/modules/whatsapp/infrastructure"
+	"undangan-digital/internal/modules/whatsapp/infrastructure/sqlc"
+	"undangan-digital/internal/shared/pagination"
 )
 
 var _ contracts.Sender = (*Service)(nil)

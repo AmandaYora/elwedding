@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	"undangan-ariana-adrian/internal/modules/content/application"
+	"undangan-digital/internal/modules/content/application"
 )
 
 // newTestHandler: service tanpa repo/storage sungguhan - kedua test di sini

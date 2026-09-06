@@ -4,7 +4,7 @@ import (
 	"context"
 	"database/sql"
 
-	"undangan-ariana-adrian/internal/modules/guest/infrastructure/sqlc"
+	"undangan-digital/internal/modules/guest/infrastructure/sqlc"
 )
 
 type Repository struct {

@@ -4,9 +4,9 @@ import (
 	"net/http"
 	"strconv"
 
-	"undangan-ariana-adrian/internal/modules/guest/application"
-	"undangan-ariana-adrian/internal/shared/pagination"
-	"undangan-ariana-adrian/internal/shared/response"
+	"undangan-digital/internal/modules/guest/application"
+	"undangan-digital/internal/shared/pagination"
+	"undangan-digital/internal/shared/response"
 )
 
 // --- admin: CRUD group tamu (docs/plan/guest-groups/PLAN.md T8) ---

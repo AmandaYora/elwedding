@@ -6,9 +6,9 @@ import (
 	"strconv"
 	"strings"
 
-	"undangan-ariana-adrian/internal/modules/guest/application"
-	"undangan-ariana-adrian/internal/shared/pagination"
-	"undangan-ariana-adrian/internal/shared/response"
+	"undangan-digital/internal/modules/guest/application"
+	"undangan-digital/internal/shared/pagination"
+	"undangan-digital/internal/shared/response"
 )
 
 type Handler struct {

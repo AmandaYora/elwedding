@@ -1,4 +1,4 @@
-# Knowledge Index — undangan-ariana-adrian
+# Knowledge Index — undangan-digital
 
 Routing for the project's single knowledge base. Read the file relevant to your task before
 editing code. This is the only knowledge rack — there is no separate `docs/` for stakeholders;

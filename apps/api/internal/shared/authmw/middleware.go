@@ -7,8 +7,8 @@ import (
 	"net/http"
 	"strings"
 
-	"undangan-ariana-adrian/internal/shared/jwtutil"
-	"undangan-ariana-adrian/internal/shared/response"
+	"undangan-digital/internal/shared/jwtutil"
+	"undangan-digital/internal/shared/response"
 )
 
 type contextKey string

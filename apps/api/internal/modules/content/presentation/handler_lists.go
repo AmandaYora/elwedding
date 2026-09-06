@@ -4,8 +4,8 @@ import (
 	"net/http"
 	"strconv"
 
-	"undangan-ariana-adrian/internal/modules/content/application"
-	"undangan-ariana-adrian/internal/shared/response"
+	"undangan-digital/internal/modules/content/application"
+	"undangan-digital/internal/shared/response"
 )
 
 func pathID(r *http.Request) (uint64, bool) {

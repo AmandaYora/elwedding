@@ -4,7 +4,7 @@ import (
 	"reflect"
 	"testing"
 
-	"undangan-ariana-adrian/internal/modules/guest/infrastructure/sqlc"
+	"undangan-digital/internal/modules/guest/infrastructure/sqlc"
 )
 
 // GuestSummaryDTO sekarang memuat slice (RecentResponses), jadi tidak bisa

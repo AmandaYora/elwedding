@@ -5,7 +5,7 @@ import (
 	"errors"
 	"strings"
 
-	"undangan-ariana-adrian/internal/modules/content/infrastructure/sqlc"
+	"undangan-digital/internal/modules/content/infrastructure/sqlc"
 )
 
 func requireNonEmpty(v, field string) error {

@@ -1,4 +1,4 @@
-# Deployment — undangan-ariana-adrian
+# Deployment — undangan-digital
 
 ## Local
 ```bash

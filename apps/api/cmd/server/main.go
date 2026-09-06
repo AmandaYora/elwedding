@@ -6,14 +6,14 @@ import (
 
 	"github.com/joho/godotenv"
 
-	"undangan-ariana-adrian/internal/config"
-	"undangan-ariana-adrian/internal/database"
-	"undangan-ariana-adrian/internal/modules/auth"
-	"undangan-ariana-adrian/internal/modules/content"
-	"undangan-ariana-adrian/internal/modules/guest"
-	"undangan-ariana-adrian/internal/modules/whatsapp"
-	"undangan-ariana-adrian/internal/router"
-	"undangan-ariana-adrian/internal/shared/storage"
+	"undangan-digital/internal/config"
+	"undangan-digital/internal/database"
+	"undangan-digital/internal/modules/auth"
+	"undangan-digital/internal/modules/content"
+	"undangan-digital/internal/modules/guest"
+	"undangan-digital/internal/modules/whatsapp"
+	"undangan-digital/internal/router"
+	"undangan-digital/internal/shared/storage"
 )
 
 func main() {

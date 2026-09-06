@@ -6,7 +6,7 @@ import (
 	"net/http"
 	"strconv"
 
-	"undangan-ariana-adrian/internal/shared/response"
+	"undangan-digital/internal/shared/response"
 )
 
 const (

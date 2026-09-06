@@ -1,6 +1,8 @@
-# undangan-ariana-adrian — Claude Code Gateway
+# undangan-digital — Claude Code Gateway
 
-Project: undangan-ariana-adrian. Backend: go (modular monolith). Frontend: React 19 + Tailwind 4.
+Project: undangan-digital. Backend: go (modular monolith). Frontend: React 18.3.1 +
+Tailwind 4 - penyimpangan sadar dari standar React 19, diratifikasi
+`knowledge/decisions/ADR-0004-react-18.md`.
 
 ## Commands (run from root)
 

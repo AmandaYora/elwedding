@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	"undangan-ariana-adrian/internal/shared/jwtutil"
+	"undangan-digital/internal/shared/jwtutil"
 )
 
 const testSecret = "test-secret"

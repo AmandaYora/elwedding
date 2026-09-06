@@ -5,7 +5,7 @@ import (
 	"testing"
 	"time"
 
-	"undangan-ariana-adrian/internal/modules/guest/infrastructure/sqlc"
+	"undangan-digital/internal/modules/guest/infrastructure/sqlc"
 )
 
 // parseCheckinCode & buildQRPayload adalah fungsi murni (docs/plan/

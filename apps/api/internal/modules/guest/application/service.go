@@ -9,11 +9,11 @@ import (
 	"log"
 	"strings"
 
-	contentContracts "undangan-ariana-adrian/internal/modules/content/contracts"
-	"undangan-ariana-adrian/internal/modules/guest/infrastructure"
-	"undangan-ariana-adrian/internal/modules/guest/infrastructure/sqlc"
-	waContracts "undangan-ariana-adrian/internal/modules/whatsapp/contracts"
-	"undangan-ariana-adrian/internal/shared/pagination"
+	contentContracts "undangan-digital/internal/modules/content/contracts"
+	"undangan-digital/internal/modules/guest/infrastructure"
+	"undangan-digital/internal/modules/guest/infrastructure/sqlc"
+	waContracts "undangan-digital/internal/modules/whatsapp/contracts"
+	"undangan-digital/internal/shared/pagination"
 )
 
 var (
@@ -200,6 +200,12 @@ func (s *Service) Create(ctx context.Context, in GuestInput) (GuestDTO, error) {
 // Update TIDAK menyentuh AttendingCount (dashboard-wa-rsvp keputusan #11) -
 // kolom itu hanya diisi TAMU lewat UpdateRsvpStatus, bukan admin.
 func (s *Service) Update(ctx context.Context, id uint64, in GuestInput) error {
+	// Keberadaan barisnya dicek PALING DULU: id di URL yang tidak ada harus
+	// dibalas "guest not found", bukan keluhan tentang isi body (mis. "Group
+	// tidak ditemukan") yang menyesatkan admin ke masalah yang salah.
+	if err := s.requireGuestExists(ctx, id); err != nil {
+		return err
+	}
 	if err := validateProfileFields(in); err != nil {
 		return err
 	}
@@ -225,7 +231,29 @@ func (s *Service) Update(ctx context.Context, id uint64, in GuestInput) error {
 }
 
 func (s *Service) Delete(ctx context.Context, id uint64) error {
+	if err := s.requireGuestExists(ctx, id); err != nil {
+		return err
+	}
 	return s.repo.Delete(ctx, id)
+}
+
+// requireGuestExists memastikan barisnya ADA sebelum Update/Delete menyentuh
+// database.
+//
+// Tanpa ini, UPDATE/DELETE pada id yang tidak ada hanya menyentuh 0 baris dan
+// endpoint membalas 200 "Guest updated/deleted successfully" - admin yang
+// bekerja dari daftar basi (tamu sudah dihapus di tab atau perangkat lain)
+// diberi tahu bahwa perubahannya tersimpan padahal tidak ada yang berubah.
+// Alasan dan pola yang sama persis dengan UpdateGroup/DeleteGroup di
+// service_groups.go dan Delete di modul auth.
+func (s *Service) requireGuestExists(ctx context.Context, id uint64) error {
+	if _, err := s.repo.GetByID(ctx, id); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return ErrNotFound
+		}
+		return err
+	}
+	return nil
 }
 
 // List mengembalikan tamu dgn paginasi wajib (PLAN.md admin-backend §3),

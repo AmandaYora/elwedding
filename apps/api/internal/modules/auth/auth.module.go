@@ -4,9 +4,9 @@ import (
 	"database/sql"
 	"time"
 
-	"undangan-ariana-adrian/internal/modules/auth/application"
-	"undangan-ariana-adrian/internal/modules/auth/infrastructure"
-	"undangan-ariana-adrian/internal/modules/auth/presentation"
+	"undangan-digital/internal/modules/auth/application"
+	"undangan-digital/internal/modules/auth/infrastructure"
+	"undangan-digital/internal/modules/auth/presentation"
 )
 
 // New merangkai modul auth: repository -> service -> handler. Hanya

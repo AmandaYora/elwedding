@@ -4,10 +4,10 @@ import (
 	"context"
 	"database/sql"
 
-	"undangan-ariana-adrian/internal/modules/whatsapp/application"
-	"undangan-ariana-adrian/internal/modules/whatsapp/contracts"
-	"undangan-ariana-adrian/internal/modules/whatsapp/infrastructure"
-	"undangan-ariana-adrian/internal/modules/whatsapp/presentation"
+	"undangan-digital/internal/modules/whatsapp/application"
+	"undangan-digital/internal/modules/whatsapp/contracts"
+	"undangan-digital/internal/modules/whatsapp/infrastructure"
+	"undangan-digital/internal/modules/whatsapp/presentation"
 )
 
 // New merangkai modul whatsapp: waclient (sesi SQLite terpisah) + repository

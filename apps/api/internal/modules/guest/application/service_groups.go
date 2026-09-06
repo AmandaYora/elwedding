@@ -8,8 +8,8 @@ import (
 	"strconv"
 	"strings"
 
-	"undangan-ariana-adrian/internal/modules/guest/infrastructure/sqlc"
-	"undangan-ariana-adrian/internal/shared/pagination"
+	"undangan-digital/internal/modules/guest/infrastructure/sqlc"
+	"undangan-digital/internal/shared/pagination"
 )
 
 // CRUD group tamu - docs/plan/guest-groups/PLAN.md T5.

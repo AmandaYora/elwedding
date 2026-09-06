@@ -1,4 +1,4 @@
-# undangan-ariana-adrian
+# undangan-digital
 
 Monorepo generated to Dimas' standard (Go modular-monolith backend +
 React frontend). Undangan pernikahan digital dengan dashboard admin —

@@ -1,4 +1,4 @@
-module undangan-ariana-adrian
+module undangan-digital
 
 go 1.26.0
 

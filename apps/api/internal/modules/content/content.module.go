@@ -3,11 +3,11 @@ package content
 import (
 	"database/sql"
 
-	"undangan-ariana-adrian/internal/modules/content/application"
-	"undangan-ariana-adrian/internal/modules/content/contracts"
-	"undangan-ariana-adrian/internal/modules/content/infrastructure"
-	"undangan-ariana-adrian/internal/modules/content/presentation"
-	"undangan-ariana-adrian/internal/shared/storage"
+	"undangan-digital/internal/modules/content/application"
+	"undangan-digital/internal/modules/content/contracts"
+	"undangan-digital/internal/modules/content/infrastructure"
+	"undangan-digital/internal/modules/content/presentation"
+	"undangan-digital/internal/shared/storage"
 )
 
 // New merangkai modul content: repository -> service -> handler. Sejak
