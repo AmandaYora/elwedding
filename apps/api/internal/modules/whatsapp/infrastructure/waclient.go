@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strconv"
 	"sync"
 	"time"
 
@@ -24,7 +25,9 @@ import (
 
 	// Driver Go murni tanpa CGO - whatsmeow TIDAK mendukung MySQL (terverifikasi
 	// PLAN.md §2: "Only SQLite and Postgres are currently fully supported").
-	_ "modernc.org/sqlite"
+	// Import NAMED (bukan blank): IsDatabaseLockedError di bawah memeriksa
+	// *sqlite.Error secara langsung.
+	"modernc.org/sqlite"
 )
 
 // QRChannelItem diteruskan apa adanya dari whatsmeow supaya application tidak
@@ -82,6 +85,27 @@ type ConnNotice struct {
 // dilepas - lihat ResetSession.
 const resetSessionTimeout = 10 * time.Second
 
+// storeBusyTimeoutMS berapa lama satu operasi SQLite menunggu lock yang
+// dipegang koneksi lain sebelum menyerah dengan SQLITE_BUSY. Default driver
+// adalah 0 (gagal seketika) - di satu proses dengan pool koneksi tak terbatas
+// (sqlstore tidak menyetel MaxOpenConns) dan mode rollback-journal, tumpang
+// tindih tulis latar whatsmeow vs baca jalur kirim sudah cukup untuk
+// menggagalkan kiriman yang sebenarnya sehat (insiden SQLITE_BUSY produksi:
+// "failed to get LID for PN ... database is locked").
+//
+// 5 detik menutup kontensi realistis (commit ms-an, transaksi Delete hitungan
+// detik, jitter I/O VPS shared) tanpa menggerogoti budget sendAttemptTimeout
+// (60 detik): yang lewat dari sini terdegradasi jadi DeadlineExceeded, yang
+// memang sudah retryable.
+const storeBusyTimeoutMS = 5000
+
+// waStoreDSN menyusun DSN SQLite untuk sqlstore. Diekstrak jadi fungsi supaya
+// parameter kritisnya terkunci test (TestStoreDSNHasBusyTimeout) - hilangnya
+// _busy_timeout diam-diam mengembalikan perilaku gagal-seketika.
+func waStoreDSN(storeDBPath string) string {
+	return "file:" + storeDBPath + "?_pragma=foreign_keys(1)&_busy_timeout=" + strconv.Itoa(storeBusyTimeoutMS)
+}
+
 // WAClient memiliki *whatsmeow.Client yang DAPAT DIGANTI (whatsapp-
 // connection-resilience pilar 1). Penggantian dibutuhkan karena
 // store.Device.Delete menandai device Deleted dan mengganti store-nya dengan
@@ -109,7 +133,7 @@ func NewWAClient(ctx context.Context, storeDBPath string) (*WAClient, error) {
 		return nil, fmt.Errorf("gagal membuat folder store WhatsApp: %w", err)
 	}
 	logger := waLog.Stdout("WhatsApp", "INFO", true)
-	container, err := sqlstore.New(ctx, "sqlite", "file:"+storeDBPath+"?_pragma=foreign_keys(1)", logger)
+	container, err := sqlstore.New(ctx, "sqlite", waStoreDSN(storeDBPath), logger)
 	if err != nil {
 		return nil, fmt.Errorf("gagal membuka store WhatsApp: %w", err)
 	}
@@ -208,6 +232,26 @@ func translateEvent(evt any) (ConnNotice, bool) {
 // klasifikasi retry TANPA mengimpor whatsmeow secara langsung.
 func IsNotConnectedError(err error) bool {
 	return errors.Is(err, whatsmeow.ErrNotConnected)
+}
+
+// sqliteBusyCode adalah SQLITE_BUSY - lock SQLite dipegang koneksi lain.
+// Didefinisikan di sini (bukan mengimpor paket C sqlite3 yang berat) karena
+// kode hasil SQLite stabil antar versi.
+const sqliteBusyCode = 5
+
+// IsDatabaseLockedError melaporkan apakah err berakar pada SQLITE_BUSY dari
+// store sesi (wa.db): "failed to get LID for PN ...: database is locked".
+// Dipakai application untuk klasifikasi retry, berdampingan dengan
+// IsNotConnectedError di atas.
+//
+// Deteksi SENGAJA via errors.As ke *sqlite.Error + kode, BUKAN match substring
+// "database is locked": teks pesan milik library C dan rapuh terhadap
+// locale/versi, sedangkan kode hasilnya kontrak stabil. *sqlite.Error tidak
+// bisa difabrikasi di test (field unexported) - test memakai kontensi SQLite
+// sungguhan (wabusy_test.go).
+func IsDatabaseLockedError(err error) bool {
+	var sqliteErr *sqlite.Error
+	return errors.As(err, &sqliteErr) && sqliteErr.Code() == sqliteBusyCode
 }
 
 // SetEventHandler dipasang Service SEBELUM connect pertama dan dipakai ulang

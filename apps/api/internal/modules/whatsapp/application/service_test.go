@@ -2,8 +2,11 @@ package application
 
 import (
 	"context"
+	"database/sql"
 	"errors"
 	"fmt"
+	"os"
+	"path/filepath"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -13,6 +16,10 @@ import (
 	// tidak ada koneksi). Graph dependensi produksi tidak berubah - biner test
 	// toh sudah me-link whatsmeow secara transitif lewat infrastructure.
 	"go.mau.fi/whatsmeow"
+
+	// Blank import KHUSUS test: genuineBusyError membuka DB SQLite langsung
+	// untuk memproduksi SQLITE_BUSY asli (lihat komentarnya).
+	_ "modernc.org/sqlite"
 
 	"undangan-digital/internal/modules/whatsapp/infrastructure/sqlc"
 )
@@ -71,16 +78,64 @@ func (timeoutError) Error() string   { return "i/o timeout" }
 func (timeoutError) Timeout() bool   { return true }
 func (timeoutError) Temporary() bool { return true }
 
+// genuineBusyError menghasilkan SQLITE_BUSY ASLI untuk TestClassifySendError:
+// koneksi pertama menahan write lock pada FILE database, koneksi kedua
+// (tanpa busy_timeout) gagal seketika. WAJIB file, bukan shared-cache memory
+// (shared-cache mengubah konflik jadi SQLITE_LOCKED + tunggu-selamanya).
+// *sqlite.Error tidak bisa difabrikasi (field unexported), jadi kontensi
+// sungguhan adalah satu-satunya cara jujur. Deterministik, tanpa timing
+// (pola yang sama dengan wabusy_test.go di infrastructure).
+func genuineBusyError(t *testing.T) error {
+	t.Helper()
+	ctx := context.Background()
+	dir := t.TempDir()
+	t.Cleanup(func() { _ = os.RemoveAll(dir) })
+	db, err := sql.Open("sqlite", filepath.Join(dir, "classifybusy.db"))
+	if err != nil {
+		t.Fatalf("sql.Open: %v", err)
+	}
+	t.Cleanup(func() { _ = db.Close() })
+	if _, err := db.ExecContext(ctx, "CREATE TABLE t (id INTEGER PRIMARY KEY, v TEXT)"); err != nil {
+		t.Fatalf("CREATE TABLE: %v", err)
+	}
+	holder, err := db.Conn(ctx)
+	if err != nil {
+		t.Fatalf("Conn holder: %v", err)
+	}
+	t.Cleanup(func() { _ = holder.Close() })
+	if _, err := holder.ExecContext(ctx, "BEGIN IMMEDIATE"); err != nil {
+		t.Fatalf("BEGIN IMMEDIATE: %v", err)
+	}
+	if _, err := holder.ExecContext(ctx, "INSERT INTO t (v) VALUES ('x')"); err != nil {
+		t.Fatalf("INSERT holder: %v", err)
+	}
+
+	contender, err := db.Conn(ctx)
+	if err != nil {
+		t.Fatalf("Conn contender: %v", err)
+	}
+	t.Cleanup(func() { _ = contender.Close() })
+	_, err = contender.ExecContext(ctx, "INSERT INTO t (v) VALUES ('y')")
+	if err == nil {
+		t.Fatal("kontensi seharusnya gagal dengan SQLITE_BUSY, malah sukses")
+	}
+	return err
+}
+
 // U1: klasifikasi retryable vs permanen (§5.3.2). Default WAJIB permanen -
 // error tak dikenal tidak boleh memicu kirim ulang (risiko pesan ganda).
 func TestClassifySendError(t *testing.T) {
 	wrappedNotConnected := fmt.Errorf("gagal unggah gambar: %w", whatsmeow.ErrNotConnected)
+	// Rantai persis insiden produksi: LID-resolve gagal di store sesi.
+	wrappedBusy := fmt.Errorf("gagal kirim pesan: failed to get LID for PN %s: %w",
+		"628123456789@s.whatsapp.net", genuineBusyError(t))
 	cases := []struct {
 		name  string
 		err   error
 		retry bool
 	}{
 		{"ErrNotConnected terbungkus -> retryable", wrappedNotConnected, true},
+		{"SQLITE_BUSY store sesi terbungkus -> retryable", wrappedBusy, true},
 		{"DeadlineExceeded -> retryable", context.DeadlineExceeded, true},
 		{"DeadlineExceeded terbungkus -> retryable", fmt.Errorf("upload: %w", context.DeadlineExceeded), true},
 		{"timeout jaringan -> retryable", timeoutError{}, true},

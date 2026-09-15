@@ -347,6 +347,15 @@ func classifySendError(err error) bool {
 	if os.IsTimeout(err) {
 		return true
 	}
+	// SQLITE_BUSY dari store sesi (mis. "failed to get LID for PN ...:
+	// database is locked"): kontensi lock transien, dan - yang menentukan -
+	// kegagalannya terjadi SEBELUM satu byte pesan pun terkirim (resolusi LID
+	// mendahului enkripsi + kirim di whatsmeow), sehingga retry terbukti aman
+	// dari pesan ganda. Tanpa ini, satu tabrakan lock sesaat memfinalkan
+	// kiriman permanen sebagai failed.
+	if infrastructure.IsDatabaseLockedError(err) {
+		return true
+	}
 	return infrastructure.IsNotConnectedError(err)
 }
 
