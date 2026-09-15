@@ -254,7 +254,11 @@ export default function WeddingWish() {
           )}
 
           {wishes.length > 0 && (
-            <div className="comment-wrap">
+            // Kelas `show` WAJIB ikut: stylesheet template menyetel
+            // `.comment-wrap{display:none}` dan hanya menampilkannya lewat
+            // `.comment-wrap.show` (dulu ditambahkan JS legacy saat komentar
+            // dimuat). Tanpa ini slider selalu tak terlihat walau datanya ada.
+            <div className="comment-wrap show">
               <WishSlider wishes={wishes} />
             </div>
           )}

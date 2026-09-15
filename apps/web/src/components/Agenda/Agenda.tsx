@@ -320,7 +320,7 @@ export default function Agenda({ content, agendaEvents }: AgendaProps) {
                         enam kotak palet warna yang sebelumnya hardcode di sini
                         (R4/K1/K2). Dirender BERSYARAT: dresscodeImageUrl
                         bernilai '' untuk semua baris tepat setelah migration
-                        000011, dan <img src=""> akan memicu request ke URL
+                        000011, dan <img decoding="async" src=""> akan memicu request ke URL
                         halaman ini sendiri lalu menampilkan ikon rusak. */}
                     {content.dresscodeImageUrl && (
                       <div className="dress-list" data-aos="fade-up" data-aos-duration="1000">

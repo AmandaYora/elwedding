@@ -93,6 +93,24 @@ test('daftar berisi -> slider menampilkan ucapan', async () => {
   expect(screen.getByText('Selamat menempuh hidup baru')).toBeInTheDocument()
 })
 
+// Regresi nyata di produksi: stylesheet template menyetel
+// `.comment-wrap{display:none}` dan hanya menampilkannya lewat
+// `.comment-wrap.show` - tanpa kelas itu slider tak terlihat walau datanya
+// ada (disangka "tertutup aset desain").
+test('slider dirender di dalam .comment-wrap.show agar tidak display:none', async () => {
+  setSearch('?guest=tok123')
+  mockSessionAndWishes(baseSession, [
+    { id: 1, guestName: 'Siti', guestSide: 'bride', message: 'Bahagia selalu!', createdAt: '2026-09-15T10:00:00+07:00' },
+  ])
+
+  const { container } = render(<WeddingWish />)
+
+  await waitFor(() => expect(screen.getByText('Bahagia selalu!')).toBeInTheDocument())
+  const wrap = container.querySelector('.comment-wrap')
+  expect(wrap).not.toBeNull()
+  expect(wrap?.classList.contains('show')).toBe(true)
+})
+
 // Kirim sukses -> kartu Ucapan Anda + daftar dimuat ulang.
 test('kirim sukses -> form berganti kartu dan daftar dimuat ulang', async () => {
   setSearch('?guest=tok123')

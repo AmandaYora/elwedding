@@ -16,5 +16,10 @@ export function coverMediaHtml(url: string, className = ""): string {
     // poster tidak dipakai (GIF asli juga tanpa poster)
     return `<video${cls} src="${esc}" autoplay muted loop playsinline></video>`;
   }
-  return `<img${cls} src="${esc}" alt="">`;
+  // Foto cover utama (kandidat LCP, URL dinamis dari admin): fetchpriority
+  // high memenangkannya dari antrean bandwidth, decoding async menjaga decode
+  // keluar jalur kritis main thread. Disuntik di sini karena tag-nya dirakit
+  // sebagai string HTML (bukan JSX), jadi tidak terjangkau aturan seragam di
+  // komponen.
+  return `<img${cls} src="${esc}" alt="" decoding="async" fetchpriority="high">`;
 }
