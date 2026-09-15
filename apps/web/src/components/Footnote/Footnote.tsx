@@ -10,43 +10,43 @@ export default function Footnote({ content }: FootnoteProps) {
 
             <div className="ornaments-wrapper">
                 <div className="orn-tc-1">
-                    <div className="image-wrap" data-aos="zoom-out-up" data-aos-duration="1500" data-aos-delay="500">
+                    <div className="image-wrap" data-aos="zoom-out-up" data-aos-duration="750" data-aos-delay="250">
                         <img src="/media/template/arsya/Orn-45.webp" width="840" height="518" alt=""  loading="lazy" decoding="async" />
                     </div>
                     <div className="orn-tc-1-1">
-                        <div className="image-wrap" data-aos="zoom-out-up" data-aos-duration="1900" data-aos-delay="900">
+                        <div className="image-wrap" data-aos="zoom-out-up" data-aos-duration="950" data-aos-delay="450">
                             <img src="/media/template/arsya/Orn-55.webp" width="1000" height="451" alt=""  loading="lazy" decoding="async" />
                         </div>
                     </div>
                 </div>
                 <div className="orn-ff-2 right">
-                    <div className="image-wrap" data-aos="zoom-in-up" data-aos-duration="2200" data-aos-delay="2500">
+                    <div className="image-wrap" data-aos="zoom-in-up" data-aos-duration="1100" data-aos-delay="1250">
                         <img src="/media/template/arsya/Orn-25.webp" width="600" height="770" alt="Ornaments"  loading="lazy" decoding="async" />
                     </div>
                 </div>
                 <div className="orn-ff-2 left">
-                    <div className="image-wrap" data-aos="zoom-in-up" data-aos-duration="2200" data-aos-delay="2500">
+                    <div className="image-wrap" data-aos="zoom-in-up" data-aos-duration="1100" data-aos-delay="1250">
                         <img src="/media/template/arsya/Orn-25.webp" width="600" height="770" alt="Ornaments"  loading="lazy" decoding="async" />
                     </div>
                 </div>
 
                 <div className="orn-lv-4 right">
-                    <div className="image-wrap" data-aos="fade-down-right" data-aos-duration="2200" data-aos-delay="2500">
+                    <div className="image-wrap" data-aos="fade-down-right" data-aos-duration="1100" data-aos-delay="1250">
                         <img src="/media/template/arsya/Orn-46.webp" width="1000" height="1040" alt="Ornaments"  loading="lazy" decoding="async" />
                     </div>
                 </div>
                 <div className="orn-lv-4 left">
-                    <div className="image-wrap" data-aos="fade-down-right" data-aos-duration="2200" data-aos-delay="2500">
+                    <div className="image-wrap" data-aos="fade-down-right" data-aos-duration="1100" data-aos-delay="1250">
                         <img src="/media/template/arsya/Orn-46.webp" width="1000" height="1040" alt="Ornaments"  loading="lazy" decoding="async" />
                     </div>
                 </div>
                 <div className="orn-cphead-2 left">
-                    <div className="image-wrap" data-aos="zoom-in-right" data-aos-duration="2200" data-aos-delay="2900">
+                    <div className="image-wrap" data-aos="zoom-in-right" data-aos-duration="1100" data-aos-delay="1450">
                         <img src="/media/template/arsya/Orn-11.webp" width="600" height="695" alt=""  loading="lazy" decoding="async" />
                     </div>
                 </div>
                 <div className="orn-cphead-2 right">
-                    <div className="image-wrap" data-aos="zoom-in-right" data-aos-duration="2200" data-aos-delay="2900">
+                    <div className="image-wrap" data-aos="zoom-in-right" data-aos-duration="1100" data-aos-delay="1450">
                         <img src="/media/template/arsya/Orn-11.webp" width="600" height="695" alt=""  loading="lazy" decoding="async" />
                     </div>
                 </div>
@@ -56,14 +56,14 @@ export default function Footnote({ content }: FootnoteProps) {
 
                 <div className="orn-wrapper">
                     <div className="orn-footnote-logo">
-                        <div className="image-wrap" data-aos="fade-up" data-aos-duration="1000" data-aos-delay="1000">
+                        <div className="image-wrap" data-aos="fade-up" data-aos-duration="500" data-aos-delay="500">
                             <img src={content.coverLogoUrl} alt="" className="logo"  loading="lazy" decoding="async" />
                         </div>
                     </div>
                 </div>
 
                 <div className="content">
-                    <p className="top-text" data-aos="fade-up" data-aos-duration="1000" data-aos-delay="1000">Wedding Invitation</p>                    <h2 className="footnote-title" data-aos="fade-up" data-aos-duration="1000" data-aos-delay="1000">{content.groomName}<br />&<br />{content.brideName}</h2>                    <p className="bottom-text" data-aos="fade-up" data-aos-duration="1000" data-aos-delay="1000">{content.hashtag}</p>                </div>
+                    <p className="top-text" data-aos="fade-up" data-aos-duration="500" data-aos-delay="500">Wedding Invitation</p>                    <h2 className="footnote-title" data-aos="fade-up" data-aos-duration="500" data-aos-delay="500">{content.groomName}<br />&<br />{content.brideName}</h2>                    <p className="bottom-text" data-aos="fade-up" data-aos-duration="500" data-aos-delay="500">{content.hashtag}</p>                </div>
 
             </div>
 
@@ -71,34 +71,34 @@ export default function Footnote({ content }: FootnoteProps) {
                 <div className="orn-ff-1 left">
                     <div className="orn-ff-1-3">
                         <div className="orn-ff-1-3-3">
-                            <div className="image-wrap" data-aos="zoom-in-up" data-aos-duration="2000" data-aos-delay="1300">
+                            <div className="image-wrap" data-aos="zoom-in-up" data-aos-duration="1000" data-aos-delay="650">
                                 <img src="/media/template/arsya/Orn-28.webp" width="400" height="954" alt=""  loading="lazy" decoding="async" />
                             </div>
                         </div>
                         <div className="orn-ff-1-3-1">
                             <div className="orn-ff-1-3-2">
-                                <div className="image-wrap" data-aos="zoom-in-up" data-aos-duration="2000" data-aos-delay="1300">
+                                <div className="image-wrap" data-aos="zoom-in-up" data-aos-duration="1000" data-aos-delay="650">
                                     <img src="/media/template/arsya/Orn-07.webp" width="400" height="1114" alt=""  loading="lazy" decoding="async" />
                                 </div>
                             </div>
-                            <div className="image-wrap" data-aos="zoom-in-up" data-aos-duration="2000" data-aos-delay="1300">
+                            <div className="image-wrap" data-aos="zoom-in-up" data-aos-duration="1000" data-aos-delay="650">
                                 <img src="/media/template/arsya/Orn-05.webp" width="400" height="1019" alt=""  loading="lazy" decoding="async" />
                             </div>
                         </div>
-                        <div className="image-wrap" data-aos="zoom-in-up" data-aos-duration="2000" data-aos-delay="1300">
+                        <div className="image-wrap" data-aos="zoom-in-up" data-aos-duration="1000" data-aos-delay="650">
                             <img src="/media/template/arsya/Orn-08.webp" width="400" height="993" alt=""  loading="lazy" decoding="async" />
                         </div>
                     </div>
                     <div className="orn-ff-1-2">
-                        <div className="image-wrap" data-aos="zoom-in-up" data-aos-duration="1700" data-aos-delay="900">
+                        <div className="image-wrap" data-aos="zoom-in-up" data-aos-duration="850" data-aos-delay="450">
                             <img src="/media/template/arsya/Orn-03.webp" width="400" height="841" alt=""  loading="lazy" decoding="async" />
                         </div>
                     </div>
-                    <div className="image-wrap" data-aos="zoom-in-up" data-aos-duration="1500" data-aos-delay="600">
+                    <div className="image-wrap" data-aos="zoom-in-up" data-aos-duration="750" data-aos-delay="300">
                         <img src="/media/template/arsya/Orn-39.webp" width="400" height="329" alt=""  loading="lazy" decoding="async" />
                     </div>
                     <div className="orn-ff-1-1">
-                        <div className="image-wrap" data-aos="zoom-in-right" data-aos-duration="1500" data-aos-delay="600">
+                        <div className="image-wrap" data-aos="zoom-in-right" data-aos-duration="750" data-aos-delay="300">
                             <img src="/media/template/arsya/Orn-50.webp" width="405" height="379" alt=""  loading="lazy" decoding="async" />
                         </div>
                     </div>
@@ -106,34 +106,34 @@ export default function Footnote({ content }: FootnoteProps) {
                 <div className="orn-ff-1 right">
                     <div className="orn-ff-1-3">
                         <div className="orn-ff-1-3-3">
-                            <div className="image-wrap" data-aos="zoom-in-up" data-aos-duration="2000" data-aos-delay="1300">
+                            <div className="image-wrap" data-aos="zoom-in-up" data-aos-duration="1000" data-aos-delay="650">
                                 <img src="/media/template/arsya/Orn-28.webp" width="400" height="954" alt=""  loading="lazy" decoding="async" />
                             </div>
                         </div>
                         <div className="orn-ff-1-3-1">
                             <div className="orn-ff-1-3-2">
-                                <div className="image-wrap" data-aos="zoom-in-up" data-aos-duration="2000" data-aos-delay="1300">
+                                <div className="image-wrap" data-aos="zoom-in-up" data-aos-duration="1000" data-aos-delay="650">
                                     <img src="/media/template/arsya/Orn-07.webp" width="400" height="1114" alt=""  loading="lazy" decoding="async" />
                                 </div>
                             </div>
-                            <div className="image-wrap" data-aos="zoom-in-up" data-aos-duration="2000" data-aos-delay="1300">
+                            <div className="image-wrap" data-aos="zoom-in-up" data-aos-duration="1000" data-aos-delay="650">
                                 <img src="/media/template/arsya/Orn-05.webp" width="400" height="1019" alt=""  loading="lazy" decoding="async" />
                             </div>
                         </div>
-                        <div className="image-wrap" data-aos="zoom-in-up" data-aos-duration="2000" data-aos-delay="1300">
+                        <div className="image-wrap" data-aos="zoom-in-up" data-aos-duration="1000" data-aos-delay="650">
                             <img src="/media/template/arsya/Orn-08.webp" width="400" height="993" alt=""  loading="lazy" decoding="async" />
                         </div>
                     </div>
                     <div className="orn-ff-1-2">
-                        <div className="image-wrap" data-aos="zoom-in-up" data-aos-duration="1700" data-aos-delay="900">
+                        <div className="image-wrap" data-aos="zoom-in-up" data-aos-duration="850" data-aos-delay="450">
                             <img src="/media/template/arsya/Orn-03.webp" width="400" height="841" alt=""  loading="lazy" decoding="async" />
                         </div>
                     </div>
-                    <div className="image-wrap" data-aos="zoom-in-up" data-aos-duration="1500" data-aos-delay="600">
+                    <div className="image-wrap" data-aos="zoom-in-up" data-aos-duration="750" data-aos-delay="300">
                         <img src="/media/template/arsya/Orn-39.webp" width="400" height="329" alt=""  loading="lazy" decoding="async" />
                     </div>
                     <div className="orn-ff-1-1">
-                        <div className="image-wrap" data-aos="zoom-in-right" data-aos-duration="1500" data-aos-delay="600">
+                        <div className="image-wrap" data-aos="zoom-in-right" data-aos-duration="750" data-aos-delay="300">
                             <img src="/media/template/arsya/Orn-50.webp" width="405" height="379" alt=""  loading="lazy" decoding="async" />
                         </div>
                     </div>

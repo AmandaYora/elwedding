@@ -10,32 +10,32 @@ export default function InstagramFilter({ content }: InstagramFilterProps) {
 
       <div className="ornaments-wrapper">
         <div className="orn-ig-bg">
-          <div className="image-wrap" data-aos="zoom-out-up" data-aos-duration="2300" data-aos-delay="500">
+          <div className="image-wrap" data-aos="zoom-out-up" data-aos-duration="1150" data-aos-delay="250">
             <img src="/media/template/arsya/Orn-31.webp" width="840" height="763" alt="Ornaments"  loading="lazy" decoding="async" />
           </div>
         </div>
         <div className="orn-ig-2 right">
-          <div className="image-wrap" data-aos="zoom-in-up" data-aos-duration="1500" data-aos-delay="600">
+          <div className="image-wrap" data-aos="zoom-in-up" data-aos-duration="750" data-aos-delay="300">
             <img src="/media/template/arsya/Orn-32.webp" width="600" height="1013" alt=""  loading="lazy" decoding="async" />
           </div>
         </div>
         <div className="orn-ig-2 left">
-          <div className="image-wrap" data-aos="zoom-in-up" data-aos-duration="1500" data-aos-delay="600">
+          <div className="image-wrap" data-aos="zoom-in-up" data-aos-duration="750" data-aos-delay="300">
             <img src="/media/template/arsya/Orn-32.webp" width="600" height="1013" alt=""  loading="lazy" decoding="async" />
           </div>
         </div>
         <div className="orn-ig-3 right">
-          <div className="image-wrap" data-aos="zoom-in-up" data-aos-duration="1500" data-aos-delay="600">
+          <div className="image-wrap" data-aos="zoom-in-up" data-aos-duration="750" data-aos-delay="300">
             <img src="/media/template/arsya/Orn-33.webp" width="600" height="377" alt=""  loading="lazy" decoding="async" />
           </div>
         </div>
         <div className="orn-ig-3 left">
-          <div className="image-wrap" data-aos="zoom-in-up" data-aos-duration="1500" data-aos-delay="600">
+          <div className="image-wrap" data-aos="zoom-in-up" data-aos-duration="750" data-aos-delay="300">
             <img src="/media/template/arsya/Orn-33.webp" width="600" height="377" alt=""  loading="lazy" decoding="async" />
           </div>
         </div>
         <div className="orn-lv-3">
-          <div className="image-wrap" data-aos="fade-up" data-aos-duration="2300" data-aos-delay="500">
+          <div className="image-wrap" data-aos="fade-up" data-aos-duration="1150" data-aos-delay="250">
             <img src="/media/template/arsya/Orn-23.webp" width="600" height="293" alt="Ornaments"  loading="lazy" decoding="async" />
           </div>
         </div>
@@ -44,17 +44,17 @@ export default function InstagramFilter({ content }: InstagramFilterProps) {
       <div className="ig-filter">
 
         <div className="ig-filter-head">
-          <h2 className="ig-filter-title" data-aos="fade-up" data-aos-duration="1200">
+          <h2 className="ig-filter-title" data-aos="fade-up" data-aos-duration="600">
             {content.instagramFilterTitle}
           </h2>
 
-          <p className="ig-filter-caption" data-aos="fade-up" data-aos-duration="1200" data-aos-delay="200">
+          <p className="ig-filter-caption" data-aos="fade-up" data-aos-duration="600" data-aos-delay="100">
             {content.instagramFilterCaption}
           </p>
         </div>
         <div className="ig-filter-body">
 
-          <div className="p-relative ig-preview-outer" data-aos="fade-up" data-aos-duration="1500" data-aos-delay="1000">
+          <div className="p-relative ig-preview-outer" data-aos="fade-up" data-aos-duration="750" data-aos-delay="500">
             <div className="ornaments-wrapper"></div>
 
             <div className="ig-filter-img-wrap">
@@ -66,8 +66,8 @@ export default function InstagramFilter({ content }: InstagramFilterProps) {
 
             <div className="ornaments-wrapper"></div>
           </div>
-          <div className="ig-filter-link-wrap" data-aos="fade-up" data-aos-duration="1200"
-            data-aos-delay="400">
+          <div className="ig-filter-link-wrap" data-aos="fade-up" data-aos-duration="600"
+            data-aos-delay="200">
             <a className="ig-filter-link" href={content.instagramFilterLink}
               target="_blank">Use Filter</a>
           </div>
@@ -77,31 +77,31 @@ export default function InstagramFilter({ content }: InstagramFilterProps) {
       <div className="ornaments-wrapper">
         <div className="orn-ig-1 right">
           <div className="orn-ig-1-2">
-            <div className="image-wrap" data-aos="zoom-in-up" data-aos-duration="2100" data-aos-delay="1500">
+            <div className="image-wrap" data-aos="zoom-in-up" data-aos-duration="1050" data-aos-delay="750">
               <img src="/media/template/arsya/Orn-28.webp" width="400" height="954" alt=""  loading="lazy" decoding="async" />
             </div>
           </div>
           <div className="orn-ig-1-1">
-            <div className="image-wrap" data-aos="zoom-in-up" data-aos-duration="1700" data-aos-delay="900">
+            <div className="image-wrap" data-aos="zoom-in-up" data-aos-duration="850" data-aos-delay="450">
               <img src="/media/template/arsya/Orn-27.webp" width="312" height="543" alt=""  loading="lazy" decoding="async" />
             </div>
           </div>
-          <div className="image-wrap" data-aos="zoom-in" data-aos-duration="1500" data-aos-delay="600">
+          <div className="image-wrap" data-aos="zoom-in" data-aos-duration="750" data-aos-delay="300">
             <img src="/media/template/arsya/Orn-26.webp" width="400" height="304" alt=""  loading="lazy" decoding="async" />
           </div>
         </div>
         <div className="orn-ig-1 left">
           <div className="orn-ig-1-2">
-            <div className="image-wrap" data-aos="zoom-in-up" data-aos-duration="2100" data-aos-delay="1500">
+            <div className="image-wrap" data-aos="zoom-in-up" data-aos-duration="1050" data-aos-delay="750">
               <img src="/media/template/arsya/Orn-28.webp" width="400" height="954" alt=""  loading="lazy" decoding="async" />
             </div>
           </div>
           <div className="orn-ig-1-1">
-            <div className="image-wrap" data-aos="zoom-in-up" data-aos-duration="1700" data-aos-delay="900">
+            <div className="image-wrap" data-aos="zoom-in-up" data-aos-duration="850" data-aos-delay="450">
               <img src="/media/template/arsya/Orn-27.webp" width="312" height="543" alt=""  loading="lazy" decoding="async" />
             </div>
           </div>
-          <div className="image-wrap" data-aos="zoom-in" data-aos-duration="1500" data-aos-delay="600">
+          <div className="image-wrap" data-aos="zoom-in" data-aos-duration="750" data-aos-delay="300">
             <img src="/media/template/arsya/Orn-26.webp" width="400" height="304" alt=""  loading="lazy" decoding="async" />
           </div>
         </div>

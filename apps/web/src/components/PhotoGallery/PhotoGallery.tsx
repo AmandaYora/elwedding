@@ -11,7 +11,7 @@ export default function PhotoGallery({ photos }: PhotoGalleryProps) {
             <div className="photo-inner">
 
                 <div className="photo-head">
-                    <h1 className="photo-title" data-aos="fade-up" data-aos-duration="1200">Potraits of Love</h1>
+                    <h1 className="photo-title" data-aos="fade-up" data-aos-duration="600">Potraits of Love</h1>
                 </div>
 
                 <div className="photo-body">
@@ -19,7 +19,7 @@ export default function PhotoGallery({ photos }: PhotoGalleryProps) {
                     <div className="photo-nav-wrap">
 
                         {/* Slider */}
-                        <div className="photo-nav" data-aos="fade-up" data-aos-duration="1200">
+                        <div className="photo-nav" data-aos="fade-up" data-aos-duration="600">
                             {photos.map((photo) => (
                                 <div className="photo-item " key={photo.id}>
                                     {/* resize_photo_nav (assets/js/39d8abba.js) memaksa slot ini
@@ -43,7 +43,7 @@ export default function PhotoGallery({ photos }: PhotoGalleryProps) {
 
                     <div className="photo-slider-wrap">
                         {/* Slider */}
-                        <div className="photo-slider" data-aos="fade-up" data-aos-duration="1200">
+                        <div className="photo-slider" data-aos="fade-up" data-aos-duration="600">
                             {photos.map((photo) => (
                                 <div className="photo-item " key={photo.id}>
                                     <div className="photo-img-wrap">

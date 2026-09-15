@@ -1,9 +1,14 @@
-/* Gaya slider & kartu ucapan (docs/plan/wedding-wish/PLAN.md T14).
+/* Kartu ucapan modern (wedding-wish).
  *
- * Kelas berawalan `ww-` milik komponen React ini. Kelas template
- * (`wedding-wish-*`, `form-control`, `submit`, ...) TIDAK didefinisikan ulang
- * di sini - semuanya tetap datang dari stylesheet template.
+ * Bahasa desainnya diderivasi dari kartu-kartu template yang sudah ada, bukan
+ * selera bebas: permukaan dari `.gift-form` (background-secondary, radius 12,
+ * bayangan lembut), radius 16-18px sejajar `.protocol-item`, teks memakai
+ * variabel tema yang sama (`--text-primary/secondary/tertiary`) sehingga
+ * menyatu dengan section lain DAN kebal dark-mode (warna eksplisit mengalahkan
+ * default UA - pelajaran insiden teks putih).
  *
+ * Kelas `ww-` milik komponen React ini. Kelas template (`wedding-wish-*`,
+ * `form-control`, `submit`, ...) TIDAK didefinisikan ulang di sini.
  * Diimpor langsung oleh WeddingWish.tsx, preseden guest-gate.css. */
 
 .ww-slider {
@@ -23,36 +28,71 @@
   min-width: 0;
   padding: 0.25rem 0.5rem;
   box-sizing: border-box;
+  display: flex;
 }
 
-.ww-card {
-  margin: 0;
-  padding: 1.25rem 1.5rem;
-  border-radius: 1rem;
-  background: rgba(255, 255, 255, 0.75);
-  border: 1px solid rgba(0, 0, 0, 0.08);
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.06);
+/* Permukaan bersama kartu slider & kartu "Ucapan Anda": solid (bukan
+ * translusen) supaya motif taman di belakangnya tidak tembus dan teks selalu
+ * terbaca - pelajaran insiden kartu hantu. */
+.ww-card,
+.ww-own {
+  background: var(--background-tertiary);
+  border: 1px solid rgba(var(--text-primary-rgb), 0.14);
+  border-radius: 18px;
+  box-shadow:
+    0 10px 30px rgba(53, 86, 86, 0.12),
+    0 2px 6px rgba(53, 86, 86, 0.08);
   text-align: center;
 }
 
+.ww-card {
+  position: relative;
+  flex: 1;
+  margin: 0;
+  padding: 1.75rem 1.5rem 1.5rem;
+  min-height: 190px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+
+/* Petik dekoratif - tipografi klasik ala kartu kutipan template
+ * (quote-end), murni CSS tanpa aset gambar tambahan. */
+.ww-card::before {
+  content: "\201C";
+  position: absolute;
+  top: 0.35rem;
+  left: 50%;
+  transform: translateX(-50%);
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: 3rem;
+  line-height: 1;
+  color: var(--text-secondary);
+  opacity: 0.28;
+  pointer-events: none;
+}
+
 .ww-card-message {
-  margin: 0 0 0.75rem;
-  font-size: 0.95rem;
-  line-height: 1.6;
+  margin: 0.75rem 0 0.9rem;
+  font-size: 0.98rem;
+  line-height: 1.65;
+  font-style: italic;
   overflow-wrap: break-word;
+  color: var(--text-primary);
 }
 
 .ww-card-name {
   display: block;
-  font-weight: 600;
-  font-size: 0.9rem;
+  font-weight: 700;
+  font-size: 0.88rem;
+  color: var(--text-secondary);
 }
 
 .ww-card-time {
   display: block;
-  margin-top: 0.15rem;
-  font-size: 0.75rem;
-  opacity: 0.65;
+  margin-top: 0.2rem;
+  font-size: 0.72rem;
+  color: var(--text-tertiary);
 }
 
 .ww-dots {
@@ -68,29 +108,28 @@
   padding: 0;
   border: 0;
   border-radius: 9999px;
-  background: rgba(0, 0, 0, 0.18);
+  background: rgba(var(--text-primary-rgb), 0.22);
   cursor: pointer;
+  transition: all 0.3s ease;
 }
 
 .ww-dot[data-active="true"] {
-  background: rgba(0, 0, 0, 0.55);
+  width: 1.6rem;
+  background: var(--text-secondary);
 }
 
-/* Kartu "Ucapan Anda" - pengganti form sesudah tamu mengisi (D3: sekali saja). */
+/* Kartu "Ucapan Anda" - permukaan sama dengan kartu slider, tanpa petik. */
 .ww-own {
   margin: 0 auto;
   max-width: 32rem;
-  padding: 1.25rem 1.5rem;
-  border-radius: 1rem;
-  background: rgba(255, 255, 255, 0.75);
-  border: 1px solid rgba(0, 0, 0, 0.08);
-  text-align: center;
+  padding: 1.5rem;
 }
 
 .ww-own-title {
   margin: 0 0 0.5rem;
   font-weight: 700;
-  font-size: 1rem;
+  font-size: 0.95rem;
+  color: var(--text-secondary);
 }
 
 .ww-own-message {
@@ -98,6 +137,7 @@
   font-size: 0.95rem;
   line-height: 1.6;
   overflow-wrap: break-word;
+  color: var(--text-primary);
 }
 
 .ww-error {
@@ -112,11 +152,13 @@
   margin: 0 0 0.75rem;
   font-size: 0.8rem;
   text-align: center;
-  opacity: 0.7;
+  color: var(--text-tertiary);
+  opacity: 0.85;
 }
 
-/* Menghormati prefers-reduced-motion (D6/T15): auto-advance dimatikan di JS,
- * dan sisa gerak (transisi geser saat dots ditekan) ikut dimatikan di sini. */
+/* Menghormati prefers-reduced-motion: auto-advance dimatikan di JS, sisa
+ * gerak (transisi geser) dimatikan di sini. Navigasi manual (dots & usap)
+ * tetap berfungsi - itu kendali pengguna, bukan animasi otomatis. */
 @media (prefers-reduced-motion: reduce) {
   .ww-track {
     transition: none;

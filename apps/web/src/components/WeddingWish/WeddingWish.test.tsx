@@ -111,6 +111,35 @@ test('slider dirender di dalam .comment-wrap.show agar tidak display:none', asyn
   expect(wrap?.classList.contains('show')).toBe(true)
 })
 
+// Usap kiri -> pindah ke ucapan berikutnya; usapan pendek diabaikan.
+test('usap horizontal menggeser slide', async () => {
+  setSearch('?guest=tok123')
+  mockSessionAndWishes(baseSession, [
+    { id: 1, guestName: 'Siti', guestSide: 'bride', message: 'Bahagia selalu!', createdAt: '2026-09-15T10:00:00+07:00' },
+    { id: 2, guestName: 'Andi', guestSide: 'groom', message: 'Selamat menempuh hidup baru', createdAt: '2026-09-15T09:00:00+07:00' },
+  ])
+
+  const { container } = render(<WeddingWish />)
+
+  await waitFor(() => expect(screen.getByText('Bahagia selalu!')).toBeInTheDocument())
+  const slider = container.querySelector('.ww-slider') as HTMLElement
+  const track = () => container.querySelector('.ww-track') as HTMLElement
+
+  fireEvent.touchStart(slider, { touches: [{ clientX: 200 }] })
+  fireEvent.touchEnd(slider, { changedTouches: [{ clientX: 100 }] })
+  expect(track().style.transform).toBe('translateX(-100%)')
+
+  // Usap kanan kembali ke awal.
+  fireEvent.touchStart(slider, { touches: [{ clientX: 100 }] })
+  fireEvent.touchEnd(slider, { changedTouches: [{ clientX: 200 }] })
+  expect(track().style.transform).toBe('translateX(-0%)')
+
+  // Gerakan pendek (< ambang) bukan usapan: tidak pindah.
+  fireEvent.touchStart(slider, { touches: [{ clientX: 100 }] })
+  fireEvent.touchEnd(slider, { changedTouches: [{ clientX: 110 }] })
+  expect(track().style.transform).toBe('translateX(-0%)')
+})
+
 // Kirim sukses -> kartu Ucapan Anda + daftar dimuat ulang.
 test('kirim sukses -> form berganti kartu dan daftar dimuat ulang', async () => {
   setSearch('?guest=tok123')

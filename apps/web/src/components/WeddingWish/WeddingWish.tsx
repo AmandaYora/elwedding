@@ -1,12 +1,18 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { httpClient } from '@/shared/services/http-client'
 import type { ApiEnvelope, PublicWish } from '@/types/api'
 import { useGuestSession } from '@/hooks/useGuestSession'
 import { apiErrorMessage } from '@/shared/lib/api-error'
+import { formatRelativeTime } from '@/shared/utils/relative-time'
 import './wedding-wish.css'
 
 /** Jeda auto-advance slider (docs/plan/wedding-wish/PLAN.md §3.6). */
 const SLIDE_INTERVAL_MS = 5000
+
+/** Jarak usap minimum (px) untuk pindah slide. Di bawah ini dianggap ketukan/
+ * scroll vertikal dan diabaikan - penting supaya usap tidak membajak scroll
+ * halaman (tidak ada preventDefault di mana pun di slider ini). */
+const SWIPE_THRESHOLD_PX = 40
 
 /** Batas panjang ucapan di sisi klien. KEMBAR dengan maxWishLength di backend
  * dan VARCHAR(500) di migration 000020 - browser tidak bisa memanggil
@@ -35,6 +41,7 @@ function WishSlider({ wishes }: { wishes: PublicWish[] }) {
   const [index, setIndex] = useState(0)
   const [paused, setPaused] = useState(false)
   const reduceMotion = usePrefersReducedMotion()
+  const touchStartX = useRef<number | null>(null)
   const count = wishes.length
 
   useEffect(() => {
@@ -52,15 +59,32 @@ function WishSlider({ wishes }: { wishes: PublicWish[] }) {
   const safeIndex = ((index % count) + count) % count
   const go = (i: number) => setIndex(((i % count) + count) % count)
 
+  function handleTouchStart(e: React.TouchEvent) {
+    touchStartX.current = e.touches[0].clientX
+    setPaused(true)
+  }
+
+  function handleTouchEnd(e: React.TouchEvent) {
+    setPaused(false)
+    if (touchStartX.current === null) return
+    const dx = e.changedTouches[0].clientX - touchStartX.current
+    touchStartX.current = null
+    if (Math.abs(dx) < SWIPE_THRESHOLD_PX) return
+    go(safeIndex + (dx < 0 ? 1 : -1))
+  }
+
   return (
     <div
       className="ww-slider"
+      role="region"
+      aria-roledescription="carousel"
+      aria-label="Ucapan tamu"
       onMouseEnter={() => setPaused(true)}
       onMouseLeave={() => setPaused(false)}
       onFocus={() => setPaused(true)}
       onBlur={() => setPaused(false)}
-      onTouchStart={() => setPaused(true)}
-      onTouchEnd={() => setPaused(false)}
+      onTouchStart={handleTouchStart}
+      onTouchEnd={handleTouchEnd}
     >
       <div className="ww-track" style={{ transform: `translateX(-${safeIndex * 100}%)` }}>
         {wishes.map((w) => (
@@ -69,6 +93,7 @@ function WishSlider({ wishes }: { wishes: PublicWish[] }) {
               <blockquote className="ww-card-message">{w.message}</blockquote>
               <figcaption>
                 <span className="ww-card-name">{w.guestName}</span>
+                <span className="ww-card-time">{formatRelativeTime(w.createdAt)}</span>
               </figcaption>
             </figure>
           </div>
@@ -181,24 +206,24 @@ export default function WeddingWish() {
 
         <div className="ornaments-wrapper">
           <div className="orn-wish-2 center">
-            <div className="image-wrap" data-aos="zoom-out" data-aos-duration="2400" data-aos-delay="2200">
+            <div className="image-wrap" data-aos="zoom-out" data-aos-duration="1200" data-aos-delay="1100">
               <img src="/media/template/arsya/Orn-31.webp" width="840" height="763" alt="Ornaments"  loading="lazy" decoding="async" />
             </div>
           </div>
           <div className="orn-wish-1 left">
-            <div className="image-wrap" data-aos="zoom-in-up" data-aos-duration="2600" data-aos-delay="2200">
+            <div className="image-wrap" data-aos="zoom-in-up" data-aos-duration="1300" data-aos-delay="1100">
               <img src="/media/template/arsya/Orn-28.webp" width="400" height="954" alt="Ornaments"  loading="lazy" decoding="async" />
             </div>
           </div>
           <div className="orn-wish-1 right">
-            <div className="image-wrap" data-aos="zoom-in-up" data-aos-duration="2600" data-aos-delay="2200">
+            <div className="image-wrap" data-aos="zoom-in-up" data-aos-duration="1300" data-aos-delay="1100">
               <img src="/media/template/arsya/Orn-28.webp" width="400" height="954" alt="Ornaments"  loading="lazy" decoding="async" />
             </div>
           </div>
         </div>
 
         <div className="wedding-wish-head">
-          <h1 className="wedding-wish-title" data-aos="fade-up" data-aos-duration="1200">
+          <h1 className="wedding-wish-title" data-aos="fade-up" data-aos-duration="600">
             Wedding Wish
           </h1>
         </div>
@@ -209,8 +234,8 @@ export default function WeddingWish() {
             <div className="wedding-wish-form">
               <form className="" id="weddingWishForm" onSubmit={handleSubmit}>
 
-                <div className="form-group guest-comment-wrap" data-aos="fade-up" data-aos-duration="1200"
-                  data-aos-delay="300">
+                <div className="form-group guest-comment-wrap" data-aos="fade-up" data-aos-duration="600"
+                  data-aos-delay="150">
                   <textarea
                     className="form-control guest-comment no-scrollbar"
                     name="comment"
@@ -222,8 +247,8 @@ export default function WeddingWish() {
                   />
                 </div>
 
-                <div className="submit-comment-wrap" data-aos="fade-up" data-aos-duration="1200"
-                  data-aos-delay="400">
+                <div className="submit-comment-wrap" data-aos="fade-up" data-aos-duration="600"
+                  data-aos-delay="200">
                   <button type="submit" className="submit submit-comment" disabled={sending}>
                     {sending ? 'Sending...' : 'Send'}
                   </button>
@@ -267,46 +292,46 @@ export default function WeddingWish() {
 
         <div className="ornaments-wrapper">
           <div className="orn-lv-3">
-            <div className="image-wrap" data-aos="fade-up" data-aos-duration="1200" data-aos-delay="500">
+            <div className="image-wrap" data-aos="fade-up" data-aos-duration="600" data-aos-delay="250">
               <img src="/media/template/arsya/Orn-23.webp" width="600" height="293" alt="Ornaments"  loading="lazy" decoding="async" />
             </div>
           </div>
           <div className="orn-lv-2 left">
             <div className="orn-lv-2-3">
-              <div className="image-wrap" data-aos="zoom-in-up" data-aos-duration="1500" data-aos-delay="1200">
+              <div className="image-wrap" data-aos="zoom-in-up" data-aos-duration="750" data-aos-delay="600">
                 <img src="/media/template/arsya/Orn-05.webp" width="400" height="1019" alt="Ornaments"  loading="lazy" decoding="async" />
               </div>
             </div>
             <div className="orn-lv-2-2">
-              <div className="image-wrap" data-aos="zoom-in-up" data-aos-duration="1600" data-aos-delay="1100">
+              <div className="image-wrap" data-aos="zoom-in-up" data-aos-duration="800" data-aos-delay="550">
                 <img src="/media/template/arsya/Orn-03.webp" width="400" height="841" alt="Ornaments"  loading="lazy" decoding="async" />
               </div>
             </div>
-            <div className="image-wrap" data-aos="fade-right" data-aos-duration="1200" data-aos-delay="500">
+            <div className="image-wrap" data-aos="fade-right" data-aos-duration="600" data-aos-delay="250">
               <img src="/media/template/arsya/Orn-20.webp" width="534" height="357" alt="Ornaments"  loading="lazy" decoding="async" />
             </div>
             <div className="orn-lv-2-1">
-              <div className="image-wrap" data-aos="fade-right" data-aos-duration="1200" data-aos-delay="500">
+              <div className="image-wrap" data-aos="fade-right" data-aos-duration="600" data-aos-delay="250">
                 <img src="/media/template/arsya/Orn-29.webp" width="376" height="294" alt="Ornaments"  loading="lazy" decoding="async" />
               </div>
             </div>
           </div>
           <div className="orn-lv-2 right">
             <div className="orn-lv-2-3">
-              <div className="image-wrap" data-aos="zoom-in-up" data-aos-duration="1500" data-aos-delay="1200">
+              <div className="image-wrap" data-aos="zoom-in-up" data-aos-duration="750" data-aos-delay="600">
                 <img src="/media/template/arsya/Orn-05.webp" width="400" height="1019" alt="Ornaments"  loading="lazy" decoding="async" />
               </div>
             </div>
             <div className="orn-lv-2-2">
-              <div className="image-wrap" data-aos="zoom-in-up" data-aos-duration="1600" data-aos-delay="1100">
+              <div className="image-wrap" data-aos="zoom-in-up" data-aos-duration="800" data-aos-delay="550">
                 <img src="/media/template/arsya/Orn-03.webp" width="400" height="841" alt="Ornaments"  loading="lazy" decoding="async" />
               </div>
             </div>
-            <div className="image-wrap" data-aos="fade-right" data-aos-duration="1200" data-aos-delay="500">
+            <div className="image-wrap" data-aos="fade-right" data-aos-duration="600" data-aos-delay="250">
               <img src="/media/template/arsya/Orn-20.webp" width="534" height="357" alt="Ornaments"  loading="lazy" decoding="async" />
             </div>
             <div className="orn-lv-2-1">
-              <div className="image-wrap" data-aos="fade-right" data-aos-duration="1200" data-aos-delay="500">
+              <div className="image-wrap" data-aos="fade-right" data-aos-duration="600" data-aos-delay="250">
                 <img src="/media/template/arsya/Orn-29.webp" width="376" height="294" alt="Ornaments"  loading="lazy" decoding="async" />
               </div>
             </div>
