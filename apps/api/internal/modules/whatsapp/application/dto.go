@@ -2,11 +2,27 @@ package application
 
 // WhatsAppStatusDTO - kontrak GET /api/v1/admin/whatsapp/status. PairingQR
 // terisi hanya selama pairing berlangsung dan belum sukses (PLAN.md §6.4).
+// LoggedIn (sesi ada) dan Connected (socket hidup) DIPISAH (keputusan D3):
+// IsLoggedIn saja berbohong sesudah putus jaringan biasa, jadi dashboard
+// wajib membaca keduanya (whatsapp-connection-resilience §2.1).
 type WhatsAppStatusDTO struct {
 	LoggedIn     bool   `json:"loggedIn"`
+	Connected    bool   `json:"connected"`
 	Pairing      bool   `json:"pairing"`
 	PairingQR    string `json:"pairingQR"`
 	PairingError string `json:"pairingError"`
+	// LastConnectedAt RFC3339, string kosong bila belum pernah terhubung
+	// sejak boot. LastError alasan gangguan terakhir, kosong bila sehat.
+	LastConnectedAt string `json:"lastConnectedAt"`
+	LastError       string `json:"lastError"`
+}
+
+// LogoutResultDTO - hasil POST /api/v1/admin/whatsapp/logout (keputusan D2).
+// RemoteRevoked false berarti sesi lokal sudah bersih tetapi server WhatsApp
+// tidak sempat dihubungi (socket mati) - admin perlu menghapus perangkat
+// manual di HP supaya tidak tetap terdaftar di sana.
+type LogoutResultDTO struct {
+	RemoteRevoked bool `json:"remoteRevoked"`
 }
 
 // WhatsAppConfigDTO dipakai KEDUA arah - GetConfig mengembalikannya dan

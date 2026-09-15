@@ -13,6 +13,8 @@ const DEFAULT_SESSION: GuestSession = {
   // tamu untuk dibaca. 2 mempertahankan tampilan dua tombol yang berlaku
   // sebelum fitur jatah kursi ada - pratinjau tidak boleh ikut berubah.
   paxQuota: 2,
+  hasWish: false,
+  wishMessage: '',
 }
 
 /** Keputusan akses undangan untuk pembuka halaman ini.
@@ -60,6 +62,12 @@ interface ResolvedGuest {
   rsvpStatus: GuestSession['status']
   attendingCount: number
   paxQuota: number
+  // Status ucapan (docs/plan/wedding-wish/PLAN.md T13): WAJIB diteruskan di
+  // sini, kalau tidak field hasWish/wishMessage dari respons by-token tidak
+  // pernah sampai ke komponen WeddingWish. Mekanisme cache promise-nya TIDAK
+  // berubah - tetap satu request yang sama, tanpa permintaan tambahan.
+  hasWish: boolean
+  wishMessage: string
 }
 
 /** Cache PROMISE (bukan hasilnya) per token, level modul.
@@ -141,7 +149,7 @@ export function useGuestSession(): GuestSessionState {
     let cancelled = false
 
     resolveGuest(token)
-      .then(({ name, side, rsvpStatus, attendingCount, paxQuota }) => {
+      .then(({ name, side, rsvpStatus, attendingCount, paxQuota, hasWish, wishMessage }) => {
         if (cancelled) return
         setSession({
           name, side, status: rsvpStatus, token,
@@ -150,6 +158,11 @@ export function useGuestSession(): GuestSessionState {
           // lama/tak lengkap tidak boleh menghasilkan jatah 0, yang akan
           // membuat tamu tidak bisa memilih angka apa pun.
           paxQuota: paxQuota || 2,
+          // `??` (bukan `||`): respons backend LAMA yang belum mengenal
+          // ucapan tidak punya field ini (undefined) dan harus jatuh ke
+          // default; nilai sah (false/'') tidak boleh tertimpa.
+          hasWish: hasWish ?? false,
+          wishMessage: wishMessage ?? '',
           resolved: true, access: 'granted',
         })
       })

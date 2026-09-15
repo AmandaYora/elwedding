@@ -82,11 +82,32 @@ func (h *Handler) Logout(w http.ResponseWriter, r *http.Request) {
 	if h.unavailable(w) {
 		return
 	}
-	if err := h.service.Logout(r.Context()); err != nil {
+	result, err := h.service.Logout(r.Context())
+	if err != nil {
 		writeServiceError(w, err)
 		return
 	}
-	response.OK(w, "Logged out successfully", nil)
+	// Keputusan D2: sesi lokal SELALU bersih pada titik ini. Bila server
+	// WhatsApp tidak sempat dihubungi (socket mati), katakan dengan jujur
+	// supaya admin menghapus perangkat manual di HP-nya.
+	if result.RemoteRevoked {
+		response.OK(w, "Logged out successfully", result)
+		return
+	}
+	response.OK(w, "Koneksi lokal diputus, tetapi perangkat mungkin masih terdaftar di HP. Hapus manual lewat WhatsApp > Perangkat Tertaut bila masih muncul di sana.", result)
+}
+
+// Reconnect pemulihan manual oleh admin (keputusan D4) - muncul sebagai
+// tombol "Sambungkan Ulang" saat tertaut tetapi terputus.
+func (h *Handler) Reconnect(w http.ResponseWriter, r *http.Request) {
+	if h.unavailable(w) {
+		return
+	}
+	if err := h.service.Reconnect(r.Context()); err != nil {
+		writeServiceError(w, err)
+		return
+	}
+	response.OK(w, "Reconnected successfully", nil)
 }
 
 func (h *Handler) GetConfig(w http.ResponseWriter, r *http.Request) {

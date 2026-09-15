@@ -34,6 +34,7 @@ func TestWhatsApp_ModulMati_BalasJSONBukanPanic(t *testing.T) {
 		{http.MethodGet, "/api/v1/admin/whatsapp/status"},
 		{http.MethodPost, "/api/v1/admin/whatsapp/pair/start"},
 		{http.MethodPost, "/api/v1/admin/whatsapp/logout"},
+		{http.MethodPost, "/api/v1/admin/whatsapp/reconnect"},
 		{http.MethodGet, "/api/v1/admin/whatsapp/config"},
 		{http.MethodPut, "/api/v1/admin/whatsapp/config"},
 		{http.MethodGet, "/api/v1/admin/whatsapp/logs"},

@@ -8,6 +8,7 @@ package sqlc
 import (
 	"context"
 	"database/sql"
+	"time"
 )
 
 const countSendLogs = `-- name: CountSendLogs :one
@@ -22,7 +23,7 @@ func (q *Queries) CountSendLogs(ctx context.Context) (int64, error) {
 }
 
 const getSendLogByID = `-- name: GetSendLogByID :one
-SELECT id, guest_id, guest_name, phone, qr_payload, couple_name, event_date_label, status, error_message, sent_at, created_at, attending_count FROM whatsapp_send_logs WHERE id = ? LIMIT 1
+SELECT id, guest_id, guest_name, phone, qr_payload, couple_name, event_date_label, error_message, sent_at, created_at, attending_count, retry_count, next_retry_at, status FROM whatsapp_send_logs WHERE id = ? LIMIT 1
 `
 
 func (q *Queries) GetSendLogByID(ctx context.Context, id uint64) (WhatsappSendLog, error) {
@@ -36,11 +37,13 @@ func (q *Queries) GetSendLogByID(ctx context.Context, id uint64) (WhatsappSendLo
 		&i.QrPayload,
 		&i.CoupleName,
 		&i.EventDateLabel,
-		&i.Status,
 		&i.ErrorMessage,
 		&i.SentAt,
 		&i.CreatedAt,
 		&i.AttendingCount,
+		&i.RetryCount,
+		&i.NextRetryAt,
+		&i.Status,
 	)
 	return i, err
 }
@@ -95,8 +98,59 @@ func (q *Queries) InsertSendLog(ctx context.Context, arg InsertSendLogParams) (i
 	return result.LastInsertId()
 }
 
+const listRetryableSendLogs = `-- name: ListRetryableSendLogs :many
+SELECT id, guest_id, guest_name, phone, qr_payload, couple_name, event_date_label, error_message, sent_at, created_at, attending_count, retry_count, next_retry_at, status FROM whatsapp_send_logs
+WHERE status = 'retrying' AND next_retry_at IS NOT NULL AND next_retry_at <= ?
+ORDER BY next_retry_at ASC
+LIMIT ?
+`
+
+type ListRetryableSendLogsParams struct {
+	NextRetryAt sql.NullTime
+	Limit       int32
+}
+
+// Filter dan sort keduanya terlayani idx_wa_logs_retry (status, next_retry_at).
+func (q *Queries) ListRetryableSendLogs(ctx context.Context, arg ListRetryableSendLogsParams) ([]WhatsappSendLog, error) {
+	rows, err := q.db.QueryContext(ctx, listRetryableSendLogs, arg.NextRetryAt, arg.Limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []WhatsappSendLog
+	for rows.Next() {
+		var i WhatsappSendLog
+		if err := rows.Scan(
+			&i.ID,
+			&i.GuestID,
+			&i.GuestName,
+			&i.Phone,
+			&i.QrPayload,
+			&i.CoupleName,
+			&i.EventDateLabel,
+			&i.ErrorMessage,
+			&i.SentAt,
+			&i.CreatedAt,
+			&i.AttendingCount,
+			&i.RetryCount,
+			&i.NextRetryAt,
+			&i.Status,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listSendLogs = `-- name: ListSendLogs :many
-SELECT id, guest_id, guest_name, phone, qr_payload, couple_name, event_date_label, status, error_message, sent_at, created_at, attending_count FROM whatsapp_send_logs ORDER BY created_at DESC LIMIT ? OFFSET ?
+SELECT id, guest_id, guest_name, phone, qr_payload, couple_name, event_date_label, error_message, sent_at, created_at, attending_count, retry_count, next_retry_at, status FROM whatsapp_send_logs ORDER BY created_at DESC LIMIT ? OFFSET ?
 `
 
 type ListSendLogsParams struct {
@@ -121,11 +175,13 @@ func (q *Queries) ListSendLogs(ctx context.Context, arg ListSendLogsParams) ([]W
 			&i.QrPayload,
 			&i.CoupleName,
 			&i.EventDateLabel,
-			&i.Status,
 			&i.ErrorMessage,
 			&i.SentAt,
 			&i.CreatedAt,
 			&i.AttendingCount,
+			&i.RetryCount,
+			&i.NextRetryAt,
+			&i.Status,
 		); err != nil {
 			return nil, err
 		}
@@ -140,8 +196,58 @@ func (q *Queries) ListSendLogs(ctx context.Context, arg ListSendLogsParams) ([]W
 	return items, nil
 }
 
+const reapStalePendingSendLogs = `-- name: ReapStalePendingSendLogs :exec
+UPDATE whatsapp_send_logs
+SET status = 'retrying',
+    next_retry_at = ?,
+    error_message = COALESCE(error_message, 'proses kirim terputus, dijadwalkan ulang')
+WHERE status = 'pending' AND created_at < ?
+`
+
+type ReapStalePendingSendLogsParams struct {
+	NextRetryAt sql.NullTime
+	CreatedAt   time.Time
+}
+
+// Baris 'pending' yang tertinggal karena API mati di tengah kirim dijadwalkan
+// ulang, bukan dibiarkan menggantung selamanya (menutup G6).
+// COALESCE menjaga pesan error yang sudah ada agar tidak tertimpa: hari ini
+// baris 'pending' selalu ber-error_message NULL (hanya InsertSendLog yang
+// menulis status itu), jadi ini pengamanan terhadap perubahan di kemudian hari,
+// bukan perbaikan bug yang aktif.
+func (q *Queries) ReapStalePendingSendLogs(ctx context.Context, arg ReapStalePendingSendLogsParams) error {
+	_, err := q.db.ExecContext(ctx, reapStalePendingSendLogs, arg.NextRetryAt, arg.CreatedAt)
+	return err
+}
+
+const scheduleSendLogRetry = `-- name: ScheduleSendLogRetry :exec
+UPDATE whatsapp_send_logs
+SET status = 'retrying', error_message = ?, retry_count = ?, next_retry_at = ?
+WHERE id = ?
+`
+
+type ScheduleSendLogRetryParams struct {
+	ErrorMessage sql.NullString
+	RetryCount   uint8
+	NextRetryAt  sql.NullTime
+	ID           uint64
+}
+
+// retry_count ditulis sebagai nilai ABSOLUT (bukan retry_count + 1), supaya
+// jalur Resend manual yang mengoper retryCount = 0 benar-benar mengulang
+// hitungan dari awal (whatsapp-connection-resilience §5.3.1).
+func (q *Queries) ScheduleSendLogRetry(ctx context.Context, arg ScheduleSendLogRetryParams) error {
+	_, err := q.db.ExecContext(ctx, scheduleSendLogRetry,
+		arg.ErrorMessage,
+		arg.RetryCount,
+		arg.NextRetryAt,
+		arg.ID,
+	)
+	return err
+}
+
 const updateSendLogStatus = `-- name: UpdateSendLogStatus :exec
-UPDATE whatsapp_send_logs SET status = ?, error_message = ?, sent_at = ? WHERE id = ?
+UPDATE whatsapp_send_logs SET status = ?, error_message = ?, sent_at = ?, next_retry_at = NULL WHERE id = ?
 `
 
 type UpdateSendLogStatusParams struct {
@@ -151,6 +257,8 @@ type UpdateSendLogStatusParams struct {
 	ID           uint64
 }
 
+// Ikut mengosongkan jadwal retry saat baris mencapai keadaan terminal.
+// Params struct TIDAK berubah karena NULL ditulis sebagai literal.
 func (q *Queries) UpdateSendLogStatus(ctx context.Context, arg UpdateSendLogStatusParams) error {
 	_, err := q.db.ExecContext(ctx, updateSendLogStatus,
 		arg.Status,

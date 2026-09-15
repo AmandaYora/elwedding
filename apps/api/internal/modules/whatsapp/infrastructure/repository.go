@@ -41,3 +41,15 @@ func (r *Repository) ListSendLogs(ctx context.Context, arg sqlc.ListSendLogsPara
 func (r *Repository) CountSendLogs(ctx context.Context) (int64, error) {
 	return r.q.CountSendLogs(ctx)
 }
+
+func (r *Repository) ScheduleSendLogRetry(ctx context.Context, arg sqlc.ScheduleSendLogRetryParams) error {
+	return r.q.ScheduleSendLogRetry(ctx, arg)
+}
+
+func (r *Repository) ListRetryableSendLogs(ctx context.Context, arg sqlc.ListRetryableSendLogsParams) ([]sqlc.WhatsappSendLog, error) {
+	return r.q.ListRetryableSendLogs(ctx, arg)
+}
+
+func (r *Repository) ReapStalePendingSendLogs(ctx context.Context, arg sqlc.ReapStalePendingSendLogsParams) error {
+	return r.q.ReapStalePendingSendLogs(ctx, arg)
+}

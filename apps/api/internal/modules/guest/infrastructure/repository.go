@@ -170,3 +170,43 @@ func (r *Repository) CountGuestsByGroupID(ctx context.Context, id uint64) (int64
 func (r *Repository) CountGroupedByGroup(ctx context.Context) ([]sqlc.CountGuestsGroupedByGroupRow, error) {
 	return r.q.CountGuestsGroupedByGroup(ctx)
 }
+
+// --- wedding wishes (docs/plan/wedding-wish/PLAN.md T5) ---
+//
+// Tabel wedding_wishes DIMILIKI modul guest yang sama (D5), jadi seluruh
+// method di bawah tetap penerusan tipis ke r.q.* seperti method group di
+// atas - tidak ada repository baru, tidak ada contracts/, tidak ada module
+// client. Query-nya menyentuh wedding_wishes dan guests - keduanya milik
+// modul ini, jadi JOIN intra-modul di query list sah.
+
+func (r *Repository) CreateWish(ctx context.Context, arg sqlc.CreateWeddingWishParams) (int64, error) {
+	return r.q.CreateWeddingWish(ctx, arg)
+}
+
+func (r *Repository) GetWishByGuestID(ctx context.Context, guestID uint64) (sqlc.WeddingWish, error) {
+	return r.q.GetWeddingWishByGuestID(ctx, guestID)
+}
+
+func (r *Repository) GetWishByID(ctx context.Context, id uint64) (sqlc.WeddingWish, error) {
+	return r.q.GetWeddingWishByID(ctx, id)
+}
+
+func (r *Repository) ListPublicWishes(ctx context.Context, limit int32) ([]sqlc.ListPublicWeddingWishesRow, error) {
+	return r.q.ListPublicWeddingWishes(ctx, limit)
+}
+
+func (r *Repository) ListWishesAdmin(ctx context.Context, arg sqlc.ListWeddingWishesAdminParams) ([]sqlc.ListWeddingWishesAdminRow, error) {
+	return r.q.ListWeddingWishesAdmin(ctx, arg)
+}
+
+func (r *Repository) CountWishes(ctx context.Context) (int64, error) {
+	return r.q.CountWeddingWishes(ctx)
+}
+
+func (r *Repository) SetWishHidden(ctx context.Context, arg sqlc.SetWeddingWishHiddenParams) error {
+	return r.q.SetWeddingWishHidden(ctx, arg)
+}
+
+func (r *Repository) DeleteWish(ctx context.Context, id uint64) error {
+	return r.q.DeleteWeddingWish(ctx, id)
+}

@@ -134,6 +134,22 @@ export interface GuestSession {
   // BENTUK pertanyaan di RsvpConfirmation: 1 = tidak ditanya sama sekali,
   // 2 = dua tombol seperti sebelumnya, >=3 = daftar tombol sampai batas jatah.
   paxQuota: number
+  // Status ucapan milik tamu ini (docs/plan/wedding-wish/PLAN.md T13).
+  // Menumpang respons by-token supaya komponen WeddingWish tahu form atau
+  // kartu "Ucapan Anda" yang ditampilkan - tanpa permintaan tambahan.
+  hasWish: boolean
+  wishMessage: string
+}
+
+// PublicWish - satu ucapan di slider undangan
+// (docs/plan/wedding-wish/PLAN.md T13). Nama field cocok persis dengan JSON
+// tag PublicWishDTO di backend (camelCase).
+export interface PublicWish {
+  id: number
+  guestName: string
+  guestSide: 'groom' | 'bride'
+  message: string
+  createdAt: string
 }
 
 // RsvpUpdateResponse - respons PATCH /public/guests/by-token/:token/rsvp

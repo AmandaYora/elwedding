@@ -29,7 +29,8 @@ test('tanpa ?guest= -> fallback "Tamu Undangan", tanpa network call', () => {
     // nilai mode pratinjau, dan 2 mempertahankan dua tombol seperti sebelum
     // fitur jatah kursi ada.
     name: 'Tamu Undangan', side: null, status: 'pending', token: null,
-    attendingCount: 1, paxQuota: 2, resolved: false, access: 'denied',
+    attendingCount: 1, paxQuota: 2, hasWish: false, wishMessage: '',
+    resolved: false, access: 'denied',
   })
   expect(mockedGet).not.toHaveBeenCalled()
 })
@@ -48,9 +49,32 @@ test('dengan token valid -> resolve nama, status, & jumlah tamu dari API', async
   await waitFor(() => expect(result.current.name).toBe('Budi Santoso'))
   expect(result.current).toEqual({
     name: 'Budi Santoso', side: 'groom', status: 'attending', token: 'abc123',
-    attendingCount: 2, paxQuota: 4, resolved: true, access: 'granted',
+    attendingCount: 2, paxQuota: 4, hasWish: false, wishMessage: '',
+    resolved: true, access: 'granted',
   })
   expect(mockedGet).toHaveBeenCalledWith('/api/v1/public/guests/by-token/abc123')
+})
+
+// Status ucapan menumpang respons by-token (docs/plan/wedding-wish/PLAN.md
+// T13) - hook WAJIB meneruskannya, kalau tidak WeddingWish tidak pernah tahu
+// form atau kartu "Ucapan Anda" yang ditampilkan.
+test('respons membawa hasWish/wishMessage -> diteruskan ke konsumen', async () => {
+  setSearch('?guest=abc123')
+  mockedGet.mockResolvedValueOnce({
+    data: {
+      success: true,
+      data: {
+        name: 'Budi Santoso', side: 'groom', rsvpStatus: 'attending',
+        attendingCount: 2, paxQuota: 4,
+        hasWish: true, wishMessage: 'Selamat ya!',
+      },
+    },
+  })
+
+  const { result } = renderHook(() => useGuestSession())
+
+  await waitFor(() => expect(result.current.hasWish).toBe(true))
+  expect(result.current.wishMessage).toBe('Selamat ya!')
 })
 
 // --- keputusan akses (gerbang undangan) ---

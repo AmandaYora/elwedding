@@ -1,0 +1,124 @@
+/* Gaya slider & kartu ucapan (docs/plan/wedding-wish/PLAN.md T14).
+ *
+ * Kelas berawalan `ww-` milik komponen React ini. Kelas template
+ * (`wedding-wish-*`, `form-control`, `submit`, ...) TIDAK didefinisikan ulang
+ * di sini - semuanya tetap datang dari stylesheet template.
+ *
+ * Diimpor langsung oleh WeddingWish.tsx, preseden guest-gate.css. */
+
+.ww-slider {
+  overflow: hidden;
+  position: relative;
+  width: 100%;
+}
+
+.ww-track {
+  display: flex;
+  transition: transform 0.5s ease;
+  will-change: transform;
+}
+
+.ww-slide {
+  flex: 0 0 100%;
+  min-width: 0;
+  padding: 0.25rem 0.5rem;
+  box-sizing: border-box;
+}
+
+.ww-card {
+  margin: 0;
+  padding: 1.25rem 1.5rem;
+  border-radius: 1rem;
+  background: rgba(255, 255, 255, 0.75);
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.06);
+  text-align: center;
+}
+
+.ww-card-message {
+  margin: 0 0 0.75rem;
+  font-size: 0.95rem;
+  line-height: 1.6;
+  overflow-wrap: break-word;
+}
+
+.ww-card-name {
+  display: block;
+  font-weight: 600;
+  font-size: 0.9rem;
+}
+
+.ww-card-time {
+  display: block;
+  margin-top: 0.15rem;
+  font-size: 0.75rem;
+  opacity: 0.65;
+}
+
+.ww-dots {
+  display: flex;
+  justify-content: center;
+  gap: 0.5rem;
+  margin-top: 0.9rem;
+}
+
+.ww-dot {
+  width: 0.55rem;
+  height: 0.55rem;
+  padding: 0;
+  border: 0;
+  border-radius: 9999px;
+  background: rgba(0, 0, 0, 0.18);
+  cursor: pointer;
+}
+
+.ww-dot[data-active="true"] {
+  background: rgba(0, 0, 0, 0.55);
+}
+
+/* Kartu "Ucapan Anda" - pengganti form sesudah tamu mengisi (D3: sekali saja). */
+.ww-own {
+  margin: 0 auto;
+  max-width: 32rem;
+  padding: 1.25rem 1.5rem;
+  border-radius: 1rem;
+  background: rgba(255, 255, 255, 0.75);
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  text-align: center;
+}
+
+.ww-own-title {
+  margin: 0 0 0.5rem;
+  font-weight: 700;
+  font-size: 1rem;
+}
+
+.ww-own-message {
+  margin: 0;
+  font-size: 0.95rem;
+  line-height: 1.6;
+  overflow-wrap: break-word;
+}
+
+.ww-error {
+  margin: 0.75rem auto 0;
+  max-width: 32rem;
+  font-size: 0.85rem;
+  text-align: center;
+  color: #b91c1c;
+}
+
+.ww-sender-note {
+  margin: 0 0 0.75rem;
+  font-size: 0.8rem;
+  text-align: center;
+  opacity: 0.7;
+}
+
+/* Menghormati prefers-reduced-motion (D6/T15): auto-advance dimatikan di JS,
+ * dan sisa gerak (transisi geser saat dots ditekan) ikut dimatikan di sini. */
+@media (prefers-reduced-motion: reduce) {
+  .ww-track {
+    transition: none;
+  }
+}

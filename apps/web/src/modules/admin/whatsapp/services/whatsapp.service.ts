@@ -2,9 +2,16 @@ import { httpClient } from '@/shared/services/http-client'
 
 export interface WhatsAppStatus {
   loggedIn: boolean
+  /** Socket hidup. Dipisah dari loggedIn (keputusan D3): sesi bisa ada
+   * sementara socket mati, dan itulah akar defect koneksi ini. */
+  connected: boolean
   pairing: boolean
   pairingQR: string
   pairingError: string
+  /** RFC3339, string kosong bila belum pernah terhubung sejak boot. */
+  lastConnectedAt: string | null
+  /** Alasan gangguan terakhir, string kosong bila sehat. */
+  lastError: string
 }
 
 export interface WhatsAppConfig {
@@ -21,7 +28,7 @@ export interface WhatsAppConfig {
   isEnabled: boolean
 }
 
-export type SendLogStatus = 'pending' | 'sent' | 'failed'
+export type SendLogStatus = 'pending' | 'sent' | 'failed' | 'retrying'
 
 export interface SendLog {
   id: number
@@ -54,8 +61,13 @@ export async function startPairing(): Promise<void> {
   await httpClient.post('/api/v1/admin/whatsapp/pair/start')
 }
 
-export async function logout(): Promise<void> {
-  await httpClient.post('/api/v1/admin/whatsapp/logout')
+export async function logout(): Promise<{ remoteRevoked: boolean }> {
+  const res = await httpClient.post<{ data: { remoteRevoked: boolean } }>('/api/v1/admin/whatsapp/logout')
+  return res.data.data
+}
+
+export async function reconnect(): Promise<void> {
+  await httpClient.post('/api/v1/admin/whatsapp/reconnect')
 }
 
 export async function getConfig(): Promise<WhatsAppConfig> {

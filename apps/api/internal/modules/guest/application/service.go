@@ -50,6 +50,14 @@ var (
 	ErrGroupNotFound           = errors.New("Group tidak ditemukan")
 	ErrGroupInUse              = errors.New("Group tidak bisa dihapus")
 	ErrInvalidGroupID          = errors.New("Filter group tidak valid")
+
+	// Wedding wish (docs/plan/wedding-wish/PLAN.md T6). Pesannya berbahasa
+	// Indonesia dan LAYAK DIBACA TAMU maupun admin - SubmitWish dipakai tamu
+	// lewat undangan publik, bukan hanya admin. Pola blok group di atas.
+	ErrWishAlreadySubmitted = errors.New("Anda sudah pernah mengirim ucapan")
+	ErrWishEmpty            = errors.New("Ucapan tidak boleh kosong")
+	ErrWishTooLong          = errors.New("Ucapan maksimal 500 karakter")
+	ErrWishNotFound         = errors.New("Ucapan tidak ditemukan")
 )
 
 var validSides = map[string]bool{"groom": true, "bride": true}
@@ -577,10 +585,23 @@ func (s *Service) ResolveByToken(ctx context.Context, token string) (GuestSessio
 		}
 		return GuestSessionDTO{}, err
 	}
-	return GuestSessionDTO{
+	dto := GuestSessionDTO{
 		Name: row.Name, Side: string(row.Side), RsvpStatus: string(row.RsvpStatus),
 		AttendingCount: int(row.AttendingCount), PaxQuota: int(row.PaxQuota),
-	}, nil
+	}
+	// Status ucapan menumpang di sini (docs/plan/wedding-wish/PLAN.md T10):
+	// endpoint ini sudah pasti dipanggil tiap tamu membuka undangan, jadi
+	// tanpa satu pun permintaan tambahan frontend tahu form atau kartu
+	// "Ucapan Anda" yang ditampilkan. sql.ErrNoRows berarti belum mengisi,
+	// BUKAN error. GetByToken di atas TIDAK diubah bentuknya - query itu juga
+	// dipakai CheckinByCode yang tidak ada hubungannya dengan ucapan.
+	if wish, err := s.repo.GetWishByGuestID(ctx, row.ID); err == nil {
+		dto.HasWish = true
+		dto.WishMessage = wish.Message
+	} else if !errors.Is(err, sql.ErrNoRows) {
+		return GuestSessionDTO{}, err
+	}
+	return dto, nil
 }
 
 // resolveAttendingCount memvalidasi & menormalisasi jumlah tamu (dashboard-
@@ -929,7 +950,7 @@ func buildCheckinSummaryDTO(row sqlc.GetCheckinSummaryRow) CheckinSummaryDTO {
 // statusHTTPCode memetakan error domain ke status HTTP - dipakai presentation.
 func StatusHTTPCode(err error) int {
 	switch {
-	case errors.Is(err, ErrNotFound), errors.Is(err, ErrGroupNotFound):
+	case errors.Is(err, ErrNotFound), errors.Is(err, ErrGroupNotFound), errors.Is(err, ErrWishNotFound):
 		return 404
 	case errors.Is(err, ErrInvalidSide), errors.Is(err, ErrInvalidStatus),
 		errors.Is(err, ErrInvalidGender), errors.Is(err, ErrInvalidInvitationType), errors.Is(err, ErrInvalidSouvenirType),
@@ -937,7 +958,8 @@ func StatusHTTPCode(err error) int {
 		errors.Is(err, ErrInvalidPaxQuota), errors.Is(err, ErrPaxQuotaBelowConfirmed),
 		errors.Is(err, ErrGroupNameRequired), errors.Is(err, ErrGroupNameTooLong),
 		errors.Is(err, ErrGroupDescriptionTooLong), errors.Is(err, ErrGroupNameTaken),
-		errors.Is(err, ErrGroupInUse), errors.Is(err, ErrInvalidGroupID):
+		errors.Is(err, ErrGroupInUse), errors.Is(err, ErrInvalidGroupID),
+		errors.Is(err, ErrWishAlreadySubmitted), errors.Is(err, ErrWishEmpty), errors.Is(err, ErrWishTooLong):
 		return 400
 	default:
 		return 500

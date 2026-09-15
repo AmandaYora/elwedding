@@ -66,6 +66,15 @@ func New(d Deps) http.Handler {
 	mux.HandleFunc("GET /api/v1/public/invitation", d.ContentHandler.GetPublicInvitation)
 	mux.HandleFunc("GET /api/v1/public/guests/by-token/{token}", d.GuestHandler.ResolveByToken)
 	mux.HandleFunc("PATCH /api/v1/public/guests/by-token/{token}/rsvp", d.GuestHandler.UpdateRsvpStatus)
+	// Ucapan tamu (docs/plan/wedding-wish/PLAN.md T12). Pola path-nya LEBIH
+	// PANJANG daripada ResolveByToken/UpdateRsvpStatus di atas, jadi Go 1.22+
+	// ServeMux memilih yang paling spesifik dan ketiganya tidak bentrok -
+	// mekanisme yang sama dengan /guests/summary vs /guests/{id}.
+	// Daftar ucapan SENGAJA ber-token (bukan /public/wishes terbuka): isinya
+	// nama-nama tamu undangan, dan penegakannya ada di service
+	// (ListPublicWishes memverifikasi token), bukan di bentuk URL.
+	mux.HandleFunc("POST /api/v1/public/guests/by-token/{token}/wish", d.GuestHandler.SubmitWish)
+	mux.HandleFunc("GET /api/v1/public/guests/by-token/{token}/wishes", d.GuestHandler.ListPublicWishes)
 
 	// --- admin: content (JWT) ---
 	admin := http.NewServeMux()
@@ -129,6 +138,13 @@ func New(d Deps) http.Handler {
 	admin.HandleFunc("DELETE /api/v1/admin/guests/{id}/rsvp", d.GuestHandler.ResetRsvp)
 	admin.HandleFunc("PATCH /api/v1/admin/guests/{id}/contacted", d.GuestHandler.SetContacted)
 
+	// --- admin: ucapan tamu (docs/plan/wedding-wish/PLAN.md T12) ---
+	// Didaftarkan di mux `admin`, jadi otomatis di balik RequireFullAdmin
+	// seperti seluruh menu admin lain - petugas gate menerima 403.
+	admin.HandleFunc("GET /api/v1/admin/wishes", d.GuestHandler.ListWishesAdmin)
+	admin.HandleFunc("PATCH /api/v1/admin/wishes/{id}/hidden", d.GuestHandler.SetWishHidden)
+	admin.HandleFunc("DELETE /api/v1/admin/wishes/{id}", d.GuestHandler.DeleteWish)
+
 	// --- admin: users (JWT) - kelola akun admin (docs/plan/admin-users/PLAN.md) ---
 	admin.HandleFunc("GET /api/v1/admin/users", d.AuthHandler.ListUsers)
 	admin.HandleFunc("POST /api/v1/admin/users", d.AuthHandler.CreateUser)
@@ -150,6 +166,7 @@ func New(d Deps) http.Handler {
 	admin.HandleFunc("GET /api/v1/admin/whatsapp/status", d.WhatsAppHandler.GetStatus)
 	admin.HandleFunc("POST /api/v1/admin/whatsapp/pair/start", d.WhatsAppHandler.StartPairing)
 	admin.HandleFunc("POST /api/v1/admin/whatsapp/logout", d.WhatsAppHandler.Logout)
+	admin.HandleFunc("POST /api/v1/admin/whatsapp/reconnect", d.WhatsAppHandler.Reconnect)
 	admin.HandleFunc("GET /api/v1/admin/whatsapp/config", d.WhatsAppHandler.GetConfig)
 	admin.HandleFunc("PUT /api/v1/admin/whatsapp/config", d.WhatsAppHandler.UpdateConfig)
 	admin.HandleFunc("GET /api/v1/admin/whatsapp/logs", d.WhatsAppHandler.ListLogs)

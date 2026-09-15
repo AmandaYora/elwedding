@@ -268,9 +268,10 @@ func (ns NullGuestsSouvenirType) Value() (driver.Value, error) {
 type WhatsappSendLogsStatus string
 
 const (
-	WhatsappSendLogsStatusPending WhatsappSendLogsStatus = "pending"
-	WhatsappSendLogsStatusSent    WhatsappSendLogsStatus = "sent"
-	WhatsappSendLogsStatusFailed  WhatsappSendLogsStatus = "failed"
+	WhatsappSendLogsStatusPending  WhatsappSendLogsStatus = "pending"
+	WhatsappSendLogsStatusSent     WhatsappSendLogsStatus = "sent"
+	WhatsappSendLogsStatusFailed   WhatsappSendLogsStatus = "failed"
+	WhatsappSendLogsStatusRetrying WhatsappSendLogsStatus = "retrying"
 )
 
 func (e *WhatsappSendLogsStatus) Scan(src interface{}) error {
@@ -436,6 +437,15 @@ type WeddingGiftBank struct {
 	SortOrder     int32
 }
 
+type WeddingWish struct {
+	ID        uint64
+	GuestID   uint64
+	Message   string
+	IsHidden  bool
+	CreatedAt time.Time
+	UpdatedAt time.Time
+}
+
 type WhatsappConfig struct {
 	ID                 uint64
 	MessageTemplate    string
@@ -452,9 +462,11 @@ type WhatsappSendLog struct {
 	QrPayload      string
 	CoupleName     string
 	EventDateLabel string
-	Status         WhatsappSendLogsStatus
 	ErrorMessage   sql.NullString
 	SentAt         sql.NullTime
 	CreatedAt      time.Time
 	AttendingCount uint8
+	RetryCount     uint8
+	NextRetryAt    sql.NullTime
+	Status         WhatsappSendLogsStatus
 }

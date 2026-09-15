@@ -93,6 +93,36 @@ type GuestSessionDTO struct {
 	RsvpStatus     string `json:"rsvpStatus"`
 	AttendingCount int    `json:"attendingCount"`
 	PaxQuota       int    `json:"paxQuota"`
+	// HasWish/WishMessage - ucapan milik tamu itu sendiri (docs/plan/
+	// wedding-wish/PLAN.md T7). Menumpang endpoint by-token yang sudah pasti
+	// dipanggil, supaya frontend tahu form atau kartu "Ucapan Anda" yang
+	// ditampilkan - tanpa satu pun permintaan tambahan. Bukan data sensitif,
+	// alasan yang sama persis dengan AttendingCount/PaxQuota di atasnya.
+	HasWish     bool   `json:"hasWish"`
+	WishMessage string `json:"wishMessage"`
+}
+
+// PublicWishDTO - satu ucapan di slider undangan (docs/plan/wedding-wish/
+// PLAN.md §3.3). Nama pengirim ikut dari JOIN, bukan snapshot - perbaikan nama
+// di admin langsung tercermin. Waktu RFC3339, konvensi seluruh modul ini.
+type PublicWishDTO struct {
+	ID        uint64 `json:"id"`
+	GuestName string `json:"guestName"`
+	GuestSide string `json:"guestSide"`
+	Message   string `json:"message"`
+	CreatedAt string `json:"createdAt"`
+}
+
+// WishAdminDTO - satu baris menu Ucapan (ditambah GuestID & IsHidden dibanding
+// versi publik: admin mengelola, bukan sekadar melihat).
+type WishAdminDTO struct {
+	ID        uint64 `json:"id"`
+	GuestID   uint64 `json:"guestId"`
+	GuestName string `json:"guestName"`
+	GuestSide string `json:"guestSide"`
+	Message   string `json:"message"`
+	IsHidden  bool   `json:"isHidden"`
+	CreatedAt string `json:"createdAt"`
 }
 
 // GuestSummaryDTO - kontrak GET /api/v1/admin/guests/summary, dipakai

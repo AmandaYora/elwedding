@@ -18,7 +18,8 @@ function setAccess(access: GuestAccess) {
   mockedUseGuestSession.mockReturnValue({
     name: 'Tamu Undangan', side: null, status: 'pending',
     token: access === 'granted' ? 'tok' : null,
-    attendingCount: 1, paxQuota: 2, resolved: access === 'granted', access,
+    attendingCount: 1, paxQuota: 2, hasWish: false, wishMessage: '',
+    resolved: access === 'granted', access,
   })
 }
 

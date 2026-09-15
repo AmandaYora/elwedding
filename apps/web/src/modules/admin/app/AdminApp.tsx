@@ -12,6 +12,9 @@ import GuestsPage from '@/modules/admin/guests/pages/GuestsPage'
 // GroupsPage eager seperti rute lain - halaman kecil tanpa dependensi berat,
 // beda dari ScanPage yang lazy karena pustaka kamera (guest-groups T14).
 import GroupsPage from '@/modules/admin/groups/pages/GroupsPage'
+// WishesPage eager seperti rute lain - halaman kecil tanpa dependensi berat,
+// alasan yang sama dengan GroupsPage (docs/plan/wedding-wish/PLAN.md T20).
+import WishesPage from '@/modules/admin/wishes/pages/WishesPage'
 import ReservationsPage from '@/modules/admin/reservations/pages/ReservationsPage'
 import WhatsAppPage from '@/modules/admin/whatsapp/pages/WhatsAppPage'
 import UsersPage from '@/modules/admin/users/pages/UsersPage'
@@ -50,6 +53,7 @@ export default function AdminApp() {
               <Route path={ROUTE_PATHS.content} element={<ContentPage />} />
               <Route path={ROUTE_PATHS.guests} element={<GuestsPage />} />
               <Route path={ROUTE_PATHS.groups} element={<GroupsPage />} />
+              <Route path={ROUTE_PATHS.wishes} element={<WishesPage />} />
               <Route path={ROUTE_PATHS.reservations} element={<ReservationsPage />} />
               <Route path={ROUTE_PATHS.whatsapp} element={<WhatsAppPage />} />
               <Route path={ROUTE_PATHS.users} element={<UsersPage />} />

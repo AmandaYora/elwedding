@@ -8,6 +8,10 @@ export const ROUTE_PATHS = {
   // SCANNER_ALLOWED_PATHS di bawah: petugas gate MELIHAT group di hasil scan
   // tapi tidak mengelolanya (D10), sama seperti menu Tamu & Pengguna.
   groups: '/groups',
+  // Ucapan tamu (docs/plan/wedding-wish/PLAN.md T17). SENGAJA TIDAK masuk
+  // SCANNER_ALLOWED_PATHS di bawah: petugas gate tidak mengelola ucapan, sama
+  // seperti menu Tamu & Group.
+  wishes: '/wishes',
   reservations: '/reservations',
   whatsapp: '/whatsapp',
   users: '/users',

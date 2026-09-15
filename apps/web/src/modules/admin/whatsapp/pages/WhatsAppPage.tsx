@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { QRCodeCanvas } from 'qrcode.react'
 import {
   type WhatsAppStatus,
@@ -7,6 +7,7 @@ import {
   getStatus,
   startPairing,
   logout,
+  reconnect,
   getConfig,
   updateConfig,
   listLogs,
@@ -26,12 +27,33 @@ const SEND_LOG_STATUS_LABEL: Record<SendLog['status'], string> = {
   pending: 'Diproses',
   sent: 'Terkirim',
   failed: 'Gagal',
+  retrying: 'Menunggu kirim ulang',
 }
 
-function sendLogTone(status: SendLog['status']): 'slate' | 'blue' | 'amber' {
+function sendLogTone(status: SendLog['status']): 'slate' | 'blue' | 'amber' | 'violet' {
   if (status === 'sent') return 'blue'
   if (status === 'failed') return 'amber'
+  if (status === 'retrying') return 'violet'
   return 'slate'
+}
+
+// Empat keadaan koneksi yang terbaca admin (keputusan D3). loggedIn = sesi
+// ada, connected = socket hidup - keduanya wajib dibaca karena sesi bisa ada
+// sementara socket mati (akar defect §2.1).
+type ConnectionState = 'ready' | 'disconnected' | 'unpaired' | 'pairing'
+
+function connectionState(status: WhatsAppStatus): ConnectionState {
+  if (!status.loggedIn) {
+    return status.pairing || status.pairingQR ? 'pairing' : 'unpaired'
+  }
+  return status.connected ? 'ready' : 'disconnected'
+}
+
+const CONNECTION_STATE_LABEL: Record<ConnectionState, string> = {
+  ready: 'Siap mengirim',
+  disconnected: 'Tertaut, koneksi terputus',
+  unpaired: 'Belum tertaut',
+  pairing: 'Menunggu pindaian QR',
 }
 
 export default function WhatsAppPage() {
@@ -44,10 +66,16 @@ export default function WhatsAppPage() {
   const [statusReloadToken, setStatusReloadToken] = useState(0)
   const [pairingBusy, setPairingBusy] = useState(false)
   const [loggingOut, setLoggingOut] = useState(false)
+  const [reconnecting, setReconnecting] = useState(false)
   const [logoutConfirmOpen, setLogoutConfirmOpen] = useState(false)
+  // Cermin status terakhir untuk keputusan error di dalam poll (state React
+  // yang dibaca closure akan basi; ref selalu segar).
+  const statusRef = useRef<WhatsAppStatus | null>(null)
 
-  // Polling tiap 2 detik HANYA saat belum tertaut, dihentikan begitu
-  // loggedIn true atau komponen unmount (dashboard-wa-rsvp task D3).
+  // Polling TIDAK PERNAH berhenti (menutup G5): 2 detik saat belum siap,
+  // 15 detik saat siap mengirim. Satu blip jaringan tidak mematikan pantauan
+  // - ErrorState hanya bila belum pernah dapat status sama sekali, selebihnya
+  // status terakhir tetap tampil dan polling coba lagi 15 detik kemudian.
   useEffect(() => {
     let cancelled = false
     let timer: ReturnType<typeof setTimeout> | null = null
@@ -56,16 +84,18 @@ export default function WhatsAppPage() {
       try {
         const s = await getStatus()
         if (cancelled) return
+        statusRef.current = s
         setStatus(s)
         setStatusError(false)
         setStatusLoading(false)
-        if (!s.loggedIn) {
-          timer = setTimeout(poll, 2000)
-        }
+        timer = setTimeout(poll, connectionState(s) === 'ready' ? 15000 : 2000)
       } catch {
         if (cancelled) return
-        setStatusError(true)
         setStatusLoading(false)
+        if (!statusRef.current) {
+          setStatusError(true)
+        }
+        timer = setTimeout(poll, 15000)
       }
     }
     void poll()
@@ -91,14 +121,35 @@ export default function WhatsAppPage() {
   async function handleLogout() {
     setLoggingOut(true)
     try {
-      await logout()
-      toast.success('WhatsApp berhasil diputus.')
+      const result = await logout()
+      if (result.remoteRevoked) {
+        toast.success('WhatsApp berhasil diputus.')
+      } else {
+        // Keputusan D2: sesi lokal sudah bersih, tetapi server WhatsApp tidak
+        // sempat dihubungi - perangkat mungkin masih terdaftar di HP admin.
+        // ToastProvider hanya punya success/error, jadi "peringatan" ini
+        // memakai error agar terlihat sebagai tindakan lanjutan yang wajib.
+        toast.error('Koneksi lokal diputus, tetapi perangkat mungkin masih terdaftar di HP. Hapus manual lewat WhatsApp > Perangkat Tertaut.')
+      }
       setLogoutConfirmOpen(false)
       setStatusReloadToken((t) => t + 1)
     } catch {
       toast.error('Gagal memutus WhatsApp.')
     } finally {
       setLoggingOut(false)
+    }
+  }
+
+  async function handleReconnect() {
+    setReconnecting(true)
+    try {
+      await reconnect()
+      toast.success('Koneksi WhatsApp dipulihkan.')
+      setStatusReloadToken((t) => t + 1)
+    } catch {
+      toast.error('Gagal menyambungkan ulang WhatsApp.')
+    } finally {
+      setReconnecting(false)
     }
   }
 
@@ -188,6 +239,8 @@ export default function WhatsAppPage() {
     }
   }
 
+  const connState = status ? connectionState(status) : null
+
   return (
     <div className="flex flex-col gap-6">
       <PageHeader
@@ -210,20 +263,55 @@ export default function WhatsAppPage() {
             <ErrorState message="Gagal memuat status WhatsApp." onRetry={() => setStatusReloadToken((t) => t + 1)} />
           )}
 
-          {!statusLoading && !statusError && status && (
+          {!statusLoading && !statusError && status && connState && (
             <>
-              {status.loggedIn ? (
+              {connState === 'ready' && (
                 <div className="flex items-center justify-between gap-4 flex-wrap">
                   <span className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-sm font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
                     <span className="w-2 h-2 rounded-full bg-emerald-500" aria-hidden="true" />
-                    Tertaut
+                    {CONNECTION_STATE_LABEL.ready}
                   </span>
                   <Button variant="secondary" size="sm" onClick={() => setLogoutConfirmOpen(true)}>
                     Putuskan
                   </Button>
                 </div>
-              ) : (
+              )}
+
+              {connState === 'disconnected' && (
+                <div className="flex flex-col gap-3">
+                  <div className="flex items-center justify-between gap-4 flex-wrap">
+                    <span className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-sm font-semibold bg-amber-50 text-amber-700 border border-amber-200">
+                      <span className="w-2 h-2 rounded-full bg-amber-500" aria-hidden="true" />
+                      {CONNECTION_STATE_LABEL.disconnected}
+                    </span>
+                    <div className="flex items-center gap-2">
+                      <Button size="sm" onClick={handleReconnect} loading={reconnecting}>
+                        Sambungkan Ulang
+                      </Button>
+                      <Button variant="secondary" size="sm" onClick={() => setLogoutConfirmOpen(true)}>
+                        Putuskan
+                      </Button>
+                    </div>
+                  </div>
+                  {status.lastError && (
+                    <p className="text-sm text-amber-700">{status.lastError}</p>
+                  )}
+                </div>
+              )}
+
+              {(connState === 'unpaired' || connState === 'pairing') && (
                 <div className="flex flex-col items-center gap-4 py-4">
+                  {connState === 'unpaired' && (
+                    <span className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-sm font-semibold bg-slate-100 text-slate-700 border border-slate-200">
+                      <span className="w-2 h-2 rounded-full bg-slate-400" aria-hidden="true" />
+                      {CONNECTION_STATE_LABEL.unpaired}
+                    </span>
+                  )}
+                  {/* Alasan sesi hilang (mis. perangkat dilepas dari HP) -
+                      ditampilkan supaya "Belum tertaut" tidak misterius. */}
+                  {status.lastError && !status.pairingQR && (
+                    <p className="text-sm text-slate-600 text-center max-w-sm">{status.lastError}</p>
+                  )}
                   {status.pairingQR ? (
                     <>
                       <div className="p-4 bg-white rounded-2xl border border-slate-200 shadow-sm">
@@ -361,7 +449,7 @@ export default function WhatsAppPage() {
                     <Td>
                       <div className="flex flex-col gap-0.5">
                         <Badge tone={sendLogTone(log.status)} label={SEND_LOG_STATUS_LABEL[log.status]} />
-                        {log.status === 'failed' && log.errorMessage && (
+                        {(log.status === 'failed' || log.status === 'retrying') && log.errorMessage && (
                           <span className="text-xs text-red-600">{log.errorMessage}</span>
                         )}
                       </div>

@@ -13,6 +13,11 @@ Kolom **Auth**: `publik` tanpa token; `JWT (admin)` = butuh token berperan
 | GET | `/api/v1/public/invitation` | publik (`Cache-Control: public, max-age=60`) | content |
 | GET | `/api/v1/public/guests/by-token/{token}` | publik | guest |
 | PATCH | `/api/v1/public/guests/by-token/{token}/rsvp` | publik | guest |
+| POST | `/api/v1/public/guests/by-token/{token}/wish` | publik (token tamu) | guest |
+| GET | `/api/v1/public/guests/by-token/{token}/wishes` | publik (token tamu) | guest |
+| GET | `/api/v1/admin/wishes` | JWT (admin) | guest |
+| PATCH | `/api/v1/admin/wishes/{id}/hidden` | JWT (admin) | guest |
+| DELETE | `/api/v1/admin/wishes/{id}` | JWT (admin) | guest |
 | GET/PATCH | `/api/v1/admin/content` | JWT (admin) | content |
 | GET/POST/PUT/DELETE | `/api/v1/admin/content/{agenda-events,rundown-items,gallery-photos,love-story-chapters,gift-banks}[/{id}]` | JWT (admin) | content |
 | GET/PATCH | `/api/v1/admin/sections` | JWT (admin) | content |
@@ -26,6 +31,7 @@ Kolom **Auth**: `publik` tanpa token; `JWT (admin)` = butuh token berperan
 | GET | `/api/v1/admin/whatsapp/status` | JWT (admin) | whatsapp |
 | POST | `/api/v1/admin/whatsapp/pair/start` | JWT (admin) | whatsapp |
 | POST | `/api/v1/admin/whatsapp/logout` | JWT (admin) | whatsapp |
+| POST | `/api/v1/admin/whatsapp/reconnect` | JWT (admin) | whatsapp |
 | GET/PUT | `/api/v1/admin/whatsapp/config` | JWT (admin) | whatsapp |
 | GET | `/api/v1/admin/whatsapp/logs` | JWT (admin) | whatsapp |
 | POST | `/api/v1/admin/whatsapp/logs/{id}/resend` | JWT (admin) | whatsapp |
@@ -84,11 +90,31 @@ dibaca. Pengiriman QR ke WhatsApp tamu (bila
 modul whatsapp aktif & tertaut) berjalan di goroutine terpisah - endpoint
 ini TIDAK menunggu hasil kirim WhatsApp.
 
+`POST /api/v1/public/guests/by-token/{token}/wish` menyimpan SATU ucapan
+untuk tamu pemilik token (`{message}`, maksimal 500 karakter, nama pengirim
+diambil dari baris tamu - bukan dari klien); kiriman kedua ditolak 400.
+`GET .../wishes` mengembalikan maksimal 30 ucapan terbaru yang tidak
+disembunyikan. Keduanya WAJIB ber-token sah (404 bila tidak) - daftar
+nama tamu tidak boleh dipanen tanpa token (docs/plan/wedding-wish/PLAN.md).
+`GET /api/v1/admin/wishes` berpaginasi standar (termasuk yang disembunyikan);
+`PATCH /{id}/hidden` menerima `{hidden: bool}`; `DELETE /{id}` menghapus
+permanen sehingga tamu itu boleh mengisi ulang. `PUT`/`DELETE`/`PATCH` pada
+id yang tidak ada membalas **404**.
+
 Endpoint `/api/v1/admin/whatsapp/*` mengelola integrasi WhatsApp
-(`go.mau.fi/whatsmeow`) - lihat `docs/plan/dashboard-wa-rsvp/PLAN.md`.
+(`go.mau.fi/whatsmeow`) - lihat `docs/plan/dashboard-wa-rsvp/PLAN.md` dan
+`docs/plan/whatsapp-connection-resilience/PLAN.md`.
 `pair/start` memulai pairing (admin scan QR dari `status.pairingQR`);
-`status` di-polling admin tiap ~2 detik selama pairing berlangsung.
-`logs` menerima `page`/`limit` (paginasi standar). Sesi WhatsApp (device &
+`status` mengembalikan `loggedIn` (sesi ada) dan `connected` (socket hidup)
+yang DIPISAH plus `lastConnectedAt`/`lastError`, di-polling admin tiap ~2
+detik saat belum siap dan ~15 detik saat siap (tidak pernah berhenti).
+`logout` SELALU membersihkan sesi lokal dan mengembalikan
+`data.remoteRevoked` - `false` berarti server WhatsApp tidak sempat
+dihubungi sehingga admin perlu menghapus perangkat manual di HP.
+`reconnect` memulihkan koneksi manual (400 bila belum pernah pairing).
+Kirim yang gagal karena koneksi masuk antrian retry otomatis (status log
+`retrying`, backoff ±4 jam, maksimal 5 percobaan); `logs` menerima
+`page`/`limit` (paginasi standar). Sesi WhatsApp (device &
 kunci enkripsi) TIDAK tersimpan di MySQL - lihat `DATABASE.md`.
 
 `/api/v1/admin/groups` mengelola group tamu (`docs/plan/guest-groups/PLAN.md`).

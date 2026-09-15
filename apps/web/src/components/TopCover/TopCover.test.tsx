@@ -18,6 +18,8 @@ const BASE_SESSION: GuestSessionState = {
   token: null,
   attendingCount: 1,
   paxQuota: 2,
+  hasWish: false,
+  wishMessage: '',
   resolved: false,
   // TopCover tidak membaca `access` (undangannya hanya dirender saat akses
   // sudah diberikan) - field ini ada semata agar literalnya memenuhi kontrak
