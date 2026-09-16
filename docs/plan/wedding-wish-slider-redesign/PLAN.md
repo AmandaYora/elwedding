@@ -125,6 +125,34 @@ Tailwind.
 > undangan tamu. Aturan Tailwind tetap berlaku penuh untuk `admin.html`. Tidak ada tindakan yang
 > diperlukan; catatan ini ada supaya programmer tidak "memperbaiki" ke arah Tailwind.
 
+**K3 — Template menyetel warna & huruf di tingkat ELEMEN, dan itu mengalahkan selector
+satu kelas.** Ditemukan saat UAT (teks nama & waktu tamu tampil putih, tak terbaca di atas
+kartu) lalu dikonfirmasi dengan mengukur `getComputedStyle` di Chrome dengan **seluruh 18
+stylesheet** halaman undangan terpasang:
+
+```css
+body.arsya span, body.arsya sup { color: inherit; font-family: inherit }   /* (0,1,2) */
+body.arsya span                 { font-size: inherit; font-weight: 400 }   /* (0,1,2) */
+body.arsya p { color: var(--text-tertiary); font-family: ...; line-height: normal }  /* (0,1,2) */
+```
+
+Spesifisitas (0,1,2) **menang** atas `.ww-card-name` yang hanya (0,1,0). Terukur sebelum
+perbaikan: `.ww-card-name` dan `.ww-card-time` = `rgb(255,255,255)` (putih, mewarisi induk),
+`.ww-card-message` = `--text-tertiary` alih-alih `--text-primary`, `.ww-own-title` abu-abu
+alih-alih rose, dan `.ww-error` **tidak merah** — bug lama yang belum pernah terlihat karena
+pesan galat jarang muncul.
+
+Obatnya: setiap aturan `ww-` yang menyetel warna **wajib** menyertakan kelas induk
+(`.ww-card .ww-card-name`), sehingga spesifisitasnya (0,2,0) — jumlah kelas dibandingkan lebih
+dulu daripada jumlah elemen, jadi 2 kelas menang atas 1 kelas + 2 elemen. Tanpa `!important`
+dan tanpa mengunci diri ke nama template `arsya`.
+
+Kaskade ini **tidak bisa diuji lewat DOM**: jsdom tidak memuat satu pun stylesheet template.
+Penjaganya karena itu membaca `wedding-wish.css` sebagai teks (`?raw`) dan menolak selector
+`ww-` satu kelas yang menyetel `color`. Itu menuntut `test.css: true` di `vite.config.ts` —
+tanpa opsi itu vitest men-stub modul CSS jadi string kosong dan penjaganya lolos tanpa
+memeriksa apa pun, jadi test-nya memuat **kontrol positif** yang gagal bila isinya kosong.
+
 **K2 — `Element.prototype.scrollTo` tidak ada di jsdom.** Diprobe langsung pada sesi ini dengan
 konfigurasi test proyek (`vite.config.ts`, `environment: 'jsdom'`):
 

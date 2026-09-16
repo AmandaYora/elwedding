@@ -2,6 +2,11 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { httpClient } from '@/shared/services/http-client'
 import WeddingWish from './WeddingWish'
 import { resetGuestSessionCache } from '@/hooks/useGuestSession'
+// Teks mentah stylesheet-nya, dipakai penjaga spesifisitas di bawah.
+// BUTUH `test.css: true` di vite.config.ts - tanpa itu vitest men-stub semua
+// modul CSS jadi string KOSONG dan penjaganya lolos tanpa memeriksa apa pun.
+// Kontrol positif di dalam test yang menjaga hal itu tidak terulang diam-diam.
+import weddingWishCss from './wedding-wish.css?raw'
 
 vi.mock('@/shared/services/http-client', () => ({
   httpClient: { get: vi.fn(), post: vi.fn() },
@@ -321,4 +326,42 @@ test('kirim ditolak sudah-pernah -> pesan tampil dan form terkunci', async () =>
   await waitFor(() => expect(screen.getByText('Anda sudah pernah mengirim ucapan')).toBeInTheDocument())
   expect(screen.queryByPlaceholderText('Give your wish')).not.toBeInTheDocument()
   expect(screen.getByText('Ucapan Anda')).toBeInTheDocument()
+})
+
+// Penjaga regresi CSS - bug ini sudah muncul DUA KALI (nama & waktu tamu
+// tampil putih, praktis tak terbaca di atas kartu).
+//
+// Sebabnya template menyetel warna di tingkat ELEMEN:
+//   body.arsya span, body.arsya sup { color: inherit; font-family: inherit }
+//   body.arsya p                    { color: var(--text-tertiary); ... }
+// Spesifisitasnya (0,1,2) MENGALAHKAN selector satu kelas seperti
+// `.ww-card-name` yang hanya (0,1,0). Obatnya: selalu menyertakan kelas induk
+// sehingga jadi (0,2,0) - jumlah kelas dibandingkan lebih dulu daripada
+// jumlah elemen.
+//
+test('setiap aturan warna di wedding-wish.css cukup spesifik melawan CSS template', () => {
+  const mentah = weddingWishCss
+  // Kontrol positif: kalau pembacaannya gagal/kosong, GAGALKAN di sini - jangan
+  // sampai penjaga ini lolos hanya karena tidak ada yang diperiksa.
+  expect(mentah).toContain('.ww-card-name')
+
+  const css = mentah.replace(/\/\*[\s\S]*?\*\//g, '') // buang komentar
+
+  const pelanggar: string[] = []
+  for (const [, selector, body] of css.matchAll(/([^{}]+)\{([^{}]*)\}/g)) {
+    // `color:` yang berdiri sendiri - bukan background-color / border-color.
+    if (!/(^|[;\s])color\s*:/.test(body)) continue
+    for (const bagian of selector.split(',')) {
+      // Satu kelas `.ww-*` polos, tanpa kelas/atribut/induk lain.
+      if (/^\s*\.ww-[a-z0-9-]+\s*$/.test(bagian)) pelanggar.push(bagian.trim())
+    }
+  }
+
+  expect(
+    pelanggar,
+    `Selector berikut menyetel color tapi hanya berspesifisitas (0,1,0), ` +
+      `sehingga kalah dari "body.arsya span/p" (0,1,2) dan teksnya akan ` +
+      `mewarisi warna induk - di halaman undangan itu berarti PUTIH. ` +
+      `Tambahkan kelas induk, mis. ".ww-card ${pelanggar[0] ?? '.ww-card-name'}".`,
+  ).toEqual([])
 })

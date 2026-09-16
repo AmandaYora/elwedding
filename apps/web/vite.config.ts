@@ -36,6 +36,10 @@ export default defineConfig({
   },
   test: {
     environment: 'jsdom',
+    // Wajib: tanpa ini vitest men-stub modul CSS jadi string kosong, dan
+    // penjaga spesifisitas di WeddingWish.test.tsx (yang membaca
+    // wedding-wish.css lewat ?raw) lolos tanpa memeriksa apa pun.
+    css: true,
     globals: true,
     setupFiles: './src/test/setup.ts',
   },
