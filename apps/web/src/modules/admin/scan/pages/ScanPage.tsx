@@ -1,6 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
-import { BrowserQRCodeReader } from '@zxing/browser'
-import type { IScannerControls } from '@zxing/browser'
+import { Suspense, lazy, useCallback, useEffect, useRef, useState } from 'react'
 import {
   type CheckinResult,
   type CheckinSearchItem,
@@ -19,22 +17,37 @@ import {
 import { PageHeader } from '@/shared/components/layout/PageHeader'
 import { Button, Card, Input } from '@/shared/components/ui'
 
+/** Dua mode input eksklusif di halaman ini (docs/plan/scan-mode-scanner/PLAN.md).
+ * 'scanner' = alat scanner USB HID keyboard-wedge (default, K2); 'camera' =
+ * kamera perangkat via @zxing/browser seperti sebelumnya. */
+type ScanMode = 'scanner' | 'camera'
+
+// CameraView di-lazy supaya @zxing/browser (~465 kB) hanya diunduh saat toggle
+// berada di mode Kamera (D2) - mayoritas pemakaian (mode Scanner) tidak
+// membayarnya.
+const CameraView = lazy(() => import('./CameraView'))
+
 /**
- * Menu Scan di gate (docs/plan/scan-checkin-gate/PLAN.md T16).
+ * Menu Scan di gate (docs/plan/scan-checkin-gate/PLAN.md T16,
+ * docs/plan/scan-mode-scanner/PLAN.md).
  *
  * Pembacanya adalah petugas yang berdiri di pintu sambil memegang telepon,
- * dengan antrean di belakang tamu. Karena itu KAMERA BUKAN TOKOH UTAMA di
- * halaman ini - petugas sudah tahu ke mana harus mengarahkan lensa; yang
- * dia butuhkan adalah PUTUSANNYA. Viewport kamera sengaja dibuat sedang dan
- * tenang, sedangkan kartu hasil dibuat besar, berpita warna, dan terbaca
- * dari jarak lengan.
+ * dengan antrean di belakang tamu. Karena itu hasil pindaian - bukan sumber
+ * inputnya - yang menjadi TOKOH UTAMA halaman ini: kartu hasil dibuat besar,
+ * berpita warna, dan terbaca dari jarak lengan, apa pun modenya.
+ *
+ * Dua mode input eksklusif dipilih lewat toggle: scanner device (USB HID
+ * keyboard-wedge, default) atau kamera. Dalam satu waktu hanya satu yang
+ * aktif - mode Scanner meng-unmount kamera total (hemat baterai), mode Kamera
+ * menyalakan stream seperti sebelumnya.
  *
  * Jenis souvenir diberi penekanan tepat di bawah nama: itu satu-satunya data
  * di layar ini yang mengubah apa yang dilakukan TANGAN petugas.
  *
- * BUTUH HTTPS: getUserMedia hanya tersedia di secure context (§2.6).
- * Produksi sudah HTTPS. Menguji lewat IP LAN ber-http:// TIDAK akan bisa
- * membuka kamera - pakai localhost (dianggap secure) atau terowongan HTTPS.
+ * Mode Kamera BUTUH HTTPS: getUserMedia hanya tersedia di secure context
+ * (§2.6). Produksi sudah HTTPS. Menguji lewat IP LAN ber-http:// TIDAK akan
+ * bisa membuka kamera - pakai localhost (dianggap secure) atau terowongan
+ * HTTPS. Mode Scanner tidak butuh HTTPS/izin kamera.
  */
 
 /** Empat keadaan yang WAJIB terlihat berbeda (T16/kriteria verifikasi #11). */
@@ -83,11 +96,13 @@ function rejectionMessage(err: unknown): string | null {
 
 export default function ScanPage() {
   const [outcome, setOutcome] = useState<Outcome>({ kind: 'idle' })
-  const [cameraError, setCameraError] = useState<string | null>(null)
+  // Default = scanner device (K2+D4): selalu mulai di sini setiap halaman
+  // dibuka, tanpa mengingat pilihan terakhir (tanpa localStorage).
+  const [mode, setMode] = useState<ScanMode>('scanner')
   const [busy, setBusy] = useState(false)
+  const [scannerValue, setScannerValue] = useState('')
+  const scannerRef = useRef<HTMLInputElement>(null)
 
-  const videoRef = useRef<HTMLVideoElement>(null)
-  const controlsRef = useRef<IScannerControls | null>(null)
   /** Kode terakhir + waktunya, untuk meredam pindaian berulang. */
   const lastScanRef = useRef<{ code: string; at: number } | null>(null)
   /** Menahan pindaian baru selama satu permintaan masih berjalan. */
@@ -139,46 +154,26 @@ export default function ScanPage() {
     [submitCheckin],
   )
 
-  // Kamera. Stream DIHENTIKAN saat unmount - kamera yang menyala terus akan
-  // menguras baterai perangkat gate sepanjang acara.
+  // Mode scanner: jaga fokus di kolom tangkap setiap masuk mode ini, supaya
+  // ketikan scanner HID langsung tertampung tanpa klik dulu. Sengaja TIDAK
+  // memakai listener blur global yang memaksa fokus kembali - itu akan
+  // merampas fokus dari kolom pencarian "Tamu tanpa QR" dan tombol-tombolnya.
+  // Klik di mana pun pada kartu scanner juga mengembalikan fokus (lihat onClick).
   useEffect(() => {
-    let cancelled = false
-    const reader = new BrowserQRCodeReader()
+    if (mode === 'scanner') scannerRef.current?.focus()
+  }, [mode])
 
-    reader
-      .decodeFromConstraints(
-        // facingMode 'environment' = kamera belakang bila tersedia; browser
-        // jatuh ke kamera mana pun yang ada bila tidak.
-        { video: { facingMode: 'environment' } },
-        videoRef.current ?? undefined,
-        (result, _err, controls) => {
-          if (cancelled) {
-            controls.stop()
-            return
-          }
-          if (result) handleScannedCode(result.getText())
-        },
-      )
-      .then((controls) => {
-        if (cancelled) {
-          controls.stop()
-          return
-        }
-        controlsRef.current = controls
-      })
-      .catch(() => {
-        if (cancelled) return
-        setCameraError(
-          'Kamera tidak bisa dibuka. Izinkan akses kamera di browser, lalu muat ulang halaman. Halaman ini butuh koneksi HTTPS.',
-        )
-      })
-
-    return () => {
-      cancelled = true
-      controlsRef.current?.stop()
-      controlsRef.current = null
-    }
-  }, [handleScannedCode])
+  /** Mengirim isi kolom scanner HID lewat jalur yang SAMA dengan kamera
+   * (handleScannedCode: peredam + inFlight + 4 keadaan + retry). Kolom
+   * langsung dikosongkan karena kode sudah disalin ke variabel - peredam
+   * memakai salinan itu, bukan state input. */
+  function handleScannerSubmit() {
+    const code = scannerValue.trim()
+    if (!code) return
+    handleScannedCode(code)
+    setScannerValue('')
+    scannerRef.current?.focus()
+  }
 
   // --- Panel pencarian nama, untuk tamu tanpa QR (K3) ---
   const [search, setSearch] = useState('')
@@ -255,52 +250,101 @@ export default function ScanPage() {
         description="Pindai QR tamu di pintu masuk, atau cari namanya bila QR-nya tidak ada."
       />
 
+      {/* Toggle mode input eksklusif (docs/plan/scan-mode-scanner/PLAN.md D1):
+          segmented control dua tombol, bukan Switch - Switch semantiknya status
+          on/off, sedangkan ini pilihan dua mode. */}
+      <div className="flex flex-wrap items-center gap-3">
+        <div
+          role="group"
+          aria-label="Mode pemindai"
+          className="inline-flex items-center gap-1 rounded-xl border border-slate-200 bg-slate-100 p-1"
+        >
+          {(['scanner', 'camera'] as const).map((m) => (
+            <button
+              key={m}
+              type="button"
+              aria-pressed={mode === m}
+              onClick={() => setMode(m)}
+              className={[
+                'rounded-lg px-4 py-2 text-sm transition-all duration-150 cursor-pointer',
+                'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--navy-500)]/30',
+                mode === m
+                  ? 'bg-white text-slate-900 shadow-sm font-semibold'
+                  : 'text-slate-500 hover:text-slate-700 font-medium',
+              ].join(' ')}
+            >
+              {m === 'scanner' ? 'Scanner' : 'Kamera'}
+            </button>
+          ))}
+        </div>
+        <p className="text-xs text-slate-500">
+          {mode === 'scanner'
+            ? 'Scanner device aktif — kamera mati. Tembak QR dengan alat scanner.'
+            : 'Kamera aktif — arahkan lensa ke QR tamu.'}
+        </p>
+      </div>
+
       <div className="grid grid-cols-1 lg:grid-cols-5 gap-6 items-start">
-        {/* Kamera - sengaja sekunder. Petugas sudah tahu ke mana mengarahkan
-            lensa; yang dia butuhkan ada di kartu hasil di sebelahnya. */}
-        <Card className="lg:col-span-2 overflow-hidden shadow-sm">
-          <div className="relative bg-slate-950 aspect-4/3">
-            <video
-              ref={videoRef}
-              className="absolute inset-0 h-full w-full object-cover"
-              muted
-              playsInline
-              aria-label="Pratinjau kamera pemindai"
-            />
-            {/* Bingkai bidik: satu-satunya hiasan di viewport, dan tugasnya
-                nyata - memberi tahu ke mana QR harus diletakkan. */}
-            {!cameraError && (
-              <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
-                <div className="h-40 w-40 rounded-2xl border-2 border-white/70 shadow-[0_0_0_9999px_rgba(2,6,23,0.45)]" />
-              </div>
-            )}
-            {cameraError && (
-              <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 p-6 text-center">
-                <svg className="w-8 h-8 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2zM3 3l18 18" />
-                </svg>
-                <p className="text-sm font-semibold text-slate-200">Kamera tidak aktif</p>
-                <p className="text-xs text-slate-400 leading-relaxed">{cameraError}</p>
-                <p className="text-xs text-slate-300 font-medium mt-1">
-                  Pencarian nama di bawah tetap bisa dipakai.
+        {mode === 'camera' ? (
+          <Suspense
+            fallback={
+              <div className="lg:col-span-2 p-6 text-sm text-slate-500">Memuat kamera...</div>
+            }
+          >
+            <CameraView onScanned={handleScannedCode} busy={busy} />
+          </Suspense>
+        ) : (
+          <Card className="lg:col-span-2 shadow-sm">
+            <div
+              className="p-4 sm:p-5 flex flex-col gap-3"
+              onClick={() => scannerRef.current?.focus()}
+            >
+              <div>
+                <h2 className="text-sm font-semibold text-slate-800">Scanner device</h2>
+                <p className="text-xs text-slate-500 mt-0.5">
+                  Tembak QR tamu dengan alat scanner. Pastikan kursor aktif di kolom ini —
+                  alat harus dikonfigurasi suffix Enter.
                 </p>
               </div>
-            )}
-          </div>
-          <div className="px-4 py-3 border-t border-slate-100 flex items-center gap-2">
-            <span
-              className={`h-2 w-2 rounded-full ${cameraError ? 'bg-slate-300' : 'bg-emerald-500 motion-safe:animate-pulse'}`}
-              aria-hidden="true"
-            />
-            <p className="text-xs text-slate-500">
-              {cameraError ? 'Pemindai berhenti' : busy ? 'Memproses pindaian...' : 'Siap memindai'}
-            </p>
-          </div>
-        </Card>
+              <div className="flex items-end gap-2">
+                <div className="flex-1 min-w-0">
+                  <Input
+                    ref={scannerRef}
+                    label="Kode QR"
+                    value={scannerValue}
+                    onChange={(e) => setScannerValue(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        e.preventDefault()
+                        handleScannerSubmit()
+                      }
+                    }}
+                    placeholder="Hasil tembakan scanner muncul di sini"
+                    autoFocus
+                    autoComplete="off"
+                    spellCheck={false}
+                  />
+                </div>
+                <Button onClick={handleScannerSubmit} disabled={busy} className="shrink-0">
+                  Catat
+                </Button>
+              </div>
+            </div>
+            <div className="px-4 py-3 border-t border-slate-100 flex items-center gap-2">
+              <span
+                className="h-2 w-2 rounded-full bg-emerald-500 motion-safe:animate-pulse"
+                aria-hidden="true"
+              />
+              <p className="text-xs text-slate-500">
+                {busy ? 'Memproses pindaian...' : 'Siap menerima pindaian'}
+              </p>
+            </div>
+          </Card>
+        )}
 
         {/* Kartu hasil - TOKOH UTAMA halaman ini. */}
         <div className="lg:col-span-3">
-          <OutcomePanel outcome={outcome} />
+          <OutcomePanel outcome={outcome} mode={mode} />
         </div>
       </div>
 
@@ -378,14 +422,16 @@ export default function ScanPage() {
  * netral, bukan merah: merah membaca sebagai "tamu ini palsu", padahal yang
  * terjadi hanyalah sinyal putus.
  */
-function OutcomePanel({ outcome }: { outcome: Outcome }) {
+function OutcomePanel({ outcome, mode }: { outcome: Outcome; mode: ScanMode }) {
   if (outcome.kind === 'idle') {
     return (
       <div className="h-full min-h-56 rounded-2xl border-2 border-dashed border-slate-200 bg-white flex flex-col items-center justify-center gap-2 p-8 text-center">
         <svg className="w-9 h-9 text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M4 7V5a1 1 0 011-1h2M4 17v2a1 1 0 001 1h2m10-16h2a1 1 0 011 1v2m-3 12h2a1 1 0 001-1v-2M7 12h10" />
         </svg>
-        <p className="text-sm font-semibold text-slate-700">Arahkan kamera ke QR tamu</p>
+        <p className="text-sm font-semibold text-slate-700">
+          {mode === 'scanner' ? 'Tembak QR tamu dengan scanner' : 'Arahkan kamera ke QR tamu'}
+        </p>
         <p className="text-xs text-slate-500 max-w-xs leading-relaxed">
           Hasilnya muncul di sini. Untuk tamu yang QR-nya tidak ada, cari namanya di bawah.
         </p>
