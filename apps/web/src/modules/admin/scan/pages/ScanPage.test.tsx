@@ -218,9 +218,10 @@ test('hasil scan menampilkan nama group tamu', async () => {
   emitScan!('ELW1:tok-abc')
 
   expect(await screen.findByText('Silakan masuk')).toBeInTheDocument()
-  // Group berdampingan dengan pihak & status RSVP di satu baris teks (T17),
-  // bukan kartu besar - jadi dicari lewat pola, bukan teks persis.
-  expect(screen.getByText(/Group Teman Kantor/)).toBeInTheDocument()
+  // Group tampil sebagai badge besar di sisi kanan: eyebrow "Group" +
+  // nama group sebagai teksnya sendiri (bukan satu baris dengan pihak/RSVP).
+  expect(screen.getByText('Group')).toBeInTheDocument()
+  expect(screen.getByText('Teman Kantor')).toBeInTheDocument()
 })
 
 // D9/2.6: groupName kosong (tamu lama, ATAU pembacaan group gagal di server)
@@ -233,7 +234,8 @@ test('groupName kosong -> kartu tetap utuh, group tampil sebagai strip', async (
 
   expect(await screen.findByText('Silakan masuk')).toBeInTheDocument()
   expect(screen.getByText('Budi Santoso')).toBeInTheDocument()
-  expect(screen.getByText(/Group —/)).toBeInTheDocument()
+  expect(screen.getByText('Group')).toBeInTheDocument()
+  expect(screen.getByText('—')).toBeInTheDocument()
 })
 
 // --- mode Scanner device (docs/plan/scan-mode-scanner/PLAN.md §8) ---

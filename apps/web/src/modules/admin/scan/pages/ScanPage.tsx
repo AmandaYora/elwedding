@@ -502,21 +502,44 @@ function OutcomePanel({ outcome, mode }: { outcome: Outcome; mode: ScanMode }) {
       </div>
 
       <div className="p-5 sm:p-6 flex flex-col gap-5">
-        {/* Nama pada ukuran display - halaman ini dibaca dari jarak lengan. */}
-        <div>
-          <h2 className="text-2xl sm:text-3xl font-bold text-slate-900 tracking-tight leading-tight">
-            {result.name}
-          </h2>
-          {/* Group berdampingan dengan pihak & status RSVP, SENGAJA bukan
-              kartu besar sejajar "Jumlah orang"/"Souvenir" (T17): kedua kartu
-              itu dipilih karena mengubah tindakan TANGAN petugas, sedangkan
-              group adalah konteks. groupName kosong (tamu lama, atau
-              pembacaan group gagal - D9) tampil sebagai em dash, bukan
-              merusak kartu. */}
-          <p className="text-sm text-slate-500 mt-1">
-            {sideLabel(result.side)} &middot; Group {result.groupName || '—'} &middot; RSVP{' '}
-            {statusLabel(result.rsvpStatus).toLowerCase()}
-          </p>
+        {/* Nama pada ukuran display + badge group besar di sisi kanan -
+            keduanya dibaca dari jarak lengan. Biru dipilih sadar: emerald/
+            amber/rose sudah dipakai pita putusan, violet untuk Souvenir VIP -
+            biru tidak bertabrakan maknanya dengan satu pun. */}
+        <div className="flex items-start justify-between gap-3">
+          <div className="min-w-0">
+            <h2 className="text-2xl sm:text-3xl font-bold text-slate-900 tracking-tight leading-tight">
+              {result.name}
+            </h2>
+            <p className="text-sm text-slate-500 mt-1">
+              {sideLabel(result.side)} &middot; RSVP {statusLabel(result.rsvpStatus).toLowerCase()}
+            </p>
+          </div>
+          {/* Badge group: groupName kosong (tamu lama, atau pembacaan group
+              gagal - D9) tampil sebagai strip redup, bukan merusak kartu. */}
+          <div
+            className={[
+              'shrink-0 rounded-xl border px-3.5 py-2 text-right max-w-44',
+              result.groupName ? 'border-blue-300 bg-blue-50' : 'border-slate-200 bg-slate-50',
+            ].join(' ')}
+          >
+            <p
+              className={[
+                'text-[10px] font-bold uppercase tracking-widest',
+                result.groupName ? 'text-blue-600' : 'text-slate-400',
+              ].join(' ')}
+            >
+              Group
+            </p>
+            <p
+              className={[
+                'text-lg font-bold leading-snug break-words',
+                result.groupName ? 'text-blue-900' : 'text-slate-400',
+              ].join(' ')}
+            >
+              {result.groupName || '—'}
+            </p>
+          </div>
         </div>
 
         {/* Dua angka yang menentukan tindakan petugas: berapa orang masuk,
