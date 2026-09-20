@@ -1,5 +1,5 @@
 import { httpClient } from '@/shared/services/http-client'
-import { PAGE_SIZE, type RsvpStatus, type Gender, type InvitationType, type SouvenirType, type Side } from '@/shared/constants/guests'
+import { PAGE_SIZE, type RsvpStatus, type Gender, type InvitationType, type SouvenirType, type Side, type ContactedFilter } from '@/shared/constants/guests'
 
 export interface Guest {
   id: number
@@ -119,6 +119,17 @@ export interface GuestListParams {
    * Dikirim sebagai `group_id` (snake_case) hanya bila terisi. */
   groupId: string
   respondedOnly: boolean
+  /** Filter penanda "sudah dihubungi" (docs/plan/guest-stage-filter T8).
+   * Dikirim sebagai `contacted` hanya bila terisi.
+   *
+   * OPSIONAL, menyimpang dari 7 field di atas yang wajib (D9). Alasannya
+   * bukan gaya: ada 18 literal listGuests({...}) di repo ini, termasuk di
+   * ReservationsPage dan tes yang mencocokkan argumen dengan
+   * toHaveBeenCalledWith({...}) yang PERSIS. Field wajib memaksa ~16
+   * suntingan mekanis tanpa manfaat, dan yang lebih penting: dengan
+   * opsional, pemanggil yang tidak menyaring tetap mengirim objek yang
+   * identik dengan sebelum fitur ini ada. */
+  contacted?: ContactedFilter
 }
 
 interface ApiListResponse {
@@ -138,7 +149,7 @@ export interface ListResponse {
  * (keputusan #12).
  */
 export async function listGuests(params: GuestListParams): Promise<ListResponse> {
-  const { page, status, q, invitationType, souvenirType, groupId, respondedOnly } = params
+  const { page, status, q, invitationType, souvenirType, groupId, respondedOnly, contacted } = params
   const res = await httpClient.get<ApiListResponse>('/api/v1/admin/guests', {
     params: {
       page,
@@ -148,6 +159,7 @@ export async function listGuests(params: GuestListParams): Promise<ListResponse>
       ...(invitationType ? { invitation_type: invitationType } : {}),
       ...(souvenirType ? { souvenir_type: souvenirType } : {}),
       ...(groupId ? { group_id: groupId } : {}),
+      ...(contacted ? { contacted } : {}),
       ...(respondedOnly ? { responded: 'true' } : {}),
     },
   })

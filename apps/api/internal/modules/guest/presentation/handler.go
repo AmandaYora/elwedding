@@ -50,9 +50,14 @@ func (h *Handler) ListGuests(w http.ResponseWriter, r *http.Request) {
 	// diteruskan sebagai string apa adanya, parsing & penolakan nilai yang
 	// salah bentuk jadi urusan service (parseGroupIDFilter).
 	groupID := r.URL.Query().Get("group_id")
+	// contacted kosong = tanpa filter (docs/plan/guest-stage-filter/PLAN.md T6).
+	// Diteruskan sebagai string apa adanya seperti group_id di atas: hanya
+	// "true"/"false"/"" yang sah, dan penolakan nilai lain jadi urusan service
+	// (parseContactedFilter) - BUKAN didiamkan seperti `responded` di bawah.
+	contacted := r.URL.Query().Get("contacted")
 	respondedOnly := r.URL.Query().Get("responded") == "true"
 
-	guests, total, err := h.service.List(r.Context(), status, q, invitationType, souvenirType, groupID, respondedOnly, p)
+	guests, total, err := h.service.List(r.Context(), status, q, invitationType, souvenirType, groupID, contacted, respondedOnly, p)
 	if err != nil {
 		writeServiceError(w, err)
 		return

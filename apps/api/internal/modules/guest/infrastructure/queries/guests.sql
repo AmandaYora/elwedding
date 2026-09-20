@@ -60,10 +60,26 @@ UPDATE guests SET contacted_at = NULL WHERE id = ?;
 -- name: DeleteGuest :exec
 DELETE FROM guests WHERE id = ?;
 
+-- contacted_filter (docs/plan/guest-stage-filter/PLAN.md T1/D7) menyaring
+-- kolom contacted_at untuk filter "Tahap undangan" di /admin/guests:
+--   0 = tanpa filter, 1 = sudah dihubungi, 2 = belum dihubungi.
+--
+-- 0 (BUKAN 1) yang berarti "tanpa filter" - disengaja (K5): SearchForCheckin
+-- merakit ListGuestsFilteredParams dengan literal bernama-field tanpa
+-- menyebut ContactedFilter, jadi zero value Go-nya harus sudah berarti
+-- "jangan saring". Menukar arti 0 dan 1 akan diam-diam menyaring pencarian
+-- check-in petugas gate.
+--
+-- INTEGER lewat CAST(... AS UNSIGNED), bukan bool/string: pola yang sama
+-- dengan responded_only di baris atasnya. Tanpa CAST, engine MySQL sqlc
+-- meng-infer tipenya jadi interface{} (lihat catatan di service.go List).
 -- name: ListGuestsFiltered :many
 SELECT * FROM guests
 WHERE (sqlc.narg(status) IS NULL OR rsvp_status = sqlc.narg(status))
   AND (CAST(sqlc.arg(responded_only) AS UNSIGNED) = 0 OR rsvp_status != 'pending')
+  AND (CAST(sqlc.arg(contacted_filter) AS UNSIGNED) = 0
+       OR (CAST(sqlc.arg(contacted_filter) AS UNSIGNED) = 1 AND contacted_at IS NOT NULL)
+       OR (CAST(sqlc.arg(contacted_filter) AS UNSIGNED) = 2 AND contacted_at IS NULL))
   AND (sqlc.narg(invitation_type) IS NULL OR invitation_type = sqlc.narg(invitation_type))
   AND (sqlc.narg(souvenir_type) IS NULL OR souvenir_type = sqlc.narg(souvenir_type))
   AND (sqlc.narg(group_id) IS NULL OR group_id = sqlc.narg(group_id))
@@ -75,6 +91,9 @@ LIMIT ? OFFSET ?;
 SELECT COUNT(*) FROM guests
 WHERE (sqlc.narg(status) IS NULL OR rsvp_status = sqlc.narg(status))
   AND (CAST(sqlc.arg(responded_only) AS UNSIGNED) = 0 OR rsvp_status != 'pending')
+  AND (CAST(sqlc.arg(contacted_filter) AS UNSIGNED) = 0
+       OR (CAST(sqlc.arg(contacted_filter) AS UNSIGNED) = 1 AND contacted_at IS NOT NULL)
+       OR (CAST(sqlc.arg(contacted_filter) AS UNSIGNED) = 2 AND contacted_at IS NULL))
   AND (sqlc.narg(invitation_type) IS NULL OR invitation_type = sqlc.narg(invitation_type))
   AND (sqlc.narg(souvenir_type) IS NULL OR souvenir_type = sqlc.narg(souvenir_type))
   AND (sqlc.narg(group_id) IS NULL OR group_id = sqlc.narg(group_id))

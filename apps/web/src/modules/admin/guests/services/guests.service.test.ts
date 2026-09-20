@@ -67,6 +67,61 @@ test('invitationType & souvenirType kosong tidak dikirim sebagai parameter', asy
   expect(params).not.toHaveProperty('souvenir_type')
 })
 
+// Filter tahap undangan (docs/plan/guest-stage-filter T13): `contacted`
+// mengikuti pola q/status - hanya dikirim bila terisi.
+
+test('contacted terkirim sebagai parameter saat terisi', async () => {
+  mockedGet.mockResolvedValueOnce({ data: { data: [], meta: { page: 1, limit: 20, total: 0, total_pages: 1 } } })
+
+  await listGuests({
+    page: 1,
+    status: 'pending',
+    q: '',
+    invitationType: '',
+    souvenirType: '',
+    groupId: '',
+    respondedOnly: false,
+    contacted: 'false',
+  })
+
+  expect(mockedGet).toHaveBeenCalledWith(
+    '/api/v1/admin/guests',
+    expect.objectContaining({ params: expect.objectContaining({ status: 'pending', contacted: 'false' }) }),
+  )
+})
+
+test('contacted tidak disertakan sama sekali -> tidak dikirim sebagai parameter', async () => {
+  mockedGet.mockResolvedValueOnce({ data: { data: [], meta: { page: 1, limit: 20, total: 0, total_pages: 1 } } })
+
+  await listGuests({ page: 1, status: '', q: '', invitationType: '', souvenirType: '', groupId: '', respondedOnly: false })
+
+  const params = mockedGet.mock.calls[0][1]?.params as Record<string, unknown>
+  expect(params).not.toHaveProperty('contacted')
+})
+
+// String kosong HARUS berarti "tanpa filter", bukan `contacted=`. Backend
+// menolak nilai di luar ""/"true"/"false" dengan 400, jadi mengirim parameter
+// kosong ke URL adalah cara paling gampang membuat seluruh daftar tamu gagal
+// dimuat.
+test('contacted string kosong tidak dikirim sebagai parameter', async () => {
+  mockedGet.mockResolvedValueOnce({ data: { data: [], meta: { page: 1, limit: 20, total: 0, total_pages: 1 } } })
+
+  await listGuests({
+    page: 1,
+    status: 'attending',
+    q: '',
+    invitationType: '',
+    souvenirType: '',
+    groupId: '',
+    respondedOnly: false,
+    contacted: '',
+  })
+
+  const params = mockedGet.mock.calls[0][1]?.params as Record<string, unknown>
+  expect(params).not.toHaveProperty('contacted')
+  expect(params).toHaveProperty('status', 'attending')
+})
+
 // dashboard-wa-rsvp: GuestSummary diperluas dengan KPI/breakdown/aktivitas
 // terbaru untuk dashboard berbasis kartu.
 test('getGuestSummary mengembalikan seluruh field dashboard', async () => {

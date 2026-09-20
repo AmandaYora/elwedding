@@ -20,6 +20,66 @@ export const STATUS_OPTIONS: RsvpStatus[] = ['attending', 'not_attending', 'remi
 // sudah merespons RSVP.
 export const RESPONDED_STATUS_OPTIONS: RsvpStatus[] = ['attending', 'not_attending', 'remind_later']
 
+// Filter "Tahap undangan" di /admin/guests (docs/plan/guest-stage-filter).
+//
+// GABUNGAN dua dimensi yang di database tersimpan terpisah: apakah admin sudah
+// menghubungi tamu (guests.contacted_at) dan apa jawaban RSVP-nya
+// (guests.rsvp_status). Itu sebabnya satu pilihan dropdown diterjemahkan jadi
+// SEPASANG parameter API, bukan satu.
+
+/** Nilai param `contacted`. String kosong = tanpa filter, sama seperti filter
+ * lain. Backend hanya menerima ketiga nilai ini dan MENOLAK sisanya dengan 400
+ * (parseContactedFilter) - salah ketik tidak boleh diam-diam berarti
+ * "tampilkan semua". */
+export type ContactedFilter = '' | 'true' | 'false'
+
+export type GuestStage =
+  | 'not_invited'
+  | 'awaiting_confirmation'
+  | 'confirmed_attending'
+  | 'confirmed_not_attending'
+  | 'remind_later'
+
+// STAGE_LABEL sengaja TERPISAH dari STATUS_LABEL di atas, bukan duplikasi yang
+// terlewat. Badge di baris tabel harus ringkas supaya muat di kolom sempit
+// ("Hadir", "Belum jawab"), sedangkan dropdown filter punya ruang dan justru
+// butuh menyebut tahapannya ("Konfirmasi hadir" vs "Belum diundang").
+// Menyatukan keduanya memaksa salah satunya berkompromi.
+export const STAGE_LABEL: Record<GuestStage, string> = {
+  not_invited: 'Belum diundang',
+  awaiting_confirmation: 'Menunggu konfirmasi',
+  confirmed_attending: 'Konfirmasi hadir',
+  confirmed_not_attending: 'Konfirmasi tidak hadir',
+  remind_later: 'Minta diingatkan kembali',
+}
+
+export const STAGE_OPTIONS: GuestStage[] = [
+  'not_invited',
+  'awaiting_confirmation',
+  'confirmed_attending',
+  'confirmed_not_attending',
+  'remind_later',
+]
+
+/**
+ * Terjemahan satu pilihan dropdown -> sepasang parameter API. SATU-SATUNYA
+ * tempat definisi kelima kategori hidup di frontend.
+ *
+ * Perhatikan bahwa `contacted` hanya membedakan DI DALAM 'pending'. Itu aturan
+ * "jawaban tamu menang": tamu yang sudah menjawab apa pun jelas sudah diundang,
+ * jadi ia masuk kategori jawabannya - walau contacted_at-nya kosong karena
+ * undangannya dikirim di luar aplikasi (japri, lisan, undangan fisik).
+ * Konsekuensinya kelima kategori ini adalah PARTISI KETAT: setiap tamu jatuh ke
+ * tepat satu kategori, dan jumlah kelimanya selalu sama dengan total tamu.
+ */
+export const STAGE_QUERY: Record<GuestStage, { status: RsvpStatus; contacted: ContactedFilter }> = {
+  not_invited: { status: 'pending', contacted: 'false' },
+  awaiting_confirmation: { status: 'pending', contacted: 'true' },
+  confirmed_attending: { status: 'attending', contacted: '' },
+  confirmed_not_attending: { status: 'not_attending', contacted: '' },
+  remind_later: { status: 'remind_later', contacted: '' },
+}
+
 // Field profil tamu (guest-fields-admin-layout).
 
 export type Gender = 'male' | 'female'

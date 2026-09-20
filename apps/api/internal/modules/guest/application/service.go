@@ -51,6 +51,16 @@ var (
 	ErrGroupInUse              = errors.New("Group tidak bisa dihapus")
 	ErrInvalidGroupID          = errors.New("Filter group tidak valid")
 
+	// Filter tahap undangan (docs/plan/guest-stage-filter/PLAN.md T3/D11).
+	// Berbahasa Indonesia & layak dibaca admin, sama seperti blok group di atas.
+	//
+	// Nilai salah DITOLAK, tidak didiamkan seperti param `responded` yang
+	// memakai `== "true"` di handler. Bedanya konsekuensi: `responded` yang
+	// salah nilai berarti "tampilkan semua" - tidak berbahaya. `contacted` yang
+	// salah ketik (mis. `contacted=flase`) akan membuat daftar "Belum diundang"
+	// diam-diam menampilkan SELURUH tamu: filter rusak yang terlihat berhasil.
+	ErrInvalidContactedFilter = errors.New("Filter status undangan tidak valid")
+
 	// Wedding wish (docs/plan/wedding-wish/PLAN.md T6). Pesannya berbahasa
 	// Indonesia dan LAYAK DIBACA TAMU maupun admin - SubmitWish dipakai tamu
 	// lewat undangan publik, bukan hanya admin. Pola blok group di atas.
@@ -345,11 +355,49 @@ func (s *Service) requireGuestExists(ctx context.Context, id uint64) (sqlc.Guest
 	return row, nil
 }
 
+// Kode filter contacted_at yang dikirim ke query (docs/plan/guest-stage-filter
+// /PLAN.md T5/D7). Nilainya INTEGER, bukan bool: query memakai
+// CAST(sqlc.arg(contacted_filter) AS UNSIGNED), pola yang sama dengan
+// responded_only - tanpa CAST, engine MySQL sqlc meng-infer tipenya jadi
+// interface{}.
+//
+// contactedFilterAny sengaja 0 supaya ia jadi ZERO VALUE struct sqlc: itulah
+// yang membuat SearchForCheckin di bawah - yang merakit
+// ListGuestsFilteredParams tanpa menyebut ContactedFilter - tetap mencari ke
+// seluruh tamu, bukan diam-diam tersaring.
+const (
+	contactedFilterAny int64 = 0
+	contactedFilterYes int64 = 1
+	contactedFilterNo  int64 = 2
+)
+
+// parseContactedFilter menerjemahkan query param `contacted` jadi kode di atas.
+//
+// String kosong = TANPA filter, persis pola parseGroupIDFilter dan keempat
+// filter lain di List.
+//
+// Nilai yang tidak dikenali DITOLAK, bukan dianggap "tanpa filter": salah ketik
+// `contacted=flase` yang didiamkan akan menampilkan SELURUH tamu di daftar yang
+// berlabel "Belum diundang" - admin lalu mengirim ulang undangan ke orang yang
+// sudah menjawab, tanpa satu pun gejala bahwa filternya rusak.
+func parseContactedFilter(contacted string) (int64, error) {
+	switch contacted {
+	case "":
+		return contactedFilterAny, nil
+	case "true":
+		return contactedFilterYes, nil
+	case "false":
+		return contactedFilterNo, nil
+	default:
+		return contactedFilterAny, ErrInvalidContactedFilter
+	}
+}
+
 // List mengembalikan tamu dgn paginasi wajib (PLAN.md admin-backend §3),
 // filter status, jenis undangan, souvenir, DAN pencarian nama/telepon/email
 // digabung dalam satu query (admin-ui-redesign keputusan #9, diperluas
 // guest-fields-admin-layout keputusan #13).
-func (s *Service) List(ctx context.Context, status, q, invitationType, souvenirType, groupID string, respondedOnly bool, p pagination.Params) ([]GuestDTO, int, error) {
+func (s *Service) List(ctx context.Context, status, q, invitationType, souvenirType, groupID, contacted string, respondedOnly bool, p pagination.Params) ([]GuestDTO, int, error) {
 	var statusArg sqlc.NullGuestsRsvpStatus
 	if status != "" {
 		if !validStatuses[status] {
@@ -382,6 +430,14 @@ func (s *Service) List(ctx context.Context, status, q, invitationType, souvenirT
 		return nil, 0, err
 	}
 
+	// Filter tahap undangan (docs/plan/guest-stage-filter/PLAN.md T6). Sama
+	// seperti groupID di atas: handler meneruskan string mentah, penolakan
+	// nilai salah bentuk jadi urusan di sini.
+	contactedArg, err := parseContactedFilter(contacted)
+	if err != nil {
+		return nil, 0, err
+	}
+
 	var qArg sql.NullString
 	if q != "" {
 		qArg = sql.NullString{String: escapeLike(q), Valid: true}
@@ -398,13 +454,13 @@ func (s *Service) List(ctx context.Context, status, q, invitationType, souvenirT
 	}
 
 	total, err := s.repo.CountFiltered(ctx, sqlc.CountGuestsFilteredParams{
-		Status: statusArg, RespondedOnly: respondedOnlyArg, InvitationType: invitationTypeArg, SouvenirType: souvenirTypeArg, GroupID: groupIDArg, Q: qArg,
+		Status: statusArg, RespondedOnly: respondedOnlyArg, ContactedFilter: contactedArg, InvitationType: invitationTypeArg, SouvenirType: souvenirTypeArg, GroupID: groupIDArg, Q: qArg,
 	})
 	if err != nil {
 		return nil, 0, err
 	}
 	rows, err := s.repo.ListFiltered(ctx, sqlc.ListGuestsFilteredParams{
-		Status: statusArg, RespondedOnly: respondedOnlyArg, InvitationType: invitationTypeArg, SouvenirType: souvenirTypeArg, GroupID: groupIDArg, Q: qArg,
+		Status: statusArg, RespondedOnly: respondedOnlyArg, ContactedFilter: contactedArg, InvitationType: invitationTypeArg, SouvenirType: souvenirTypeArg, GroupID: groupIDArg, Q: qArg,
 		Limit: int32(p.Limit), Offset: int32(p.Offset()),
 	})
 	if err != nil {
@@ -959,6 +1015,7 @@ func StatusHTTPCode(err error) int {
 		errors.Is(err, ErrGroupNameRequired), errors.Is(err, ErrGroupNameTooLong),
 		errors.Is(err, ErrGroupDescriptionTooLong), errors.Is(err, ErrGroupNameTaken),
 		errors.Is(err, ErrGroupInUse), errors.Is(err, ErrInvalidGroupID),
+		errors.Is(err, ErrInvalidContactedFilter),
 		errors.Is(err, ErrWishAlreadySubmitted), errors.Is(err, ErrWishEmpty), errors.Is(err, ErrWishTooLong):
 		return 400
 	default:

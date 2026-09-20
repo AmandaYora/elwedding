@@ -498,3 +498,185 @@ test('tamu tanpa nomor HP -> tidak ada penanda karena tombolnya nonaktif', async
 
   expect(mockedSetContacted).not.toHaveBeenCalled()
 })
+
+// ---------------------------------------------------------------------------
+// Filter tahap undangan (docs/plan/guest-stage-filter T14)
+// ---------------------------------------------------------------------------
+
+/** Menunggu pemuatan pertama selesai, supaya assertion di bawah tidak keliru
+ * membaca panggilan awal halaman sebagai hasil pilihan dropdown. */
+async function waitFirstLoad() {
+  await waitFor(() =>
+    expect(mockedList).toHaveBeenCalledWith({ page: 1, status: '', q: '', invitationType: '', souvenirType: '', groupId: '', respondedOnly: false }),
+  )
+}
+
+test('pilih "Belum diundang" -> status pending + contacted false', async () => {
+  mockedList.mockResolvedValue({ data: [], meta: { page: 1, limit: 20, total: 0, totalPages: 1 } })
+
+  renderPage()
+  await waitFirstLoad()
+
+  fireEvent.change(screen.getByDisplayValue('Semua status'), { target: { value: 'not_invited' } })
+
+  await waitFor(() =>
+    expect(mockedList).toHaveBeenCalledWith({
+      page: 1,
+      status: 'pending',
+      contacted: 'false',
+      q: '',
+      invitationType: '',
+      souvenirType: '',
+      groupId: '',
+      respondedOnly: false,
+    }),
+  )
+})
+
+// Dua kategori ini SAMA-SAMA rsvp_status 'pending' dan hanya dibedakan oleh
+// contacted. Kalau pemetaannya tertukar, daftar "sudah diundang, belum
+// menjawab" akan berisi orang yang justru belum pernah dihubungi - dan tidak
+// ada gejala lain yang menunjukkannya.
+test('pilih "Menunggu konfirmasi" -> status pending + contacted true', async () => {
+  mockedList.mockResolvedValue({ data: [], meta: { page: 1, limit: 20, total: 0, totalPages: 1 } })
+
+  renderPage()
+  await waitFirstLoad()
+
+  fireEvent.change(screen.getByDisplayValue('Semua status'), { target: { value: 'awaiting_confirmation' } })
+
+  await waitFor(() =>
+    expect(mockedList).toHaveBeenCalledWith({
+      page: 1,
+      status: 'pending',
+      contacted: 'true',
+      q: '',
+      invitationType: '',
+      souvenirType: '',
+      groupId: '',
+      respondedOnly: false,
+    }),
+  )
+})
+
+// "Jawaban tamu menang": begitu tamu menjawab, contacted_at tidak lagi jadi
+// pembeda - tamu yang undangannya dikirim di luar aplikasi tetap harus muncul.
+test('pilih "Konfirmasi hadir" -> status attending tanpa menyaring contacted', async () => {
+  mockedList.mockResolvedValue({ data: [], meta: { page: 1, limit: 20, total: 0, totalPages: 1 } })
+
+  renderPage()
+  await waitFirstLoad()
+
+  fireEvent.change(screen.getByDisplayValue('Semua status'), { target: { value: 'confirmed_attending' } })
+
+  await waitFor(() =>
+    expect(mockedList).toHaveBeenCalledWith({
+      page: 1,
+      status: 'attending',
+      contacted: '',
+      q: '',
+      invitationType: '',
+      souvenirType: '',
+      groupId: '',
+      respondedOnly: false,
+    }),
+  )
+})
+
+// Penjaga keputusan T9: cabang tanpa-filter TIDAK boleh menambahkan
+// `contacted: ''`. Objeknya harus identik dengan panggilan awal halaman -
+// itulah yang membuat 23 test lama di berkas ini tetap hijau tanpa disunting.
+test('kembali ke "Semua status" -> objek panggilan identik dengan pemuatan awal', async () => {
+  mockedList.mockResolvedValue({ data: [], meta: { page: 1, limit: 20, total: 0, totalPages: 1 } })
+
+  renderPage()
+  await waitFirstLoad()
+
+  fireEvent.change(screen.getByDisplayValue('Semua status'), { target: { value: 'remind_later' } })
+  await waitFor(() => expect(mockedList).toHaveBeenCalledWith(expect.objectContaining({ status: 'remind_later' })))
+
+  fireEvent.change(screen.getByDisplayValue('Minta diingatkan kembali'), { target: { value: '' } })
+
+  await waitFor(() => {
+    const last = mockedList.mock.calls[mockedList.mock.calls.length - 1][0]
+    expect(last).not.toHaveProperty('contacted')
+    expect(last).toEqual({ page: 1, status: '', q: '', invitationType: '', souvenirType: '', groupId: '', respondedOnly: false })
+  })
+})
+
+test('ubah filter tahap saat di halaman 2 -> balik ke halaman 1', async () => {
+  // total 25 dengan PAGE_SIZE 20 -> 2 halaman, sehingga "Berikutnya" aktif.
+  // Pagination di repo ini memakai tombol Sebelumnya/Berikutnya, bukan nomor
+  // halaman.
+  mockedList.mockResolvedValue({ data: [sampleGuest], meta: { page: 1, limit: 20, total: 25, totalPages: 2 } })
+
+  renderPage()
+  await waitFirstLoad()
+
+  fireEvent.click(screen.getByRole('button', { name: /Berikutnya/ }))
+  await waitFor(() => expect(mockedList).toHaveBeenCalledWith(expect.objectContaining({ page: 2 })))
+
+  fireEvent.change(screen.getByDisplayValue('Semua status'), { target: { value: 'not_invited' } })
+
+  await waitFor(() => expect(mockedList).toHaveBeenCalledWith(expect.objectContaining({ page: 1, status: 'pending', contacted: 'false' })))
+})
+
+// Tanpa stageFilter di hasFilter, hasil filter kosong akan berbunyi "Belum ada
+// tamu" + tombol "Tambah tamu pertama" - seolah databasenya kosong, padahal
+// yang kosong cuma hasil penyaringan.
+test('filter tahap aktif + hasil kosong -> EmptyState versi "tidak cocok"', async () => {
+  mockedList.mockResolvedValue({ data: [], meta: { page: 1, limit: 20, total: 0, totalPages: 1 } })
+
+  renderPage()
+  await waitFor(() => expect(screen.getByText('Belum ada tamu')).toBeInTheDocument())
+
+  fireEvent.change(screen.getByDisplayValue('Semua status'), { target: { value: 'not_invited' } })
+
+  await waitFor(() => expect(screen.getByText('Tidak ada tamu yang cocok')).toBeInTheDocument())
+  expect(screen.queryByText('Belum ada tamu')).not.toBeInTheDocument()
+})
+
+// K2: satu-satunya penulis contacted_at selama ini adalah klik tautan
+// WhatsApp, dan tautan itu tidak dirender tanpa nomor HP. Tanpa tombol ini,
+// tamu undangan fisik permanen tersangkut di "Belum diundang".
+test('tamu tanpa nomor HP & belum ditandai -> tombol tandai manual memanggil setContacted', async () => {
+  mockedList.mockResolvedValue({
+    data: [{ ...sampleGuest, phone: '', contactedAt: null }],
+    meta: { page: 1, limit: 20, total: 1, totalPages: 1 },
+  })
+  mockedSetContacted.mockResolvedValue(undefined)
+
+  renderPage()
+  await waitFor(() => expect(screen.getByText('Budi Santoso')).toBeInTheDocument())
+
+  fireEvent.click(screen.getByRole('button', { name: 'Tandai sudah diundang' }))
+
+  await waitFor(() => expect(mockedSetContacted).toHaveBeenCalledWith(1, true))
+  // Badge muncul dari respons yang SUKSES, bukan optimistis.
+  await waitFor(() => expect(screen.getByRole('button', { name: 'Dihubungi' })).toBeInTheDocument())
+})
+
+test('tamu tanpa nomor HP yang sudah ditandai -> tombol tandai manual tidak dirender', async () => {
+  mockedList.mockResolvedValue({
+    data: [{ ...sampleGuest, phone: '', contactedAt: '2026-01-02T00:00:00Z' }],
+    meta: { page: 1, limit: 20, total: 1, totalPages: 1 },
+  })
+
+  renderPage()
+  await waitFor(() => expect(screen.getByText('Budi Santoso')).toBeInTheDocument())
+
+  expect(screen.queryByRole('button', { name: 'Tandai sudah diundang' })).not.toBeInTheDocument()
+  expect(screen.getByRole('button', { name: 'Dihubungi' })).toBeInTheDocument()
+})
+
+// Tamu yang tautan WhatsApp-nya hidup tidak butuh tombol kedua: "Kirim
+// Undangan" sudah menandai contacted_at sendiri.
+test('tamu dengan nomor HP & template siap -> tombol tandai manual tidak dirender', async () => {
+  mockedList.mockResolvedValue({ data: [sampleGuest], meta: { page: 1, limit: 20, total: 1, totalPages: 1 } })
+
+  renderPage()
+  await waitFor(() => expect(screen.getByText('Budi Santoso')).toBeInTheDocument())
+  await waitFor(() => expect(screen.getByRole('link', { name: 'Kirim Undangan' })).toBeInTheDocument())
+
+  expect(screen.queryByRole('button', { name: 'Tandai sudah diundang' })).not.toBeInTheDocument()
+})

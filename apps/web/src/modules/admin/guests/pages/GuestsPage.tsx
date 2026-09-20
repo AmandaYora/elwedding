@@ -32,6 +32,10 @@ import {
   SIDE_OPTIONS,
   EXPECTED_ATTENDING_LABEL,
   EXPECTED_ATTENDING_DESCRIPTION,
+  STAGE_LABEL,
+  STAGE_OPTIONS,
+  STAGE_QUERY,
+  type GuestStage,
 } from '@/shared/constants/guests'
 import { Button, Input, Select, Textarea, Switch, Badge, Card, Table, Thead, Tbody, Tr, Th, Td, Modal, Pagination } from '@/shared/components/ui'
 import { PageHeader } from '@/shared/components/layout/PageHeader'
@@ -69,6 +73,9 @@ export default function GuestsPage() {
   const [guests, setGuests] = useState<Guest[]>([])
   const [total, setTotal] = useState(0)
   const [page, setPage] = useState(1)
+  // Filter tahap undangan (docs/plan/guest-stage-filter T9). String kosong =
+  // "Semua status", sama seperti tiga filter di bawahnya.
+  const [stageFilter, setStageFilter] = useState<GuestStage | ''>('')
   const [invitationTypeFilter, setInvitationTypeFilter] = useState('')
   const [souvenirTypeFilter, setSouvenirTypeFilter] = useState('')
   const [groupFilter, setGroupFilter] = useState('')
@@ -198,7 +205,20 @@ export default function GuestsPage() {
 
   useEffect(() => {
     let cancelled = false
-    listGuests({ page, status: '', q: debouncedSearch, invitationType: invitationTypeFilter, souvenirType: souvenirTypeFilter, groupId: groupFilter, respondedOnly: false })
+    // Satu pilihan dropdown -> SEPASANG parameter (status + contacted), dipetakan
+    // di STAGE_QUERY. Cabang tanpa-filter sengaja HANYA mengirim `status: ''` dan
+    // TIDAK menambahkan `contacted: ''`: field itu opsional, jadi menghilangkannya
+    // berarti persis sama dengan mengirim string kosong, sekaligus membuat objek
+    // panggilan default identik dengan sebelum filter ini ada.
+    listGuests({
+      page,
+      ...(stageFilter ? STAGE_QUERY[stageFilter] : { status: '' }),
+      q: debouncedSearch,
+      invitationType: invitationTypeFilter,
+      souvenirType: souvenirTypeFilter,
+      groupId: groupFilter,
+      respondedOnly: false,
+    })
       .then((res) => {
         if (cancelled) return
         setGuests(res.data)
@@ -214,7 +234,7 @@ export default function GuestsPage() {
     return () => {
       cancelled = true
     }
-  }, [page, invitationTypeFilter, souvenirTypeFilter, groupFilter, debouncedSearch, reloadToken])
+  }, [page, stageFilter, invitationTypeFilter, souvenirTypeFilter, groupFilter, debouncedSearch, reloadToken])
 
   function openCreate() {
     setEditingId(null)
@@ -349,7 +369,8 @@ export default function GuestsPage() {
     return 'Belum ada group. Buat minimal satu group lebih dulu.'
   }
 
-  const hasFilter = debouncedSearch !== '' || invitationTypeFilter !== '' || souvenirTypeFilter !== '' || groupFilter !== ''
+  const hasFilter =
+    debouncedSearch !== '' || stageFilter !== '' || invitationTypeFilter !== '' || souvenirTypeFilter !== '' || groupFilter !== ''
 
   return (
     <div className="flex flex-col gap-6">
@@ -422,6 +443,25 @@ export default function GuestsPage() {
                   </svg>
                 }
               />
+            </div>
+            {/* Filter tahap undangan (docs/plan/guest-stage-filter T10) - Select
+                PERTAMA setelah kolom pencarian: tahap undangan adalah sumbu
+                utama yang dicari admin, tiga filter di bawahnya penyempit. */}
+            <div className="w-full sm:w-52">
+              <Select
+                value={stageFilter}
+                onChange={(e) => {
+                  setPage(1)
+                  setStageFilter(e.target.value as GuestStage | '')
+                }}
+              >
+                <option value="">Semua status</option>
+                {STAGE_OPTIONS.map((v) => (
+                  <option key={v} value={v}>
+                    {STAGE_LABEL[v]}
+                  </option>
+                ))}
+              </Select>
             </div>
             <div className="w-full sm:w-44">
               <Select
@@ -652,15 +692,44 @@ export default function GuestsPage() {
                                 Kirim Undangan
                               </a>
                             ) : (
-                              <Button
-                                variant="secondary"
-                                size="sm"
-                                disabled
-                                title={waDisabledReason(guest)}
-                                className="h-8 px-2.5 text-xs whitespace-nowrap"
-                              >
-                                Kirim Undangan
-                              </Button>
+                              /* Tombol WA nonaktif TETAP dirender: title-nya yang
+                                 memberi tahu apa yang harus diperbaiki. Di
+                                 sebelahnya jalan keluar manual (docs/plan/
+                                 guest-stage-filter T11/K2) - tanpa itu, tamu
+                                 undangan fisik atau tanpa nomor HP TIDAK PUNYA
+                                 cara apa pun keluar dari "Belum diundang",
+                                 karena satu-satunya penulis contacted_at selama
+                                 ini adalah klik tautan WhatsApp di atas.
+
+                                 Dibungkus fragment karena cabang ini harus
+                                 mengembalikan satu elemen.
+
+                                 Hanya muncul saat penandanya masih kosong; kalau
+                                 sudah terisi, badge "Dihubungi" di kolom Nama
+                                 yang mengambil alih - termasuk jalur
+                                 membatalkannya. */
+                              <>
+                                <Button
+                                  variant="secondary"
+                                  size="sm"
+                                  disabled
+                                  title={waDisabledReason(guest)}
+                                  className="h-8 px-2.5 text-xs whitespace-nowrap"
+                                >
+                                  Kirim Undangan
+                                </Button>
+                                {!guest.contactedAt && (
+                                  <Button
+                                    variant="secondary"
+                                    size="sm"
+                                    onClick={() => void toggleContacted(guest, true)}
+                                    title={`Catat bahwa ${guest.name} sudah diundang lewat jalur lain (undangan fisik, telepon, japri)`}
+                                    className="h-8 px-2.5 text-xs whitespace-nowrap"
+                                  >
+                                    Tandai sudah diundang
+                                  </Button>
+                                )}
+                              </>
                             )
                           })()}
                           <Button

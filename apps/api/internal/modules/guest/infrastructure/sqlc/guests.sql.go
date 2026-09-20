@@ -40,6 +40,9 @@ const countGuestsFiltered = `-- name: CountGuestsFiltered :one
 SELECT COUNT(*) FROM guests
 WHERE (? IS NULL OR rsvp_status = ?)
   AND (CAST(? AS UNSIGNED) = 0 OR rsvp_status != 'pending')
+  AND (CAST(? AS UNSIGNED) = 0
+       OR (CAST(? AS UNSIGNED) = 1 AND contacted_at IS NOT NULL)
+       OR (CAST(? AS UNSIGNED) = 2 AND contacted_at IS NULL))
   AND (? IS NULL OR invitation_type = ?)
   AND (? IS NULL OR souvenir_type = ?)
   AND (? IS NULL OR group_id = ?)
@@ -47,12 +50,13 @@ WHERE (? IS NULL OR rsvp_status = ?)
 `
 
 type CountGuestsFilteredParams struct {
-	Status         NullGuestsRsvpStatus
-	RespondedOnly  int64
-	InvitationType NullGuestsInvitationType
-	SouvenirType   NullGuestsSouvenirType
-	GroupID        sql.NullInt64
-	Q              sql.NullString
+	Status          NullGuestsRsvpStatus
+	RespondedOnly   int64
+	ContactedFilter int64
+	InvitationType  NullGuestsInvitationType
+	SouvenirType    NullGuestsSouvenirType
+	GroupID         sql.NullInt64
+	Q               sql.NullString
 }
 
 func (q *Queries) CountGuestsFiltered(ctx context.Context, arg CountGuestsFilteredParams) (int64, error) {
@@ -60,6 +64,9 @@ func (q *Queries) CountGuestsFiltered(ctx context.Context, arg CountGuestsFilter
 		arg.Status,
 		arg.Status,
 		arg.RespondedOnly,
+		arg.ContactedFilter,
+		arg.ContactedFilter,
+		arg.ContactedFilter,
 		arg.InvitationType,
 		arg.InvitationType,
 		arg.SouvenirType,
@@ -551,6 +558,9 @@ const listGuestsFiltered = `-- name: ListGuestsFiltered :many
 SELECT id, name, phone, side, token, rsvp_status, rsvp_responded_at, created_at, updated_at, gender, invitation_type, souvenir_type, email, address, notes, attending_count, is_expected_attending, checked_in_at, group_id, pax_quota, contacted_at FROM guests
 WHERE (? IS NULL OR rsvp_status = ?)
   AND (CAST(? AS UNSIGNED) = 0 OR rsvp_status != 'pending')
+  AND (CAST(? AS UNSIGNED) = 0
+       OR (CAST(? AS UNSIGNED) = 1 AND contacted_at IS NOT NULL)
+       OR (CAST(? AS UNSIGNED) = 2 AND contacted_at IS NULL))
   AND (? IS NULL OR invitation_type = ?)
   AND (? IS NULL OR souvenir_type = ?)
   AND (? IS NULL OR group_id = ?)
@@ -560,21 +570,39 @@ LIMIT ? OFFSET ?
 `
 
 type ListGuestsFilteredParams struct {
-	Status         NullGuestsRsvpStatus
-	RespondedOnly  int64
-	InvitationType NullGuestsInvitationType
-	SouvenirType   NullGuestsSouvenirType
-	GroupID        sql.NullInt64
-	Q              sql.NullString
-	Limit          int32
-	Offset         int32
+	Status          NullGuestsRsvpStatus
+	RespondedOnly   int64
+	ContactedFilter int64
+	InvitationType  NullGuestsInvitationType
+	SouvenirType    NullGuestsSouvenirType
+	GroupID         sql.NullInt64
+	Q               sql.NullString
+	Limit           int32
+	Offset          int32
 }
 
+// contacted_filter (docs/plan/guest-stage-filter/PLAN.md T1/D7) menyaring
+// kolom contacted_at untuk filter "Tahap undangan" di /admin/guests:
+//
+//	0 = tanpa filter, 1 = sudah dihubungi, 2 = belum dihubungi.
+//
+// 0 (BUKAN 1) yang berarti "tanpa filter" - disengaja (K5): SearchForCheckin
+// merakit ListGuestsFilteredParams dengan literal bernama-field tanpa
+// menyebut ContactedFilter, jadi zero value Go-nya harus sudah berarti
+// "jangan saring". Menukar arti 0 dan 1 akan diam-diam menyaring pencarian
+// check-in petugas gate.
+//
+// INTEGER lewat CAST(... AS UNSIGNED), bukan bool/string: pola yang sama
+// dengan responded_only di baris atasnya. Tanpa CAST, engine MySQL sqlc
+// meng-infer tipenya jadi interface{} (lihat catatan di service.go List).
 func (q *Queries) ListGuestsFiltered(ctx context.Context, arg ListGuestsFilteredParams) ([]Guest, error) {
 	rows, err := q.db.QueryContext(ctx, listGuestsFiltered,
 		arg.Status,
 		arg.Status,
 		arg.RespondedOnly,
+		arg.ContactedFilter,
+		arg.ContactedFilter,
+		arg.ContactedFilter,
 		arg.InvitationType,
 		arg.InvitationType,
 		arg.SouvenirType,
