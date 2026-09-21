@@ -521,9 +521,25 @@ yang sama dengan `docs/plan/guest-stage-filter/PLAN.md`.
 Tidak ada tes unit yang bisa membuktikan MySQL benar-benar menerima `SET time_zone` —
 buktinya hanya ada di lingkungan nyata. Empat langkah, berurutan:
 
-1. **Aplikasi hidup.** `curl -sI https://elwedding.elcodelabs.com/api/v1/health` → `200`.
-   Kalau `SET time_zone` ditolak, **setiap** koneksi gagal dan langkah ini yang pertama
-   jatuh — itulah sebabnya ia diletakkan paling depan.
+1. **Aplikasi hidup DAN bisa query DB.** Dua perintah, dan urutannya penting:
+
+   - `curl -sI https://elwedding.elcodelabs.com/api/v1/health` → `200`.
+     **KOREKSI (pasca-deploy):** endpoint ini TIDAK menyentuh database
+     ([router.go:58-60](../../../apps/api/internal/router/router.go#L58-L60) hanya
+     membalas OK), jadi 200 saja **tidak** membuktikan `SET time_zone` diterima. Yang ia
+     buktikan: prosesnya hidup — dan itu sudah bermakna, karena
+     [main.go:34-37](../../../apps/api/cmd/server/main.go#L34-L37) memanggil
+     `database.Open` yang melakukan `db.Ping()` dan `log.Fatalf` bila gagal. Koneksi
+     pertama itulah yang menjalankan `SET time_zone`, jadi container yang hidup berarti
+     MySQL menerimanya.
+   - `curl -s -o /dev/null -w "%{http_code}" https://elwedding.elcodelabs.com/api/v1/public/invitation`
+     → `200`. **Ini bukti yang sebenarnya**: endpoint publik ini membaca
+     `invitation_content` dari database tanpa perlu autentikasi, jadi 200 berarti query
+     nyata berhasil lewat koneksi ber-`SET time_zone`.
+
+   Sekalian periksa datanya konsisten — `weddingDateUnix` dikonversi ke WIB harus sama
+   persis dengan `weddingDateRaw`. Kalau berbeda, `wedding_date` ikut tergeser dan
+   migrasi salah cakupan.
 2. **Waktu baru benar.** Di `/admin/guests`, tandai satu tamu "sudah diundang", lalu arahkan
    kursor ke badge "Dihubungi". Harus berbunyi "beberapa detik lalu", bukan "7 jam lalu".
 3. **Waktu lama ikut benar.** Pada tamu yang sudah dihubungi **sebelum** rilis ini, jam
