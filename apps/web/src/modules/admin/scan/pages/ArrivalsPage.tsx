@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
+import { formatWibDateTime, formatWibTime } from '@/shared/utils/wib-time'
 import {
   type ArrivalItem,
   type CheckinSummary,
@@ -40,22 +41,6 @@ function sideLabel(side: string): string {
 
 function souvenirLabel(type: string): string {
   return SOUVENIR_TYPE_LABEL[type as SouvenirType] ?? type
-}
-
-/** Jam masuk saja - acaranya satu hari. Tanggal lengkapnya tetap tersedia
- * lewat atribut `title` kalau ada yang perlu memeriksa. */
-function formatTime(iso: string): string {
-  if (!iso) return '-'
-  const d = new Date(iso)
-  if (Number.isNaN(d.getTime())) return '-'
-  return new Intl.DateTimeFormat('id-ID', { hour: '2-digit', minute: '2-digit' }).format(d)
-}
-
-function formatFull(iso: string): string {
-  if (!iso) return ''
-  const d = new Date(iso)
-  if (Number.isNaN(d.getTime())) return ''
-  return new Intl.DateTimeFormat('id-ID', { dateStyle: 'full', timeStyle: 'short' }).format(d)
 }
 
 export default function ArrivalsPage() {
@@ -174,11 +159,15 @@ export default function ArrivalsPage() {
                         </span>
                       </Td>
                       <Td className="text-right pr-6">
+                        {/* Jam masuk saja - acaranya satu hari. Tanggal
+                            lengkapnya tetap tersedia lewat `title` kalau ada
+                            yang perlu memeriksa. Keduanya dipatok WIB, bukan
+                            zona perangkat petugas gate (timezone-wib T7). */}
                         <span
                           className="font-mono font-semibold text-slate-900 tabular-nums whitespace-nowrap"
-                          title={formatFull(item.checkedInAt)}
+                          title={formatWibDateTime(item.checkedInAt)}
                         >
-                          {formatTime(item.checkedInAt)}
+                          {formatWibTime(item.checkedInAt, '-')}
                         </span>
                       </Td>
                     </Tr>

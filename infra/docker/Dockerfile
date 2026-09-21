@@ -33,6 +33,20 @@ COPY --from=web /repo/apps/web/dist ./public
 COPY apps/api/migrations ./migrations
 ENV APP_PORT=8080
 ENV PUBLIC_DIR=/app/public
+# TZ (docs/plan/timezone-wib/PLAN.md T4/D5) membuat time.Now() dan log
+# container berjalan WIB, sehingga jam yang terlihat saat mendiagnosis
+# insiden satu bahasa dengan jam di data.
+#
+# TIDAK memperbaiki bug "mundur 7 jam" - itu murni urusan zona sesi MySQL
+# (lihat internal/database/db.go). Jangan menghapus time_zone di DSN sana
+# dengan anggapan baris ini sudah menggantikannya.
+#
+# NOL dampak ke isi database: nilai yang ditulis Go tetap dikonversi driver
+# ke loc=Asia/Jakarta sebelum dikirim, apa pun time.Local container.
+#
+# tzdata-nya sudah dipasang di atas untuk keperluan loc, jadi tidak ada
+# paket tambahan yang dibutuhkan baris ini.
+ENV TZ=Asia/Jakarta
 EXPOSE 8080
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
   CMD wget -qO- http://127.0.0.1:${APP_PORT}/api/v1/health || exit 1

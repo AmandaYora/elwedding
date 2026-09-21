@@ -1,4 +1,5 @@
 import { Suspense, lazy, useCallback, useEffect, useRef, useState } from 'react'
+import { formatWibTime } from '@/shared/utils/wib-time'
 import {
   type CheckinResult,
   type CheckinSearchItem,
@@ -63,13 +64,6 @@ type Outcome =
  * detik tanpa ini - sumber beban terbesar di seluruh rancangan ini. */
 const REPEAT_SCAN_QUIET_MS = 4000
 const SEARCH_DEBOUNCE_MS = 300
-
-function formatArrivalTime(iso: string): string {
-  if (!iso) return ''
-  const d = new Date(iso)
-  if (Number.isNaN(d.getTime())) return ''
-  return new Intl.DateTimeFormat('id-ID', { hour: '2-digit', minute: '2-digit' }).format(d)
-}
 
 function sideLabel(side: string): string {
   return SIDE_LABEL[side as Side] ?? side
@@ -470,7 +464,7 @@ function OutcomePanel({ outcome, mode }: { outcome: Outcome; mode: ScanMode }) {
 
   const { result } = outcome
   const already = outcome.kind === 'already'
-  const arrival = formatArrivalTime(result.checkedInAt)
+  const arrival = formatWibTime(result.checkedInAt)
   const vip = result.souvenirType === 'vip'
 
   return (
