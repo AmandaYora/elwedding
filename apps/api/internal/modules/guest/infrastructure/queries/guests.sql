@@ -3,8 +3,8 @@
 -- UpdateGuestRsvpStatusByToken, dan tetap memakai DEFAULT kolomnya di sini.
 -- Dua kolom, dua pemilik (D11): admin menentukan JATAH, tamu menentukan JANJI.
 -- name: CreateGuest :execlastid
-INSERT INTO guests (name, phone, side, group_id, token, rsvp_status, gender, invitation_type, souvenir_type, email, address, notes, is_expected_attending, pax_quota)
-VALUES (?, ?, ?, ?, ?, 'pending', ?, ?, ?, ?, ?, ?, ?, ?);
+INSERT INTO guests (name, phone, side, group_id, token, rsvp_status, gender, invitation_type, souvenir_type, email, username_telegram, address, notes, is_expected_attending, pax_quota)
+VALUES (?, ?, ?, ?, ?, 'pending', ?, ?, ?, ?, ?, ?, ?, ?, ?);
 
 -- name: GetGuestByID :one
 SELECT * FROM guests WHERE id = ? LIMIT 1;
@@ -15,7 +15,7 @@ SELECT * FROM guests WHERE token = ? LIMIT 1;
 -- Sama seperti CreateGuest: pax_quota ikut, attending_count TIDAK PERNAH ikut
 -- (D11 - keputusan lama dashboard-wa-rsvp #11 tetap berlaku penuh).
 -- name: UpdateGuest :exec
-UPDATE guests SET name = ?, phone = ?, side = ?, group_id = ?, gender = ?, invitation_type = ?, souvenir_type = ?, email = ?, address = ?, notes = ?, is_expected_attending = ?, pax_quota = ?
+UPDATE guests SET name = ?, phone = ?, side = ?, group_id = ?, gender = ?, invitation_type = ?, souvenir_type = ?, email = ?, username_telegram = ?, address = ?, notes = ?, is_expected_attending = ?, pax_quota = ?
 WHERE id = ?;
 
 -- name: UpdateGuestRsvpStatusByToken :exec
@@ -83,7 +83,7 @@ WHERE (sqlc.narg(status) IS NULL OR rsvp_status = sqlc.narg(status))
   AND (sqlc.narg(invitation_type) IS NULL OR invitation_type = sqlc.narg(invitation_type))
   AND (sqlc.narg(souvenir_type) IS NULL OR souvenir_type = sqlc.narg(souvenir_type))
   AND (sqlc.narg(group_id) IS NULL OR group_id = sqlc.narg(group_id))
-  AND (sqlc.narg(q) IS NULL OR name LIKE sqlc.narg(q) OR phone LIKE sqlc.narg(q) OR email LIKE sqlc.narg(q))
+  AND (sqlc.narg(q) IS NULL OR name LIKE sqlc.narg(q) OR phone LIKE sqlc.narg(q) OR email LIKE sqlc.narg(q) OR username_telegram LIKE sqlc.narg(q))
 ORDER BY created_at DESC
 LIMIT ? OFFSET ?;
 
@@ -97,7 +97,7 @@ WHERE (sqlc.narg(status) IS NULL OR rsvp_status = sqlc.narg(status))
   AND (sqlc.narg(invitation_type) IS NULL OR invitation_type = sqlc.narg(invitation_type))
   AND (sqlc.narg(souvenir_type) IS NULL OR souvenir_type = sqlc.narg(souvenir_type))
   AND (sqlc.narg(group_id) IS NULL OR group_id = sqlc.narg(group_id))
-  AND (sqlc.narg(q) IS NULL OR name LIKE sqlc.narg(q) OR phone LIKE sqlc.narg(q) OR email LIKE sqlc.narg(q));
+  AND (sqlc.narg(q) IS NULL OR name LIKE sqlc.narg(q) OR phone LIKE sqlc.narg(q) OR email LIKE sqlc.narg(q) OR username_telegram LIKE sqlc.narg(q));
 
 -- CountGuestsGroupedByStatus juga menghasilkan total_pax (SUM attending_count)
 -- digabung ke query yang sama (PLAN.md dashboard-wa-rsvp keputusan #16) -

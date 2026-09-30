@@ -28,3 +28,10 @@ sql:
       go:
         package: "sqlc"
         out: "internal/modules/whatsapp/infrastructure/sqlc"
+  - engine: "mysql"
+    schema: "migrations"
+    queries: "internal/modules/telegram/infrastructure/queries"
+    gen:
+      go:
+        package: "sqlc"
+        out: "internal/modules/telegram/infrastructure/sqlc"

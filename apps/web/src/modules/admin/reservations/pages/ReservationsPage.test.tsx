@@ -36,6 +36,7 @@ const sampleGuest = {
   invitationType: 'online' as const,
   souvenirType: 'regular' as const,
   email: 'budi@example.com',
+  usernameTelegram: '',
   address: 'Jl. Merdeka No. 1',
   notes: '',
   attendingCount: 2,

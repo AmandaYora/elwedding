@@ -17,6 +17,9 @@ import GroupsPage from '@/modules/admin/groups/pages/GroupsPage'
 import WishesPage from '@/modules/admin/wishes/pages/WishesPage'
 import ReservationsPage from '@/modules/admin/reservations/pages/ReservationsPage'
 import WhatsAppPage from '@/modules/admin/whatsapp/pages/WhatsAppPage'
+// TelegramPage eager seperti rute lain - halaman kecil tanpa dependensi berat,
+// alasan yang sama dengan GroupsPage/WishesPage.
+import TelegramPage from '@/modules/admin/telegram/pages/TelegramPage'
 import UsersPage from '@/modules/admin/users/pages/UsersPage'
 import SettingsPage from '@/modules/admin/settings/pages/SettingsPage'
 
@@ -56,6 +59,7 @@ export default function AdminApp() {
               <Route path={ROUTE_PATHS.wishes} element={<WishesPage />} />
               <Route path={ROUTE_PATHS.reservations} element={<ReservationsPage />} />
               <Route path={ROUTE_PATHS.whatsapp} element={<WhatsAppPage />} />
+              <Route path={ROUTE_PATHS.telegram} element={<TelegramPage />} />
               <Route path={ROUTE_PATHS.users} element={<UsersPage />} />
               <Route path={ROUTE_PATHS.settings} element={<SettingsPage />} />
               <Route

@@ -2,9 +2,13 @@ import { useEffect, useState } from 'react'
 import {
   type Guest,
   type GuestInput,
+  type InvitationChannel,
+  type InvitationPreview,
   createGuest,
   deleteGuest,
   listGuests,
+  previewInvitation,
+  sendInvitation,
   setContacted,
   updateGuest,
 } from '@/modules/admin/guests/services/guests.service'
@@ -16,10 +20,6 @@ import { ROUTE_PATHS } from '@/app/routes/route-paths'
 // (.claude/rules/backend-modular-monolith.md). Preseden yang sudah ada:
 // SettingsPage mengimpor content.service; DashboardPage & ReservationsPage
 // mengimpor guests.service.
-import { getConfig, type WhatsAppConfig } from '@/modules/admin/whatsapp/services/whatsapp.service'
-import { getContent } from '@/modules/admin/content/services/content.service'
-import { normalizePhoneForWa, applyInvitationTemplate, buildWaMeUrl } from '@/shared/lib/waInvite'
-import type { InvitationContent } from '@/types/api'
 import {
   PAGE_SIZE,
   GENDER_LABEL,
@@ -54,6 +54,7 @@ const EMPTY_FORM: GuestInput = {
   invitationType: 'online',
   souvenirType: 'regular',
   email: '',
+  usernameTelegram: '',
   address: '',
   notes: '',
   isExpectedAttending: true,
@@ -124,13 +125,17 @@ export default function GuestsPage() {
     }
   }
 
-  // Dua singleton yang dibutuhkan tombol "Kirim Undangan": template pesannya
-  // (menu WhatsApp) dan nama mempelai + tanggal acara (menu Konten).
-  // Keduanya sudah punya endpoint admin sendiri, jadi pesan dirakit di klien
-  // dan TIDAK ada endpoint baru maupun pembacaan lintas modul di sisi Go
-  // (docs/plan/og-share-image-dinamis/PLAN.md D10).
-  const [waConfig, setWaConfig] = useState<WhatsAppConfig | null>(null)
-  const [invitationContent, setInvitationContent] = useState<InvitationContent | null>(null)
+  // Modal kirim undangan: preview di-render SERVER dari template milik modul
+  // pengirim (source of truth) lewat GET .../invitation-preview, lalu dikirim
+  // lewat POST .../send-invitation. Halaman ini tidak lagi merakit pesan
+  // maupun membaca config/konten modul lain - jalur wa.me murni-klien sudah
+  // dihapus.
+  const [inviteGuest, setInviteGuest] = useState<Guest | null>(null)
+  const [inviteChannel, setInviteChannel] = useState<InvitationChannel>('wa')
+  const [invitePreview, setInvitePreview] = useState<InvitationPreview | null>(null)
+  const [inviteLoading, setInviteLoading] = useState(false)
+  const [inviteError, setInviteError] = useState<string | null>(null)
+  const [inviteSending, setInviteSending] = useState(false)
 
   // Daftar group dimuat SEKALI dan dipakai tiga kali: pemetaan id->nama di
   // kolom tabel, dropdown filter, dan Select di form (D2). Inilah yang membuat
@@ -179,22 +184,6 @@ export default function GuestsPage() {
   // tanpa ini, instalasi baru (§2.5 butir 1) membuat menu Tamu MATI TOTAL:
   // form mewajibkan group sementara dropdown-nya tidak punya satu pun pilihan.
   const canAddGuest = !groupsLoading && !groupsFailed && groups.length > 0
-
-  // Kegagalan kedua permintaan ini TIDAK BOLEH menggagalkan daftar tamu -
-  // ditangkap terpisah dari listGuests, dan akibatnya hanya tombol Kirim
-  // Undangan yang nonaktif, bukan halaman error.
-  useEffect(() => {
-    let cancelled = false
-    getConfig()
-      .then((c) => !cancelled && setWaConfig(c))
-      .catch(() => !cancelled && setWaConfig(null))
-    getContent()
-      .then((c) => !cancelled && setInvitationContent(c))
-      .catch(() => !cancelled && setInvitationContent(null))
-    return () => {
-      cancelled = true
-    }
-  }, [])
 
   // Debounce pencarian
   const [debouncedSearch, setDebouncedSearch] = useState('')
@@ -253,6 +242,7 @@ export default function GuestsPage() {
       invitationType: guest.invitationType,
       souvenirType: guest.souvenirType,
       email: guest.email,
+      usernameTelegram: guest.usernameTelegram,
       address: guest.address,
       notes: guest.notes,
       isExpectedAttending: guest.isExpectedAttending,
@@ -333,31 +323,56 @@ export default function GuestsPage() {
     setTimeout(() => setCopiedId(null), 2000)
   }
 
-  /** URL wa.me siap pakai untuk satu tamu, atau `null` bila undangan belum
-   * bisa dikirim. `null` -> tombol dirender NON-ANCHOR & disabled (K7). */
-  function waInviteUrl(guest: Guest): string | null {
-    const phone = normalizePhoneForWa(guest.phone)
-    if (!phone) return null
-    if (!waConfig || !invitationContent) return null
-    if (waConfig.invitationTemplate.trim() === '') return null
-
-    const text = applyInvitationTemplate(waConfig.invitationTemplate, {
-      nama: guest.name,
-      mempelai: `${invitationContent.groomName} & ${invitationContent.brideName}`,
-      // weddingDateLabel apa adanya - JANGAN memformat ulang weddingDateRaw di
-      // klien, supaya tanggalnya identik dengan yang dipakai jalur QR.
-      tanggal: invitationContent.weddingDateLabel,
-      link: invitationLink(guest),
-    })
-    return buildWaMeUrl(phone, text)
+  /** Membuka modal kirim undangan untuk satu tamu + satu kanal. Preview
+   * di-render server (tanpa efek samping); kegagalannya (modul mati, template
+   * kosong, ...) tampil DI DALAM modal sebagai pesan, bukan toast sepintas -
+   * admin membacanya sambil memutuskan langkah berikutnya. */
+  async function openInvite(guest: Guest, channel: InvitationChannel) {
+    setInviteGuest(guest)
+    setInviteChannel(channel)
+    setInvitePreview(null)
+    setInviteError(null)
+    setInviteLoading(true)
+    try {
+      setInvitePreview(await previewInvitation(guest.id, channel))
+    } catch (err) {
+      setInviteError(apiErrorMessage(err, 'Gagal memuat pratinjau pesan.'))
+    } finally {
+      setInviteLoading(false)
+    }
   }
 
-  /** Alasan tombol nonaktif, ditampilkan sebagai title supaya admin tahu apa
-   * yang harus diperbaiki alih-alih menghadapi tombol mati tanpa penjelasan. */
-  function waDisabledReason(guest: Guest): string {
-    if (!normalizePhoneForWa(guest.phone)) return 'Nomor HP tamu belum diisi.'
-    if (!waConfig || !invitationContent) return 'Gagal memuat template/konten undangan. Muat ulang halaman.'
-    return 'Template Pesan Undangan belum diisi di menu WhatsApp.'
+  function closeInvite() {
+    // Menutup saat pengiriman berjalan DILARANG: responsnya menandai
+    // contacted_at, dan admin yang menutup lebih dulu akan mengira pesannya
+    // batal padahal terkirim.
+    if (inviteSending) return
+    setInviteGuest(null)
+    setInvitePreview(null)
+    setInviteError(null)
+  }
+
+  /** Mengirim undangan dari modal. Sukses menutup modal + menyalakan badge
+   * dari respons yang SUKSES saja, bukan optimistis (pola toggleContacted):
+   * menampilkan "sudah" untuk sesuatu yang gagal tersimpan justru membuat
+   * tamu terlewat. Gagal membuat modal tetap terbuka dengan pesannya. */
+  async function confirmInvite() {
+    if (!inviteGuest || inviteSending) return
+    setInviteSending(true)
+    try {
+      await sendInvitation(inviteGuest.id, inviteChannel)
+      const now = new Date().toISOString()
+      const sentId = inviteGuest.id
+      setGuests((prev) => prev.map((g) => (g.id === sentId ? { ...g, contactedAt: now } : g)))
+      setInviteGuest(null)
+      setInvitePreview(null)
+      setInviteError(null)
+      toast.success('Undangan terkirim.')
+    } catch (err) {
+      setInviteError(apiErrorMessage(err, 'Undangan gagal terkirim.'))
+    } finally {
+      setInviteSending(false)
+    }
   }
 
   /** Alasan tombol Tambah tamu mati, ditampilkan sebagai title - dua sebab
@@ -573,11 +588,12 @@ export default function GuestsPage() {
                                   ditandai oleh ketiadaan badge.
 
                                   Badge-nya <button> karena memang bisa diklik
-                                  untuk membatalkan - wa.me tidak bisa
-                                  memastikan pesan terkirim, jadi penanda yang
-                                  salah harus bisa diperbaiki. Labelnya
-                                  "Dihubungi", BUKAN "Terkirim": yang sistem
-                                  ini tahu hanyalah admin membuka WhatsApp. */}
+                                  untuk membatalkan - penanda yang salah tetap
+                                  harus bisa diperbaiki dari dalam aplikasi.
+                                  Labelnya "Dihubungi", BUKAN "Terkirim":
+                                  pengiriman server-side memang membuktikan
+                                  pesan diterima server WA/TG, tetapi bukan
+                                  bukti tamu membacanya. */}
                               {guest.contactedAt && (
                                 <button
                                   type="button"
@@ -651,74 +667,55 @@ export default function GuestsPage() {
                             </svg>
                             {copiedId === guest.id ? 'Tersalin!' : 'Salin link'}
                           </Button>
-                          {/* Kirim Undangan lewat wa.me - membuka WhatsApp
-                              dengan pesan sudah terisi. Ini BUKAN modul
-                              WhatsApp (whatsmeow) yang mengirim QR otomatis:
-                              tidak ada request ke backend, tidak ada log, dan
-                              sakelar "pengiriman otomatis" tidak mengaturnya
-                              (D12). Pengirimannya juga tidak dilacak (K6) -
-                              wa.me secara desain tidak bisa melaporkan apa pun
-                              kembali ke aplikasi.
+                          {/* Kirim undangan LEWAT MODUL (bukan wa.me): tombol
+                              membuka modal preview yang di-render server,
+                              lalu mengirim sebagai pesan TEKS via akun
+                              tertaut saat admin menekan Kirim. Tombol
+                              nonaktif TETAP dirender dengan title yang
+                              memberi tahu apa yang harus diperbaiki (K7):
+                              <button disabled>, bukan <a> yang "di-disable"
+                              tapi tetap bisa diklik.
 
-                              Keadaan bisa-kirim dirender <a>, bukan
-                              window.open di handler klik, supaya tidak
-                              diblokir popup blocker dan admin bisa
-                              Ctrl/Cmd-klik. Keadaan nonaktif dirender
-                              <Button disabled> - <a> yang "di-disable" lewat
-                              atribut tetap bisa diklik. */}
+                              Jalan keluar manual ("Tandai sudah diundang",
+                              docs/plan/guest-stage-filter T11/K2) muncul
+                              hanya bila KEDUA kanal tak tersedia dan penanda
+                              masih kosong - tanpa itu, tamu undangan fisik
+                              atau tanpa kontak TIDAK PUNYA cara apa pun
+                              keluar dari "Belum diundang". Kalau penanda
+                              sudah terisi, badge "Dihubungi" di kolom Nama
+                              yang mengambil alih. */}
                           {(() => {
-                            const url = waInviteUrl(guest)
-                            return url ? (
-                              <a
-                                href={url}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                // Menandai "sudah dihubungi" (D9). TIDAK
-                                // memanggil preventDefault dan TIDAK di-await:
-                                // navigasi <a> harus tetap jalan apa adanya,
-                                // termasuk Ctrl/Cmd-klik. PATCH-nya berjalan
-                                // di samping, bukan di depan.
-                                //
-                                // Kegagalannya sengaja tidak menahan apa pun -
-                                // WhatsApp tetap terbuka, admin cuma diberi
-                                // tahu penandanya belum tersimpan (D10).
-                                onClick={() => void toggleContacted(guest, true)}
-                                title={`Kirim undangan ke ${guest.name} lewat WhatsApp`}
-                                className="inline-flex items-center h-8 px-2.5 rounded-lg text-xs font-semibold whitespace-nowrap border border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 transition-colors shadow-2xs"
-                              >
-                                <svg className="w-3.5 h-3.5 mr-1 shrink-0" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-                                  <path d="M12.04 2C6.58 2 2.13 6.45 2.13 11.91c0 1.75.46 3.45 1.32 4.95L2 22l5.25-1.38a9.9 9.9 0 004.79 1.22h.01c5.46 0 9.91-4.45 9.91-9.91 0-2.65-1.03-5.14-2.9-7.01A9.82 9.82 0 0012.04 2zm5.8 14.13c-.24.68-1.42 1.31-1.96 1.36-.5.05-1.14.07-1.84-.12-.42-.13-.97-.31-1.67-.61-2.94-1.27-4.86-4.23-5.01-4.43-.15-.2-1.2-1.59-1.2-3.03s.76-2.15 1.03-2.44c.27-.3.59-.37.79-.37.2 0 .39 0 .57.01.18.01.42-.07.66.5.24.58.83 2.01.9 2.16.07.15.12.32.02.52-.1.2-.15.32-.29.5-.15.17-.31.39-.44.52-.15.15-.3.31-.13.6.17.3.76 1.25 1.63 2.03 1.12 1 2.06 1.31 2.36 1.46.3.15.47.12.64-.07.17-.2.74-.86.94-1.16.2-.3.39-.25.66-.15.27.1 1.7.8 1.99.95.29.15.48.22.55.35.07.12.07.72-.17 1.4z" />
-                                </svg>
-                                Kirim Undangan
-                              </a>
-                            ) : (
-                              /* Tombol WA nonaktif TETAP dirender: title-nya yang
-                                 memberi tahu apa yang harus diperbaiki. Di
-                                 sebelahnya jalan keluar manual (docs/plan/
-                                 guest-stage-filter T11/K2) - tanpa itu, tamu
-                                 undangan fisik atau tanpa nomor HP TIDAK PUNYA
-                                 cara apa pun keluar dari "Belum diundang",
-                                 karena satu-satunya penulis contacted_at selama
-                                 ini adalah klik tautan WhatsApp di atas.
-
-                                 Dibungkus fragment karena cabang ini harus
-                                 mengembalikan satu elemen.
-
-                                 Hanya muncul saat penandanya masih kosong; kalau
-                                 sudah terisi, badge "Dihubungi" di kolom Nama
-                                 yang mengambil alih - termasuk jalur
-                                 membatalkannya. */
+                            const hasPhone = guest.phone.trim() !== ''
+                            const hasTelegram = guest.usernameTelegram.trim() !== ''
+                            return (
                               <>
                                 <Button
                                   variant="secondary"
                                   size="sm"
-                                  disabled
-                                  title={waDisabledReason(guest)}
-                                  className="h-8 px-2.5 text-xs whitespace-nowrap"
+                                  disabled={!hasPhone}
+                                  title={hasPhone ? `Kirim undangan ke ${guest.name} lewat WhatsApp` : 'Nomor HP tamu belum diisi.'}
+                                  onClick={() => void openInvite(guest, 'wa')}
+                                  className="h-8 px-2.5 text-xs whitespace-nowrap border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100"
                                 >
-                                  Kirim Undangan
+                                  <svg className="w-3.5 h-3.5 mr-1 shrink-0" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                                    <path d="M12.04 2C6.58 2 2.13 6.45 2.13 11.91c0 1.75.46 3.45 1.32 4.95L2 22l5.25-1.38a9.9 9.9 0 004.79 1.22h.01c5.46 0 9.91-4.45 9.91-9.91 0-2.65-1.03-5.14-2.9-7.01A9.82 9.82 0 0012.04 2zm5.8 14.13c-.24.68-1.42 1.31-1.96 1.36-.5.05-1.14.07-1.84-.12-.42-.13-.97-.31-1.67-.61-2.94-1.27-4.86-4.23-5.01-4.43-.15-.2-1.2-1.59-1.2-3.03s.76-2.15 1.03-2.44c.27-.3.59-.37.79-.37.2 0 .39 0 .57.01.18.01.42-.07.66.5.24.58.83 2.01.9 2.16.07.15.12.32.02.52-.1.2-.15.32-.29.5-.15.17-.31.39-.44.52-.15.15-.3.31-.13.6.17.3.76 1.25 1.63 2.03 1.12 1 2.06 1.31 2.36 1.46.3.15.47.12.64-.07.17-.2.74-.86.94-1.16.2-.3.39-.25.66-.15.27.1 1.7.8 1.99.95.29.15.48.22.55.35.07.12.07.72-.17 1.4z" />
+                                  </svg>
+                                  Kirim WA
                                 </Button>
-                                {!guest.contactedAt && (
+                                <Button
+                                  variant="secondary"
+                                  size="sm"
+                                  disabled={!hasTelegram}
+                                  title={hasTelegram ? `Kirim undangan ke @${guest.usernameTelegram.trim()} lewat Telegram` : 'Username Telegram tamu belum diisi.'}
+                                  onClick={() => void openInvite(guest, 'tg')}
+                                  className="h-8 px-2.5 text-xs whitespace-nowrap border-sky-200 bg-sky-50 text-sky-700 hover:bg-sky-100"
+                                >
+                                  <svg className="w-3.5 h-3.5 mr-1 shrink-0" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                                    <path d="M21.9 4.6c.2-1.2-.9-2.1-2-1.7L2.7 9.5c-1.2.5-1.2 2.2.1 2.6l4.4 1.4 1.7 5.3c.4 1.2 1.9 1.4 2.7.4l2.5-2.9 4.7 3.5c.9.7 2.3.1 2.5-1L21.9 4.6zM8.4 12.4l8.2-6.6c.2-.2.5.1.3.3l-6.9 6.3-.3 2.9-1.3-2.9z" />
+                                  </svg>
+                                  Kirim TG
+                                </Button>
+                                {!hasPhone && !hasTelegram && !guest.contactedAt && (
                                   <Button
                                     variant="secondary"
                                     size="sm"
@@ -904,6 +901,14 @@ export default function GuestsPage() {
             onChange={(e) => setForm((f) => ({ ...f, phone: e.target.value }))}
             placeholder="08123456789"
           />
+          <Input
+            label="Username Telegram"
+            value={form.usernameTelegram}
+            error={formErrors.usernameTelegram}
+            onChange={(e) => setForm((f) => ({ ...f, usernameTelegram: e.target.value }))}
+            placeholder="@nama_tele"
+            hint="Opsional. Kosongkan bila tamu tidak punya Telegram."
+          />
           <div className="sm:col-span-2">
             <Textarea
               label="Alamat"
@@ -944,6 +949,10 @@ export default function GuestsPage() {
             <div>
               <dt className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Telepon</dt>
               <dd className="text-slate-800 mt-0.5">{detailTarget.phone || '—'}</dd>
+            </div>
+            <div>
+              <dt className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Telegram</dt>
+              <dd className="text-slate-800 mt-0.5">{detailTarget.usernameTelegram ? `@${detailTarget.usernameTelegram}` : '—'}</dd>
             </div>
             <div>
               <dt className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Alamat</dt>
@@ -1005,6 +1014,49 @@ export default function GuestsPage() {
             </p>
           </div>
         </div>
+      </Modal>
+
+      {/* Modal kirim undangan: preview di-render server, Kirim mengirim via
+          modul, Batal menutup tanpa efek. Pesan TIDAK editable: template
+          adalah milik modul pengirim dan satu-satunya cara mengubahnya lewat
+          menu WhatsApp/Telegram - mengedit di sini berarti teks yang terkirim
+          berbeda dari template tanpa jejak. */}
+      <Modal
+        open={!!inviteGuest}
+        onClose={closeInvite}
+        title={inviteGuest ? `Kirim undangan via ${inviteChannel === 'wa' ? 'WhatsApp' : 'Telegram'} ke ${inviteGuest.name}` : 'Kirim undangan'}
+        footer={
+          <>
+            <Button variant="secondary" onClick={closeInvite} disabled={inviteSending}>
+              Batal
+            </Button>
+            <Button onClick={confirmInvite} loading={inviteSending} disabled={inviteLoading || !invitePreview}>
+              Kirim
+            </Button>
+          </>
+        }
+      >
+        {inviteLoading && <p className="text-sm text-slate-500">Memuat pratinjau pesan...</p>}
+        {!inviteLoading && inviteError && (
+          <div className="rounded-xl border border-rose-200 bg-rose-50 px-4 py-3">
+            <p className="text-sm font-semibold text-rose-900">Tidak bisa mengirim</p>
+            <p className="text-sm text-rose-800 leading-relaxed mt-0.5">{inviteError}</p>
+          </div>
+        )}
+        {!inviteLoading && !inviteError && invitePreview && (
+          <div className="flex flex-col gap-3">
+            <div>
+              <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Tujuan</p>
+              <p className="text-sm text-slate-800 mt-0.5 font-mono">{invitePreview.target}</p>
+            </div>
+            <div>
+              <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Pesan</p>
+              <p className="text-sm text-slate-800 mt-0.5 whitespace-pre-wrap rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 leading-relaxed">
+                {invitePreview.text}
+              </p>
+            </div>
+          </div>
+        )}
       </Modal>
     </div>
   )

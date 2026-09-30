@@ -35,6 +35,13 @@ Kolom **Auth**: `publik` tanpa token; `JWT (admin)` = butuh token berperan
 | GET/PUT | `/api/v1/admin/whatsapp/config` | JWT (admin) | whatsapp |
 | GET | `/api/v1/admin/whatsapp/logs` | JWT (admin) | whatsapp |
 | POST | `/api/v1/admin/whatsapp/logs/{id}/resend` | JWT (admin) | whatsapp |
+| GET | `/api/v1/admin/telegram/status` | JWT (admin) | telegram |
+| POST | `/api/v1/admin/telegram/login/start` | JWT (admin) | telegram |
+| POST | `/api/v1/admin/telegram/login/complete` | JWT (admin) | telegram |
+| POST | `/api/v1/admin/telegram/logout` | JWT (admin) | telegram |
+| GET/PUT | `/api/v1/admin/telegram/config` | JWT (admin) | telegram |
+| GET | `/api/v1/admin/telegram/logs` | JWT (admin) | telegram |
+| POST | `/api/v1/admin/telegram/logs/{id}/resend` | JWT (admin) | telegram |
 | GET/POST/PUT/DELETE | `/api/v1/admin/users[/{id}]` | JWT (admin) | auth |
 | POST | `/api/v1/admin/checkin/scan` | JWT (admin+petugas) | guest |
 | GET | `/api/v1/admin/checkin/search` | JWT (admin+petugas) | guest |
@@ -87,8 +94,9 @@ status lain). Respons berisi `data.qrPayload` - kini berbentuk
 kosong untuk status selain `attending`. Nilainya dihitung SEBELUM info
 undangan dibaca, jadi tetap sah walau tabel `invitation_content` sedang gagal
 dibaca. Pengiriman QR ke WhatsApp tamu (bila
-modul whatsapp aktif & tertaut) berjalan di goroutine terpisah - endpoint
-ini TIDAK menunggu hasil kirim WhatsApp.
+modul whatsapp aktif & tertaut) DAN ke Telegram tamu (bila modul telegram
+aktif, tertaut, & tamu punya `username_telegram`) berjalan di goroutine
+terpisah - endpoint ini TIDAK menunggu hasil kirim keduanya.
 
 `POST /api/v1/public/guests/by-token/{token}/wish` menyimpan SATU ucapan
 untuk tamu pemilik token (`{message}`, maksimal 500 karakter, nama pengirim
@@ -116,6 +124,17 @@ Kirim yang gagal karena koneksi masuk antrian retry otomatis (status log
 `retrying`, backoff ±4 jam, maksimal 5 percobaan); `logs` menerima
 `page`/`limit` (paginasi standar). Sesi WhatsApp (device &
 kunci enkripsi) TIDAK tersimpan di MySQL - lihat `DATABASE.md`.
+
+Endpoint `/api/v1/admin/telegram/*` mengelola userbot Telegram
+(`github.com/gotd/td`, akun pengguna biasa - bukan Bot API). `login/start`
+meminta Telegram mengirim kode OTP ke nomor HP akun (`TG_PHONE`);
+`login/complete` menukarnya (+ `password` bila akun ber-2FA, ditandai error
+`memakai verifikasi 2 langkah`) jadi sesi di file `TG_SESSION_DIR`.
+`status` mengembalikan `loggedIn` (sesi sah) dan `connected` (pemeriksaan
+terakhir berhasil). `logout` SELALU membersihkan sesi lokal. `config`/`logs`/
+`logs/{id}/resend` cermin WhatsApp (template `{nama}`/`{jumlah}`/`{mempelai}`/
+`{tanggal}`, retry otomatis yang sama). Sesi Telegram TIDAK tersimpan di
+MySQL - lihat `DATABASE.md`.
 
 `/api/v1/admin/groups` mengelola group tamu (`docs/plan/guest-groups/PLAN.md`).
 `GET` berpaginasi standar dan setiap baris membawa `guestCount` - diisi dari

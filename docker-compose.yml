@@ -13,8 +13,13 @@ services:
       # whatsmeow sendiri, BUKAN MySQL. Wajib persist - kalau hilang, akun
       # WhatsApp harus di-pairing ulang lewat scan QR.
       - wa_store_data:/app/wa-store
+      # Sesi userbot Telegram (modul `telegram`, gotd/td) - file JSON dibuat
+      # gotd/td sendiri, BUKAN MySQL. Wajib persist - kalau hilang, akun harus
+      # login ulang lewat kode OTP + password 2FA.
+      - tg_store_data:/app/tg-store
     extra_hosts:
       - "host.docker.internal:host-gateway"
 
 volumes:
   wa_store_data:
+  tg_store_data:

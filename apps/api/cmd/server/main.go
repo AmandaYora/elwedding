@@ -11,6 +11,7 @@ import (
 	"undangan-digital/internal/modules/auth"
 	"undangan-digital/internal/modules/content"
 	"undangan-digital/internal/modules/guest"
+	"undangan-digital/internal/modules/telegram"
 	"undangan-digital/internal/modules/whatsapp"
 	"undangan-digital/internal/router"
 	"undangan-digital/internal/shared/storage"
@@ -60,13 +61,28 @@ func main() {
 	if err != nil {
 		log.Printf("whatsapp: modul tidak aktif (%v) - RSVP tetap berjalan tanpa kirim QR otomatis", err)
 	}
-	guestHandler := guest.New(db, sender, invitationInfo)
+	// telegram dirakit sebelum guest - guest butuh contracts.Sender milik
+	// telegram untuk memicu kirim QR (pola whatsapp keputusan #8).
+	// Kegagalan modul Telegram TIDAK menghentikan boot API - tgSender tetap
+	// nil, RSVP tetap berjalan tanpa pengiriman Telegram (dicek nil di
+	// guest/application/service.go).
+	telegramHandler, tgSender, err := telegram.New(db, telegram.TGConfig{
+		AppID:       cfg.TGAppID,
+		AppHash:     cfg.TGAppHash,
+		Phone:       cfg.TGPhone,
+		SessionPath: cfg.TGSessionPath,
+	})
+	if err != nil {
+		log.Printf("telegram: modul tidak aktif (%v) - RSVP tetap berjalan tanpa kirim QR Telegram otomatis", err)
+	}
+	guestHandler := guest.New(db, sender, tgSender, invitationInfo)
 
 	mux := router.New(router.Deps{
 		AuthHandler:     authHandler,
 		ContentHandler:  contentHandler,
 		GuestHandler:    guestHandler,
 		WhatsAppHandler: whatsappHandler,
+		TelegramHandler: telegramHandler,
 		JWTSecret:       cfg.JWTSecret,
 		PublicDir:       cfg.PublicDir,
 		Storage:         storageClient,

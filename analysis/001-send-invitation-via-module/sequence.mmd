@@ -1,0 +1,21 @@
+sequenceDiagram
+    participant A as Admin
+    participant FE as GuestsPage
+    participant G as guest Service
+    participant W as whatsapp Service
+    participant T as telegram Service
+    A->>FE: Klik Kirim WA
+    FE->>G: GET guests/id/invitation-preview?channel=wa
+    G->>G: requireGuestExists + GetQRInfo
+    G->>W: PreviewInvitation via contracts
+    W-->>G: teks undangan
+    G-->>FE: teks + nomor tujuan
+    FE->>A: Modal preview + Kirim_Batal
+    A->>FE: Klik Kirim
+    FE->>G: POST guests/id/send-invitation {wa}
+    G->>W: SendInvitation via contracts
+    W->>W: kirim teks whatsmeow
+    G->>G: MarkContacted bila sukses
+    G-->>FE: 200
+    FE->>A: Toast + badge Dihubungi
+    Note over A,T: Jalur TG identik via tgContracts Sender

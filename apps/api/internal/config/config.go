@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -38,6 +39,20 @@ type Config struct {
 	// WAJIB ikut volume persisten - kalau hilang, WhatsApp harus di-pairing
 	// ulang lewat scan QR.
 	WAStoreDBPath string
+
+	// TG*: kredensial userbot Telegram (modul `telegram`, gotd/td) - appID
+	// & appHash dari my.telegram.org, Phone nomor akun PENGIRIM (format
+	// internasional, mis. +62812xxxxxxx). SessionPath file sesi JSON gotd
+	// - TERPISAH dari MySQL, WAJIB ikut volume persisten: kalau hilang,
+	// akun harus login ulang lewat kode OTP + password 2FA.
+	//
+	// SENGAJA tidak masuk Validate(): modul telegram yang tidak terisi
+	// membuat telegram.New gagal dan main.go melanjutkan boot TANPA telegram
+	// (pola whatsapp) - RSVP tetap berjalan tanpa kirim QR Telegram.
+	TGAppID       int
+	TGAppHash     string
+	TGPhone       string
+	TGSessionPath string
 }
 
 func Load() Config {
@@ -59,6 +74,11 @@ func Load() Config {
 		S3UseSSL:    getenv("S3_USE_SSL", "true") == "true",
 
 		WAStoreDBPath: filepath.Join(getenv("WA_STORE_DIR", "./wa-store"), "wa.db"),
+
+		TGAppID:       parseInt(getenv("TG_API_ID", "")),
+		TGAppHash:     os.Getenv("TG_API_HASH"),
+		TGPhone:       os.Getenv("TG_PHONE"),
+		TGSessionPath: filepath.Join(getenv("TG_SESSION_DIR", "./tg-store"), "session.json"),
 	}
 }
 
@@ -75,6 +95,17 @@ func parseDuration(s string, fallback time.Duration) time.Duration {
 		return fallback
 	}
 	return d
+}
+
+// parseInt mengembalikan 0 untuk string kosong/tidak valid - modul telegram
+// memakai 0 itu sebagai "kredensial belum diisi" dan menonaktifkan diri
+// (lihat NewTGClient), jadi tidak ada error fatal di sini.
+func parseInt(s string) int {
+	n, err := strconv.Atoi(strings.TrimSpace(s))
+	if err != nil {
+		return 0
+	}
+	return n
 }
 
 // Validate memastikan konfigurasi yang SENGAJA tidak punya default memang

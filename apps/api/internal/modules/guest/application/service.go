@@ -7,11 +7,13 @@ import (
 	"encoding/hex"
 	"errors"
 	"log"
+	"regexp"
 	"strings"
 
 	contentContracts "undangan-digital/internal/modules/content/contracts"
 	"undangan-digital/internal/modules/guest/infrastructure"
 	"undangan-digital/internal/modules/guest/infrastructure/sqlc"
+	tgContracts "undangan-digital/internal/modules/telegram/contracts"
 	waContracts "undangan-digital/internal/modules/whatsapp/contracts"
 	"undangan-digital/internal/shared/pagination"
 )
@@ -23,6 +25,10 @@ var (
 	ErrInvalidGender         = errors.New("gender must be 'male' or 'female'")
 	ErrInvalidInvitationType = errors.New("invitation type must be 'online' or 'physical'")
 	ErrInvalidSouvenirType   = errors.New("souvenir type must be 'regular' or 'vip'")
+	// Username Telegram opsional (kolom username_telegram, migration 000022):
+	// "" = tidak punya Telegram. Berbahasa Inggris mengikuti gaya
+	// ErrInvalid* lain di blok ini - frontend menampilkannya di bawah field.
+	ErrInvalidTelegramUsername = errors.New("username Telegram tidak valid (5-32 karakter: huruf, angka, garis bawah)")
 	// Pesannya tidak lagi menyebut "1 or 2": batas atasnya kini pax_quota per
 	// tamu (docs/plan/guest-pax-quota/PLAN.md D4), jadi angka tetap di pesan
 	// akan berbohong untuk tamu yang jatahnya 6.
@@ -90,16 +96,17 @@ var validSouvenirTypes = map[string]bool{"regular": true, "vip": true}
 
 // Service - sender & invitationInfo diterima lewat contracts modul lain
 // (PLAN.md dashboard-wa-rsvp keputusan #8/#19), TIDAK PERNAH lewat tipe
-// konkret modul whatsapp/content. sender boleh nil (deployment tanpa
-// WhatsApp) - wajib dicek nil sebelum dipanggil.
+// konkret modul whatsapp/content/telegram. sender & tgSender boleh nil
+// (deployment tanpa WhatsApp/Telegram) - wajib dicek nil sebelum dipanggil.
 type Service struct {
 	repo           *infrastructure.Repository
 	sender         waContracts.Sender
+	tgSender       tgContracts.Sender
 	invitationInfo contentContracts.InvitationInfoProvider
 }
 
-func NewService(repo *infrastructure.Repository, sender waContracts.Sender, invitationInfo contentContracts.InvitationInfoProvider) *Service {
-	return &Service{repo: repo, sender: sender, invitationInfo: invitationInfo}
+func NewService(repo *infrastructure.Repository, sender waContracts.Sender, tgSender tgContracts.Sender, invitationInfo contentContracts.InvitationInfoProvider) *Service {
+	return &Service{repo: repo, sender: sender, tgSender: tgSender, invitationInfo: invitationInfo}
 }
 
 func generateToken() (string, error) {
@@ -165,6 +172,7 @@ func toDTO(g sqlc.Guest) GuestDTO {
 		InvitationType:      string(g.InvitationType),
 		SouvenirType:        string(g.SouvenirType),
 		Email:               g.Email,
+		UsernameTelegram:    g.UsernameTelegram,
 		Address:             address,
 		Notes:               notes,
 		AttendingCount:      int(g.AttendingCount),
@@ -178,6 +186,29 @@ func toDTO(g sqlc.Guest) GuestDTO {
 // validateProfileFields memvalidasi 3 enum wajib yang ditambahkan
 // guest-fields-admin-layout. Dipakai bersama oleh Create & Update supaya
 // keduanya konsisten.
+//
+// telegramUsernameRe adalah aturan username Telegram: 5-32 karakter,
+// huruf/angka/garis bawah. Dicocokkan SETELAH normalisasi (tanpa @,
+// lowercase) - lihat normalizeTelegramUsername.
+var telegramUsernameRe = regexp.MustCompile(`^[a-z0-9_]{5,32}$`)
+
+// normalizeTelegramUsername menyeragamkan input admin ("@nama", " Nama ",
+// "NAMA") jadi "nama" yang siap di-resolve userbot. String kosong = tamu
+// tidak punya Telegram dan BUKAN error - pemanggil (pengiriman QR) melewati
+// tamu itu, cermin nomor telepon kosong di modul whatsapp.
+func normalizeTelegramUsername(s string) (string, error) {
+	u := strings.TrimSpace(s)
+	u = strings.TrimPrefix(u, "@")
+	u = strings.ToLower(u)
+	if u == "" {
+		return "", nil
+	}
+	if !telegramUsernameRe.MatchString(u) {
+		return "", ErrInvalidTelegramUsername
+	}
+	return u, nil
+}
+
 func validateProfileFields(in GuestInput) error {
 	if !validSides[in.Side] {
 		return ErrInvalidSide
@@ -190,6 +221,9 @@ func validateProfileFields(in GuestInput) error {
 	}
 	if !validSouvenirTypes[in.SouvenirType] {
 		return ErrInvalidSouvenirType
+	}
+	if _, err := normalizeTelegramUsername(in.UsernameTelegram); err != nil {
+		return err
 	}
 	// Jatah kursi ikut di sini, BUKAN dipanggil terpisah di Create & Update
 	// (docs/plan/guest-pax-quota/PLAN.md T7) - itulah alasan fungsi ini ada:
@@ -217,6 +251,9 @@ func (s *Service) Create(ctx context.Context, in GuestInput) (GuestDTO, error) {
 	if err != nil {
 		return GuestDTO{}, err
 	}
+	// Sudah divalidasi di validateProfileFields di atas; di sini diambil
+	// bentuk kanonisnya (tanpa @, lowercase) untuk disimpan.
+	tgUsername, _ := normalizeTelegramUsername(in.UsernameTelegram)
 	id, err := s.repo.Create(ctx, sqlc.CreateGuestParams{
 		Name:                in.Name,
 		Phone:               in.Phone,
@@ -227,6 +264,7 @@ func (s *Service) Create(ctx context.Context, in GuestInput) (GuestDTO, error) {
 		InvitationType:      sqlc.GuestsInvitationType(in.InvitationType),
 		SouvenirType:        sqlc.GuestsSouvenirType(in.SouvenirType),
 		Email:               in.Email,
+		UsernameTelegram:    tgUsername,
 		Address:             nullableText(in.Address),
 		Notes:               nullableText(in.Notes),
 		IsExpectedAttending: in.IsExpectedAttending,
@@ -271,6 +309,8 @@ func (s *Service) Update(ctx context.Context, id uint64, in GuestInput) error {
 	if err := s.validateGroupID(ctx, in.GroupID); err != nil {
 		return err
 	}
+	// Kanonis seperti di Create (sudah divalidasi di validateProfileFields).
+	tgUsername, _ := normalizeTelegramUsername(in.UsernameTelegram)
 	return s.repo.Update(ctx, sqlc.UpdateGuestParams{
 		Name:                in.Name,
 		Phone:               in.Phone,
@@ -280,6 +320,7 @@ func (s *Service) Update(ctx context.Context, id uint64, in GuestInput) error {
 		InvitationType:      sqlc.GuestsInvitationType(in.InvitationType),
 		SouvenirType:        sqlc.GuestsSouvenirType(in.SouvenirType),
 		Email:               in.Email,
+		UsernameTelegram:    tgUsername,
 		Address:             nullableText(in.Address),
 		Notes:               nullableText(in.Notes),
 		IsExpectedAttending: in.IsExpectedAttending,
@@ -804,6 +845,25 @@ func (s *Service) UpdateRsvpStatus(ctx context.Context, token, status string, at
 		}()
 	}
 
+	// Jalur Telegram (modul `telegram`, userbot MTProto) - cermin jalur
+	// WhatsApp di atas: hanya bila tamu punya username Telegram. Keduanya
+	// berjalan di goroutine terpisah sehingga RSVP tidak menunggu keduanya,
+	// dan kegagalan salah satu tidak membatalkan yang lain.
+	if s.tgSender != nil && row.UsernameTelegram != "" {
+		guestID, guestName, tgUsername := row.ID, row.Name, row.UsernameTelegram
+		coupleName := info.GroomName + " & " + info.BrideName
+		eventDateLabel := info.WeddingDateLabel
+		go func() {
+			err := s.tgSender.SendQR(context.Background(), tgContracts.SendTGInput{
+				GuestID: guestID, GuestName: guestName, TelegramUsername: tgUsername, QRPayload: qrPayload,
+				CoupleName: coupleName, EventDateLabel: eventDateLabel, AttendingCount: finalCount,
+			})
+			if err != nil {
+				log.Printf("guest: gagal kirim QR Telegram untuk tamu %d: %v", guestID, err)
+			}
+		}()
+	}
+
 	return qrPayload, nil
 }
 
@@ -1008,15 +1068,20 @@ func StatusHTTPCode(err error) int {
 	switch {
 	case errors.Is(err, ErrNotFound), errors.Is(err, ErrGroupNotFound), errors.Is(err, ErrWishNotFound):
 		return 404
+	case errors.Is(err, ErrChannelUnavailable):
+		return 503
 	case errors.Is(err, ErrInvalidSide), errors.Is(err, ErrInvalidStatus),
 		errors.Is(err, ErrInvalidGender), errors.Is(err, ErrInvalidInvitationType), errors.Is(err, ErrInvalidSouvenirType),
+		errors.Is(err, ErrInvalidTelegramUsername),
 		errors.Is(err, ErrInvalidAttendingCount), errors.Is(err, ErrInvalidCheckinCode),
 		errors.Is(err, ErrInvalidPaxQuota), errors.Is(err, ErrPaxQuotaBelowConfirmed),
 		errors.Is(err, ErrGroupNameRequired), errors.Is(err, ErrGroupNameTooLong),
 		errors.Is(err, ErrGroupDescriptionTooLong), errors.Is(err, ErrGroupNameTaken),
 		errors.Is(err, ErrGroupInUse), errors.Is(err, ErrInvalidGroupID),
 		errors.Is(err, ErrInvalidContactedFilter),
-		errors.Is(err, ErrWishAlreadySubmitted), errors.Is(err, ErrWishEmpty), errors.Is(err, ErrWishTooLong):
+		errors.Is(err, ErrWishAlreadySubmitted), errors.Is(err, ErrWishEmpty), errors.Is(err, ErrWishTooLong),
+		errors.Is(err, ErrInvalidInvitationChannel), errors.Is(err, ErrInvitationNoTarget),
+		errors.Is(err, ErrInvitationFailed):
 		return 400
 	default:
 		return 500

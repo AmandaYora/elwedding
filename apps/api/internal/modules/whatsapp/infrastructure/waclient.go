@@ -393,6 +393,21 @@ func (w *WAClient) UploadImage(ctx context.Context, png []byte) (whatsmeow.Uploa
 	return client.Upload(ctx, png, whatsmeow.MediaImage)
 }
 
+// SendTextMessage mengirim pesan TEKS biasa ke nomor (already-normalized,
+// format 628xxxxxxxxxx). Dipakai jalur undangan manual per tamu - beda dari
+// SendImageMessage yang dipakai jalur QR otomatis.
+func (w *WAClient) SendTextMessage(ctx context.Context, normalizedPhone, text string) error {
+	w.mu.RLock()
+	client := w.client
+	w.mu.RUnlock()
+	jid := types.NewJID(normalizedPhone, types.DefaultUserServer)
+	msg := &waE2E.Message{
+		Conversation: proto.String(text),
+	}
+	_, err := client.SendMessage(ctx, jid, msg)
+	return err
+}
+
 // SendImageMessage mengirim gambar hasil UploadImage sebagai pesan ke nomor
 // (already-normalized, format 628xxxxxxxxxx) dengan caption dari template
 // ter-substitusi.

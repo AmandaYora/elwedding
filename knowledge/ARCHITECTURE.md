@@ -2,13 +2,13 @@
 
 ## Apps
 
-- `apps/api` — Go modular monolith. 4 modul: `auth`, `content`, `guest`,
-  `whatsapp` (lihat `MODULE_MAP.md`). `net/http` `ServeMux` (Go 1.22+
-  pattern matching), tanpa framework HTTP tambahan. `whatsapp` adalah
-  modul pertama yang mengekspos `contracts/` nyata dan dikonsumsi modul
-  lain (`guest` mengonsumsi `content/contracts.InvitationInfoProvider` &
-  `whatsapp/contracts.Sender`) - arah ketergantungan searah
-  `content -> guest -> whatsapp`, tanpa siklus, tanpa satu pun modul saling
+- `apps/api` — Go modular monolith. 5 modul: `auth`, `content`, `guest`,
+  `whatsapp`, `telegram` (lihat `MODULE_MAP.md`). `net/http` `ServeMux` (Go 1.22+
+  pattern matching), tanpa framework HTTP tambahan. `whatsapp` dan `telegram`
+  sama-sama mengekspos `contracts/` nyata dan dikonsumsi modul
+  lain (`guest` mengonsumsi `content/contracts.InvitationInfoProvider`,
+  `whatsapp/contracts.Sender`, & `telegram/contracts.Sender`) - arah ketergantungan searah
+  `content -> guest -> {whatsapp, telegram}`, tanpa siklus, tanpa satu pun modul saling
   mengimpor internal (`application`/`infrastructure`/`domain`) modul lain.
 - `apps/web` — satu paket Vite, **dua entry HTML terpisah**:
   - `index.html` (`src/main.tsx`) — undangan tamu. React 18.3.1 (BUKAN 19 —

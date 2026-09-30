@@ -21,6 +21,11 @@ type GuestDTO struct {
 	InvitationType      string  `json:"invitationType"`
 	SouvenirType        string  `json:"souvenirType"`
 	Email               string  `json:"email"`
+	// UsernameTelegram - username Telegram tamu TANPA @ (opsional, "" = tidak
+	// punya). Dipakai modul `telegram` (userbot MTProto) untuk mengirim QR
+	// konfirmasi kehadiran saat tamu RSVP 'attending' - cermin `phone` untuk
+	// modul `whatsapp`. Dinormalisasi di service (normalizeTelegramUsername).
+	UsernameTelegram    string  `json:"usernameTelegram"`
 	Address             string  `json:"address"`
 	Notes               string  `json:"notes"`
 	AttendingCount      int     `json:"attendingCount"`
@@ -56,6 +61,9 @@ type GuestInput struct {
 	InvitationType      string `json:"invitationType"`
 	SouvenirType        string `json:"souvenirType"`
 	Email               string `json:"email"`
+	// UsernameTelegram opsional: "" = tamu tidak punya Telegram dan dilewati
+	// jalur kirim Telegram. Boleh diawali @, dinormalisasi di service.
+	UsernameTelegram    string `json:"usernameTelegram"`
 	Address             string `json:"address"`
 	Notes               string `json:"notes"`
 	IsExpectedAttending bool   `json:"isExpectedAttending"`

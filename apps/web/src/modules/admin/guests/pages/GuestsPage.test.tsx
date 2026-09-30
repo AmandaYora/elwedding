@@ -1,8 +1,6 @@
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import GuestsPage from './GuestsPage'
-import { listGuests, createGuest, deleteGuest, setContacted } from '@/modules/admin/guests/services/guests.service'
-import { getConfig } from '@/modules/admin/whatsapp/services/whatsapp.service'
-import { getContent } from '@/modules/admin/content/services/content.service'
+import { listGuests, createGuest, deleteGuest, setContacted, previewInvitation, sendInvitation } from '@/modules/admin/guests/services/guests.service'
 import { listAllGroups } from '@/modules/admin/groups/services/groups.service'
 import { ToastProvider } from '@/shared/components/toast/ToastProvider'
 
@@ -20,16 +18,8 @@ vi.mock('@/modules/admin/guests/services/guests.service', () => ({
   updateGuest: vi.fn(),
   deleteGuest: vi.fn(),
   setContacted: vi.fn(),
-}))
-
-// Tombol "Kirim Undangan" memuat dua singleton di samping daftar tamu
-// (docs/plan/og-share-image-dinamis/PLAN.md T24). Keduanya di-mock supaya
-// test tidak menembus httpClient.
-vi.mock('@/modules/admin/whatsapp/services/whatsapp.service', () => ({
-  getConfig: vi.fn(),
-}))
-vi.mock('@/modules/admin/content/services/content.service', () => ({
-  getContent: vi.fn(),
+  previewInvitation: vi.fn(),
+  sendInvitation: vi.fn(),
 }))
 
 // Daftar group dimuat sekali oleh halaman ini (guest-groups D2/T16) - di-mock
@@ -41,10 +31,10 @@ vi.mock('@/modules/admin/groups/services/groups.service', () => ({
 const mockedList = vi.mocked(listGuests)
 const mockedDelete = vi.mocked(deleteGuest)
 const mockedCreate = vi.mocked(createGuest)
-const mockedGetConfig = vi.mocked(getConfig)
-const mockedGetContent = vi.mocked(getContent)
 const mockedListAllGroups = vi.mocked(listAllGroups)
 const mockedSetContacted = vi.mocked(setContacted)
+const mockedPreviewInvitation = vi.mocked(previewInvitation)
+const mockedSendInvitation = vi.mocked(sendInvitation)
 
 const sampleGuest = {
   id: 1,
@@ -59,6 +49,7 @@ const sampleGuest = {
   invitationType: 'online' as const,
   souvenirType: 'regular' as const,
   email: 'budi@example.com',
+  usernameTelegram: '',
   address: 'Jl. Merdeka No. 1',
   notes: '',
   attendingCount: 1,
@@ -75,33 +66,27 @@ const sampleGroups = [
   { id: 4, name: 'Keluarga', description: '', guestCount: 0, defaultPax: 4, createdAt: '2026-01-01T00:00:00Z' },
 ]
 
-const sampleConfig = {
-  messageTemplate: 'Halo {nama}, {jumlah} orang',
-  invitationTemplate: 'Halo {nama}, undangan {mempelai} pada {tanggal}: {link}',
-  isEnabled: true,
+const samplePreview = {
+  channel: 'wa' as const,
+  target: '0812345678',
+  text: 'Halo Budi Santoso, undangan Adrian & Ariana pada Sabtu, 16 Mei 2026: https://x/?guest=abc123',
 }
-
-const sampleContent = {
-  brideName: 'Ariana',
-  groomName: 'Adrian',
-  weddingDateLabel: 'Sabtu, 16 Mei 2026',
-} as unknown as Awaited<ReturnType<typeof getContent>>
 
 beforeEach(() => {
   // Default "jalan normal" - test yang menguji jalur gagal menimpanya sendiri.
-  mockedGetConfig.mockResolvedValue(sampleConfig)
-  mockedGetContent.mockResolvedValue(sampleContent)
   mockedListAllGroups.mockResolvedValue(sampleGroups)
+  mockedPreviewInvitation.mockResolvedValue(samplePreview)
+  mockedSendInvitation.mockResolvedValue(undefined)
 })
 
 afterEach(() => {
   mockedList.mockReset()
   mockedDelete.mockReset()
   mockedCreate.mockReset()
-  mockedGetConfig.mockReset()
-  mockedGetContent.mockReset()
   mockedListAllGroups.mockReset()
   mockedSetContacted.mockReset()
+  mockedPreviewInvitation.mockReset()
+  mockedSendInvitation.mockReset()
 })
 
 test('daftar kosong -> EmptyState', async () => {
@@ -195,34 +180,65 @@ test('ubah filter jenis undangan -> listGuests dipanggil dengan invitationType t
   )
 })
 
-// --- tombol "Kirim Undangan" (docs/plan/og-share-image-dinamis/PLAN.md T24) ---
+// --- tombol kirim undangan via modul (modal preview) ---
 
-test('tamu ber-nomor -> tombol Kirim Undangan berupa <a> wa.me dengan pesan terisi', async () => {
+test('tamu ber-nomor -> klik Kirim WA membuka modal berisi preview dari server', async () => {
   mockedList.mockResolvedValue({ data: [sampleGuest], meta: { page: 1, limit: 20, total: 1, totalPages: 1 } })
 
   renderPage()
+  fireEvent.click(await screen.findByRole('button', { name: 'Kirim WA' }))
 
-  const link = await screen.findByRole('link', { name: /Kirim Undangan/ })
-  const href = link.getAttribute('href') as string
-
-  // 0812345678 -> 62812345678 (aturan cermin normalizePhone Go).
-  expect(href.startsWith('https://wa.me/62812345678?text=')).toBe(true)
-  // Anchor WAJIB aman dibuka di tab baru.
-  expect(link).toHaveAttribute('target', '_blank')
-  expect(link).toHaveAttribute('rel', 'noopener noreferrer')
-
-  // Pesannya utuh setelah didecode - bukti encodeURIComponent bekerja pada
-  // '?' & '&' yang justru datang dari URL undangan itu sendiri.
-  const text = decodeURIComponent(href.slice(href.indexOf('?text=') + '?text='.length))
-  expect(text).toContain('Halo Budi Santoso')
-  expect(text).toContain('Adrian & Ariana')
-  expect(text).toContain('Sabtu, 16 Mei 2026')
-  expect(text).toContain('/?guest=abc123')
+  await waitFor(() => expect(mockedPreviewInvitation).toHaveBeenCalledWith(1, 'wa'))
+  // Teks preview datang dari server, bukan dirakit di klien.
+  expect(await screen.findByText(/Halo Budi Santoso/)).toBeInTheDocument()
+  expect(screen.getByText('0812345678')).toBeInTheDocument()
+  // Belum ada pengiriman sebelum admin menekan Kirim di modal.
+  expect(mockedSendInvitation).not.toHaveBeenCalled()
 })
 
-// K7: tamu tanpa nomor -> tombol NONAKTIF, dan WAJIB non-anchor. <a> yang
-// "di-disable" lewat atribut tetap bisa diklik.
-test('tamu tanpa nomor HP -> tombol nonaktif non-anchor dengan title yang menjelaskan', async () => {
+test('klik Kirim di modal -> sendInvitation dipanggil + badge Dihubungi muncul', async () => {
+  mockedList.mockResolvedValue({ data: [sampleGuest], meta: { page: 1, limit: 20, total: 1, totalPages: 1 } })
+
+  renderPage()
+  fireEvent.click(await screen.findByRole('button', { name: 'Kirim WA' }))
+  await screen.findByText(/Halo Budi Santoso/)
+
+  fireEvent.click(screen.getByRole('button', { name: 'Kirim' }))
+
+  await waitFor(() => expect(mockedSendInvitation).toHaveBeenCalledWith(1, 'wa'))
+  // Badge muncul dari respons yang SUKSES, bukan optimistis.
+  expect(await screen.findByRole('button', { name: /Dihubungi/ })).toBeInTheDocument()
+})
+
+test('klik Batal di modal -> sendInvitation tidak dipanggil, modal tertutup', async () => {
+  mockedList.mockResolvedValue({ data: [sampleGuest], meta: { page: 1, limit: 20, total: 1, totalPages: 1 } })
+
+  renderPage()
+  fireEvent.click(await screen.findByRole('button', { name: 'Kirim WA' }))
+  await screen.findByText(/Halo Budi Santoso/)
+
+  fireEvent.click(screen.getByRole('button', { name: 'Batal' }))
+
+  expect(mockedSendInvitation).not.toHaveBeenCalled()
+  await waitFor(() => expect(screen.queryByText(/Halo Budi Santoso/)).not.toBeInTheDocument())
+})
+
+test('tamu ber-username Telegram -> klik Kirim TG memakai kanal tg', async () => {
+  mockedList.mockResolvedValue({
+    data: [{ ...sampleGuest, usernameTelegram: 'budi_santoso' }],
+    meta: { page: 1, limit: 20, total: 1, totalPages: 1 },
+  })
+  mockedPreviewInvitation.mockResolvedValue({ channel: 'tg', target: '@budi_santoso', text: 'Halo Budi' })
+
+  renderPage()
+  fireEvent.click(await screen.findByRole('button', { name: 'Kirim TG' }))
+
+  await waitFor(() => expect(mockedPreviewInvitation).toHaveBeenCalledWith(1, 'tg'))
+  expect(await screen.findByText('@budi_santoso')).toBeInTheDocument()
+})
+
+// K7: tamu tanpa nomor -> tombol WA NONAKTIF dengan title yang menjelaskan.
+test('tamu tanpa nomor HP -> tombol Kirim WA nonaktif dengan title yang menjelaskan', async () => {
   mockedList.mockResolvedValue({
     data: [{ ...sampleGuest, phone: '' }],
     meta: { page: 1, limit: 20, total: 1, totalPages: 1 },
@@ -230,35 +246,53 @@ test('tamu tanpa nomor HP -> tombol nonaktif non-anchor dengan title yang menjel
 
   renderPage()
 
-  const btn = await screen.findByRole('button', { name: /Kirim Undangan/ })
+  const btn = await screen.findByRole('button', { name: 'Kirim WA' })
   expect(btn).toBeDisabled()
   expect(btn).toHaveAttribute('title', expect.stringContaining('Nomor HP'))
-  expect(screen.queryByRole('link', { name: /Kirim Undangan/ })).not.toBeInTheDocument()
+  fireEvent.click(btn)
+  expect(mockedPreviewInvitation).not.toHaveBeenCalled()
 })
 
-// Jalur gagal: daftar tamu TETAP tampil normal, hanya tombolnya nonaktif -
-// bukan halaman error.
-test('config WhatsApp gagal dimuat -> daftar tamu tetap tampil, tombol nonaktif', async () => {
+test('tamu tanpa username Telegram -> tombol Kirim TG nonaktif dengan title yang menjelaskan', async () => {
   mockedList.mockResolvedValue({ data: [sampleGuest], meta: { page: 1, limit: 20, total: 1, totalPages: 1 } })
-  mockedGetConfig.mockRejectedValue(new Error('500'))
 
   renderPage()
 
+  const btn = await screen.findByRole('button', { name: 'Kirim TG' })
+  expect(btn).toBeDisabled()
+  expect(btn).toHaveAttribute('title', expect.stringContaining('Telegram'))
+})
+
+// Preview gagal (modul mati/template kosong): daftar tamu TETAP tampil,
+// pesannya tampil DI DALAM modal - bukan halaman error.
+test('preview gagal dimuat -> modal menampilkan pesan error', async () => {
+  mockedList.mockResolvedValue({ data: [sampleGuest], meta: { page: 1, limit: 20, total: 1, totalPages: 1 } })
+  mockedPreviewInvitation.mockRejectedValueOnce(new Error('Modul WhatsApp tidak aktif di server ini'))
+
+  renderPage()
+  fireEvent.click(await screen.findByRole('button', { name: 'Kirim WA' }))
+
+  expect(await screen.findByText('Tidak bisa mengirim')).toBeInTheDocument()
+  expect(screen.getByText(/tidak aktif/)).toBeInTheDocument()
   expect(await screen.findByText('Budi Santoso')).toBeInTheDocument()
-  const btn = await screen.findByRole('button', { name: /Kirim Undangan/ })
-  expect(btn).toBeDisabled()
-  expect(screen.queryByRole('link', { name: /Kirim Undangan/ })).not.toBeInTheDocument()
 })
 
-test('template undangan kosong -> tombol nonaktif dengan title yang menyebut template', async () => {
+// Kirim gagal: modal tetap terbuka dengan pesannya, badge tidak muncul,
+// admin bisa menekan Kirim lagi.
+test('kirim gagal -> modal tetap terbuka, badge tidak muncul', async () => {
   mockedList.mockResolvedValue({ data: [sampleGuest], meta: { page: 1, limit: 20, total: 1, totalPages: 1 } })
-  mockedGetConfig.mockResolvedValue({ ...sampleConfig, invitationTemplate: '   ' })
+  mockedSendInvitation.mockRejectedValueOnce(new Error('koneksi WhatsApp belum siap'))
 
   renderPage()
+  fireEvent.click(await screen.findByRole('button', { name: 'Kirim WA' }))
+  await screen.findByText(/Halo Budi Santoso/)
 
-  const btn = await screen.findByRole('button', { name: /Kirim Undangan/ })
-  expect(btn).toBeDisabled()
-  expect(btn).toHaveAttribute('title', expect.stringContaining('Template'))
+  fireEvent.click(screen.getByRole('button', { name: 'Kirim' }))
+
+  await waitFor(() => expect(screen.getByText(/belum siap/)).toBeInTheDocument())
+  expect(screen.queryByRole('button', { name: /Dihubungi/ })).not.toBeInTheDocument()
+  // Modalnya masih di sana - bukan tertutup diam-diam.
+  expect(screen.getByRole('button', { name: 'Kirim' })).toBeInTheDocument()
 })
 
 // --- group tamu (docs/plan/guest-groups/PLAN.md T18) ---
@@ -433,22 +467,19 @@ test('buka edit tamu -> jatah kursi memakai nilai TERSIMPAN, bukan defaultPax gr
 
 // --- Penanda "sudah dihubungi" (docs/plan/reservation-reset-contacted-flag/PLAN.md T10) ---
 
-test('klik "Kirim Undangan" -> menandai dihubungi TANPA merusak link wa.me', async () => {
+test('kirim WA sukses -> penanda menyala TANPA PATCH manual terpisah', async () => {
   mockedList.mockResolvedValue({ data: [sampleGuest], meta: { page: 1, limit: 20, total: 1, totalPages: 1 } })
-  mockedSetContacted.mockResolvedValueOnce(undefined)
 
   renderPage()
   await screen.findByText('Budi Santoso')
 
-  const link = await screen.findByRole('link', { name: /Kirim Undangan/ })
-  // D9: tetap <a> ber-href wa.me. Kalau penandanya dipasang lewat
-  // preventDefault + window.open, Ctrl/Cmd-klik dan popup blocker rusak.
-  expect(link).toHaveAttribute('href', expect.stringContaining('wa.me'))
+  fireEvent.click(await screen.findByRole('button', { name: 'Kirim WA' }))
+  await screen.findByText(/Halo Budi Santoso/)
+  fireEvent.click(screen.getByRole('button', { name: 'Kirim' }))
 
-  fireEvent.click(link)
-
-  await waitFor(() => expect(mockedSetContacted).toHaveBeenCalledWith(1, true))
-  expect(link).toHaveAttribute('href', expect.stringContaining('wa.me'))
+  await waitFor(() => expect(mockedSendInvitation).toHaveBeenCalledWith(1, 'wa'))
+  // Server menyalakan contacted_at; klien TIDAK perlu PATCH /contacted lagi.
+  expect(mockedSetContacted).not.toHaveBeenCalled()
   // Badge muncul dari respons yang SUKSES, bukan optimistis.
   expect(await screen.findByRole('button', { name: /Dihubungi/ })).toBeInTheDocument()
 })
@@ -468,34 +499,35 @@ test('klik badge "Dihubungi" -> membatalkan penanda', async () => {
 })
 
 // D10 - gagal DIAM-DIAM lebih berbahaya daripada gagal: admin mengira tamu
-// sudah tertandai lalu melewatinya. Tapi kegagalannya juga tidak boleh
-// menahan apa pun; WhatsApp tetap terbuka.
-test('penanda gagal disimpan -> badge tidak muncul, tidak melempar', async () => {
+// sudah tertandai lalu melewatinya. Kegagalan kirim tampil di modal dan badge
+// tidak muncul.
+test('kirim gagal -> badge tidak muncul, tidak melempar', async () => {
   mockedList.mockResolvedValue({ data: [sampleGuest], meta: { page: 1, limit: 20, total: 1, totalPages: 1 } })
-  mockedSetContacted.mockRejectedValueOnce(new Error('500'))
+  mockedSendInvitation.mockRejectedValueOnce(new Error('500'))
 
   renderPage()
   await screen.findByText('Budi Santoso')
 
-  fireEvent.click(await screen.findByRole('link', { name: /Kirim Undangan/ }))
+  fireEvent.click(await screen.findByRole('button', { name: 'Kirim WA' }))
+  await screen.findByText(/Halo Budi Santoso/)
+  fireEvent.click(screen.getByRole('button', { name: 'Kirim' }))
 
-  await waitFor(() => expect(mockedSetContacted).toHaveBeenCalledWith(1, true))
+  await waitFor(() => expect(mockedSendInvitation).toHaveBeenCalledWith(1, 'wa'))
   expect(screen.queryByRole('button', { name: /Dihubungi/ })).not.toBeInTheDocument()
-  // Link-nya tetap utuh - kirim undangan tidak boleh ikut gagal.
-  expect(screen.getByRole('link', { name: /Kirim Undangan/ })).toBeInTheDocument()
 })
 
-test('tamu tanpa nomor HP -> tidak ada penanda karena tombolnya nonaktif', async () => {
+test('tamu tanpa nomor HP -> tombol WA nonaktif, tidak ada preview maupun penanda', async () => {
   const tanpaHp = { ...sampleGuest, phone: '' }
   mockedList.mockResolvedValue({ data: [tanpaHp], meta: { page: 1, limit: 20, total: 1, totalPages: 1 } })
 
   renderPage()
   await screen.findByText('Budi Santoso')
 
-  const btn = await screen.findByRole('button', { name: /Kirim Undangan/ })
+  const btn = await screen.findByRole('button', { name: 'Kirim WA' })
   expect(btn).toBeDisabled()
   fireEvent.click(btn)
 
+  expect(mockedPreviewInvitation).not.toHaveBeenCalled()
   expect(mockedSetContacted).not.toHaveBeenCalled()
 })
 
@@ -636,10 +668,10 @@ test('filter tahap aktif + hasil kosong -> EmptyState versi "tidak cocok"', asyn
   expect(screen.queryByText('Belum ada tamu')).not.toBeInTheDocument()
 })
 
-// K2: satu-satunya penulis contacted_at selama ini adalah klik tautan
-// WhatsApp, dan tautan itu tidak dirender tanpa nomor HP. Tanpa tombol ini,
-// tamu undangan fisik permanen tersangkut di "Belum diundang".
-test('tamu tanpa nomor HP & belum ditandai -> tombol tandai manual memanggil setContacted', async () => {
+// K2: tamu tanpa kontak apa pun (tanpa nomor HP DAN tanpa username Telegram)
+// tidak bisa dikirimi lewat modul. Tanpa tombol ini, tamu undangan fisik
+// permanen tersangkut di "Belum diundang".
+test('tamu tanpa nomor HP & tanpa Telegram & belum ditandai -> tombol tandai manual memanggil setContacted', async () => {
   mockedList.mockResolvedValue({
     data: [{ ...sampleGuest, phone: '', contactedAt: null }],
     meta: { page: 1, limit: 20, total: 1, totalPages: 1 },
@@ -669,14 +701,27 @@ test('tamu tanpa nomor HP yang sudah ditandai -> tombol tandai manual tidak dire
   expect(screen.getByRole('button', { name: 'Dihubungi' })).toBeInTheDocument()
 })
 
-// Tamu yang tautan WhatsApp-nya hidup tidak butuh tombol kedua: "Kirim
-// Undangan" sudah menandai contacted_at sendiri.
-test('tamu dengan nomor HP & template siap -> tombol tandai manual tidak dirender', async () => {
+// Tamu yang bisa dikirimi lewat salah satu kanal tidak butuh tombol kedua:
+// kirim sukses sudah menyalakan contacted_at sendiri.
+test('tamu dengan nomor HP -> tombol tandai manual tidak dirender', async () => {
   mockedList.mockResolvedValue({ data: [sampleGuest], meta: { page: 1, limit: 20, total: 1, totalPages: 1 } })
 
   renderPage()
   await waitFor(() => expect(screen.getByText('Budi Santoso')).toBeInTheDocument())
-  await waitFor(() => expect(screen.getByRole('link', { name: 'Kirim Undangan' })).toBeInTheDocument())
+  await waitFor(() => expect(screen.getByRole('button', { name: 'Kirim WA' })).toBeInTheDocument())
+
+  expect(screen.queryByRole('button', { name: 'Tandai sudah diundang' })).not.toBeInTheDocument()
+})
+
+test('tamu tanpa nomor HP tapi ber-username Telegram -> tombol tandai manual tidak dirender', async () => {
+  mockedList.mockResolvedValue({
+    data: [{ ...sampleGuest, phone: '', usernameTelegram: 'budi_santoso' }],
+    meta: { page: 1, limit: 20, total: 1, totalPages: 1 },
+  })
+
+  renderPage()
+  await waitFor(() => expect(screen.getByText('Budi Santoso')).toBeInTheDocument())
+  await waitFor(() => expect(screen.getByRole('button', { name: 'Kirim TG' })).toBeInTheDocument())
 
   expect(screen.queryByRole('button', { name: 'Tandai sudah diundang' })).not.toBeInTheDocument()
 })

@@ -1,0 +1,55 @@
+package infrastructure
+
+import (
+	"context"
+
+	"undangan-digital/internal/modules/telegram/infrastructure/sqlc"
+)
+
+type Repository struct {
+	q *sqlc.Queries
+}
+
+func NewRepository(db sqlc.DBTX) *Repository {
+	return &Repository{q: sqlc.New(db)}
+}
+
+func (r *Repository) GetConfig(ctx context.Context) (sqlc.TelegramConfig, error) {
+	return r.q.GetTelegramConfig(ctx)
+}
+
+func (r *Repository) UpdateConfig(ctx context.Context, arg sqlc.UpdateTelegramConfigParams) error {
+	return r.q.UpdateTelegramConfig(ctx, arg)
+}
+
+func (r *Repository) InsertSendLog(ctx context.Context, arg sqlc.InsertSendLogParams) (int64, error) {
+	return r.q.InsertSendLog(ctx, arg)
+}
+
+func (r *Repository) GetSendLogByID(ctx context.Context, id uint64) (sqlc.TelegramSendLog, error) {
+	return r.q.GetSendLogByID(ctx, id)
+}
+
+func (r *Repository) ListSendLogs(ctx context.Context, arg sqlc.ListSendLogsParams) ([]sqlc.TelegramSendLog, error) {
+	return r.q.ListSendLogs(ctx, arg)
+}
+
+func (r *Repository) CountSendLogs(ctx context.Context) (int64, error) {
+	return r.q.CountSendLogs(ctx)
+}
+
+func (r *Repository) UpdateSendLogStatus(ctx context.Context, arg sqlc.UpdateSendLogStatusParams) error {
+	return r.q.UpdateSendLogStatus(ctx, arg)
+}
+
+func (r *Repository) ScheduleSendLogRetry(ctx context.Context, arg sqlc.ScheduleSendLogRetryParams) error {
+	return r.q.ScheduleSendLogRetry(ctx, arg)
+}
+
+func (r *Repository) ListRetryableSendLogs(ctx context.Context, arg sqlc.ListRetryableSendLogsParams) ([]sqlc.TelegramSendLog, error) {
+	return r.q.ListRetryableSendLogs(ctx, arg)
+}
+
+func (r *Repository) ReapStalePendingSendLogs(ctx context.Context, arg sqlc.ReapStalePendingSendLogsParams) error {
+	return r.q.ReapStalePendingSendLogs(ctx, arg)
+}

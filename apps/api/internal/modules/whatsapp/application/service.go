@@ -643,6 +643,56 @@ func (s *Service) SendQR(ctx context.Context, in contracts.SendQRInput) error {
 	}, cfg)
 }
 
+// --- undangan manual per tamu (tombol kirim di menu Tamu) ---
+
+// Undangan manual adalah pesan TEKS dari invitation_template - BUKAN gambar
+// QR. Jalur ini SENGAJA tidak memakai sendAndRecord: tidak ada baris
+// send_logs yang ditulis (undangan bukan QR), tidak ada antrean retry (admin
+// menekan Kirim ulang bila gagal), dan is_enabled TIDAK digerbangi (D12:
+// sakelar itu hanya milik QR otomatis; pengiriman manual adalah tindakan
+// admin yang eksplisit). Kegagalan koneksi dibalas langsung supaya tampil di
+// modal, bukan dijadwalkan diam-diam.
+func (s *Service) PreviewInvitation(ctx context.Context, in contracts.PreviewInvitationInput) (string, error) {
+	cfg, err := s.repo.GetConfig(ctx)
+	if err != nil {
+		return "", err
+	}
+	if strings.TrimSpace(cfg.InvitationTemplate) == "" {
+		return "", fmt.Errorf("%w: Template Pesan Undangan belum diisi di menu WhatsApp", ErrSendFailed)
+	}
+	return applyInvitationTemplate(cfg.InvitationTemplate, in.GuestName, in.CoupleName, in.EventDateLabel, in.Link), nil
+}
+
+func (s *Service) SendInvitation(ctx context.Context, in contracts.SendInvitationInput) error {
+	cfg, err := s.repo.GetConfig(ctx)
+	if err != nil {
+		return err
+	}
+	if strings.TrimSpace(cfg.InvitationTemplate) == "" {
+		return fmt.Errorf("%w: Template Pesan Undangan belum diisi di menu WhatsApp", ErrSendFailed)
+	}
+	normalized, ok := normalizePhone(in.Phone)
+	if !ok {
+		return fmt.Errorf("%w: nomor telepon kosong", ErrSendFailed)
+	}
+	// Gate yang sama dengan sendAndRecord, tetapi gagal koneksi di sini
+	// bersifat final (tanpa scheduleRetry): admin melihat hasilnya seketika
+	// di modal dan memutuskan sendiri kapan menekan Kirim lagi.
+	if !s.client.HasStoredSession() {
+		return fmt.Errorf("%w: WhatsApp belum tertaut", ErrSendFailed)
+	}
+	if !s.client.IsReady() {
+		return fmt.Errorf("%w: koneksi WhatsApp belum siap, coba lagi beberapa saat lagi", ErrSendFailed)
+	}
+	text := applyInvitationTemplate(cfg.InvitationTemplate, in.GuestName, in.CoupleName, in.EventDateLabel, in.Link)
+	attemptCtx, cancel := context.WithTimeout(ctx, sendAttemptTimeout)
+	defer cancel()
+	if err := s.client.SendTextMessage(attemptCtx, normalized, text); err != nil {
+		return fmt.Errorf("%w: gagal kirim pesan: %s", ErrSendFailed, err.Error())
+	}
+	return nil
+}
+
 // sendJob adalah satu pekerjaan kirim yang LENGKAP SENDIRI: seluruh isinya
 // snapshot dari baris whatsapp_send_logs, sehingga modul ini tidak pernah
 // perlu membaca tabel milik modul lain (keputusan #12/#19). Dikumpulkan dalam
@@ -797,6 +847,20 @@ func applyTemplate(tpl, guestName string, attendingCount int, coupleName, eventD
 		"{jumlah}", strconv.Itoa(attendingCount),
 		"{mempelai}", coupleName,
 		"{tanggal}", eventDateLabel,
+	)
+	return r.Replace(tpl)
+}
+
+// applyInvitationTemplate me-render invitation_template. Placeholder TANPA
+// {jumlah} (K5 og-share-image-dinamis): saat undangan dikirim tamu belum
+// RSVP, jadi angka hadir selalu menyesatkan. Placeholder tak dikenal dibiarkan
+// utuh supaya admin melihat kesalahannya di preview.
+func applyInvitationTemplate(tpl, guestName, coupleName, eventDateLabel, link string) string {
+	r := strings.NewReplacer(
+		"{nama}", guestName,
+		"{mempelai}", coupleName,
+		"{tanggal}", eventDateLabel,
+		"{link}", link,
 	)
 	return r.Replace(tpl)
 }

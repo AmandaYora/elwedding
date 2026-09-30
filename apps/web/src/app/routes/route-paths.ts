@@ -14,6 +14,10 @@ export const ROUTE_PATHS = {
   wishes: '/wishes',
   reservations: '/reservations',
   whatsapp: '/whatsapp',
+  // Akun Telegram pengirim (modul `telegram`, userbot). SENGAJA TIDAK masuk
+  // SCANNER_ALLOWED_PATHS di bawah: petugas gate tidak mengelola integrasi
+  // kirim, sama seperti menu WhatsApp & Pengguna.
+  telegram: '/telegram',
   users: '/users',
   settings: '/settings',
   // Dua rute yang boleh dibuka akun petugas gate

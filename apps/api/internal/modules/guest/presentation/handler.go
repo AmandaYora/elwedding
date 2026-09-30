@@ -33,6 +33,8 @@ func writeServiceError(w http.ResponseWriter, err error) {
 		response.NotFound(w, err.Error())
 	case 400:
 		response.BadRequest(w, err.Error(), nil)
+	case 503:
+		response.Error(w, http.StatusServiceUnavailable, err.Error(), nil)
 	default:
 		response.Internal(w, "")
 	}
@@ -161,6 +163,65 @@ func (h *Handler) SetContacted(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	response.OK(w, "Penanda tersimpan", nil)
+}
+
+// --- admin: undangan manual per tamu (tombol kirim di menu Tamu) ---
+//
+// Preview + kirim ditaruh di modul guest (bukan di whatsapp/telegram) karena
+// HANYA guest yang boleh memegang ketiganya sekaligus: baris tamu (nama,
+// nomor/username, token), InvitationInfoProvider (mempelai, tanggal), dan
+// kedua contracts.Sender. Modul pengirim tidak boleh mengimpor guest
+// (siklus + larangan lintas modul), dan guest tidak membaca config milik
+// modul lain - template di-render pemiliknya lewat Preview/SendInvitation.
+//
+// Origin link dibangun di sini dari Host request (pola origin di router
+// og_meta): satu host menyajikan admin + undangan publik, jadi host admin =
+// host publik. Path-nya segmen lebih panjang dari PUT/DELETE /guests/{id},
+// jadi ServeMux memilih yang paling spesifik tanpa bentrok.
+
+// PreviewInvitation menangani GET /api/v1/admin/guests/{id}/invitation-preview?channel=wa|tg.
+func (h *Handler) PreviewInvitation(w http.ResponseWriter, r *http.Request) {
+	id, err := strconv.ParseUint(r.PathValue("id"), 10, 64)
+	if err != nil {
+		response.BadRequest(w, "Invalid id", nil)
+		return
+	}
+	preview, err := h.service.PreviewInvitation(r.Context(), id, r.URL.Query().Get("channel"), requestOrigin(r))
+	if err != nil {
+		writeServiceError(w, err)
+		return
+	}
+	response.OK(w, "Invitation preview retrieved successfully", preview)
+}
+
+// SendInvitation menangani POST /api/v1/admin/guests/{id}/send-invitation.
+func (h *Handler) SendInvitation(w http.ResponseWriter, r *http.Request) {
+	id, err := strconv.ParseUint(r.PathValue("id"), 10, 64)
+	if err != nil {
+		response.BadRequest(w, "Invalid id", nil)
+		return
+	}
+	var body struct {
+		Channel string `json:"channel"`
+	}
+	if !decodeJSON(w, r, &body) {
+		return
+	}
+	if err := h.service.SendInvitation(r.Context(), id, body.Channel, requestOrigin(r)); err != nil {
+		writeServiceError(w, err)
+		return
+	}
+	response.OK(w, "Undangan terkirim", nil)
+}
+
+// requestOrigin menyusun "https://<host>" dari request - salinan pola origin
+// di router.renderIndexWithOgMeta (TLS diterminasi nginx, X-Forwarded-Proto
+// tidak disetel). Link tamu = origin + /?guest=<token>, dirakit service.
+func requestOrigin(r *http.Request) string {
+	if r.Host != "" {
+		return "https://" + r.Host
+	}
+	return ""
 }
 
 // --- admin: check-in di gate (docs/plan/scan-checkin-gate/PLAN.md T8) ---

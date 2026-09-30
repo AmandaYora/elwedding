@@ -67,6 +67,27 @@ func TestStatusHTTPCode_InvalidContactedFilterIs400(t *testing.T) {
 	}
 }
 
+// Error undangan manual WAJIB terdaftar di cabang yang benar. Alasan yang
+// sama dengan penjaga di atas: salah mapping membuat admin salah membaca
+// keadaan (modul mati tampak seperti server rusak bila 503 jatuh ke 500,
+// template kosong tampak seperti bug bila 400 jatuh ke 500).
+func TestStatusHTTPCode_InvitationErrors(t *testing.T) {
+	cases := []struct {
+		err  error
+		want int
+	}{
+		{ErrInvalidInvitationChannel, 400},
+		{ErrInvitationNoTarget, 400},
+		{ErrInvitationFailed, 400},
+		{ErrChannelUnavailable, 503},
+	}
+	for _, c := range cases {
+		if got := StatusHTTPCode(c.err); got != c.want {
+			t.Fatalf("StatusHTTPCode(%v) = %d, want %d", c.err, got, c.want)
+		}
+	}
+}
+
 // contactedFilterAny HARUS 0, bukan sekadar "salah satu kode".
 //
 // Nilainya adalah zero value field ContactedFilter di ListGuestsFilteredParams,

@@ -265,6 +265,50 @@ func (ns NullGuestsSouvenirType) Value() (driver.Value, error) {
 	return string(ns.GuestsSouvenirType), nil
 }
 
+type TelegramSendLogsStatus string
+
+const (
+	TelegramSendLogsStatusPending  TelegramSendLogsStatus = "pending"
+	TelegramSendLogsStatusSent     TelegramSendLogsStatus = "sent"
+	TelegramSendLogsStatusFailed   TelegramSendLogsStatus = "failed"
+	TelegramSendLogsStatusRetrying TelegramSendLogsStatus = "retrying"
+)
+
+func (e *TelegramSendLogsStatus) Scan(src interface{}) error {
+	switch s := src.(type) {
+	case []byte:
+		*e = TelegramSendLogsStatus(s)
+	case string:
+		*e = TelegramSendLogsStatus(s)
+	default:
+		return fmt.Errorf("unsupported scan type for TelegramSendLogsStatus: %T", src)
+	}
+	return nil
+}
+
+type NullTelegramSendLogsStatus struct {
+	TelegramSendLogsStatus TelegramSendLogsStatus
+	Valid                  bool // Valid is true if TelegramSendLogsStatus is not NULL
+}
+
+// Scan implements the Scanner interface.
+func (ns *NullTelegramSendLogsStatus) Scan(value interface{}) error {
+	if value == nil {
+		ns.TelegramSendLogsStatus, ns.Valid = "", false
+		return nil
+	}
+	ns.Valid = true
+	return ns.TelegramSendLogsStatus.Scan(value)
+}
+
+// Value implements the driver Valuer interface.
+func (ns NullTelegramSendLogsStatus) Value() (driver.Value, error) {
+	if !ns.Valid {
+		return nil, nil
+	}
+	return string(ns.TelegramSendLogsStatus), nil
+}
+
 type WhatsappSendLogsStatus string
 
 const (
@@ -357,6 +401,7 @@ type Guest struct {
 	GroupID             sql.NullInt64
 	PaxQuota            uint8
 	ContactedAt         sql.NullTime
+	UsernameTelegram    string
 }
 
 type GuestGroup struct {
@@ -427,6 +472,31 @@ type Section struct {
 	Label      string
 	IsEnabled  bool
 	SortOrder  int32
+}
+
+type TelegramConfig struct {
+	ID                 uint64
+	MessageTemplate    string
+	IsEnabled          bool
+	UpdatedAt          time.Time
+	InvitationTemplate string
+}
+
+type TelegramSendLog struct {
+	ID               uint64
+	GuestID          uint64
+	GuestName        string
+	TelegramUsername string
+	QrPayload        string
+	CoupleName       string
+	EventDateLabel   string
+	AttendingCount   uint8
+	Status           TelegramSendLogsStatus
+	ErrorMessage     sql.NullString
+	SentAt           sql.NullTime
+	RetryCount       uint8
+	NextRetryAt      sql.NullTime
+	CreatedAt        time.Time
 }
 
 type WeddingGiftBank struct {

@@ -70,6 +70,25 @@ func TestApplyTemplate_MissingPlaceholdersLeftUntouched(t *testing.T) {
 	}
 }
 
+// Undangan manual memakai kamus TANPA {jumlah} (K5): tamu belum RSVP saat
+// diundang, dan {link} menggantikannya sebagai placeholder keempat.
+func TestApplyInvitationTemplate(t *testing.T) {
+	tpl := "Halo {nama}, kami mengundang Anda ke pernikahan {mempelai} pada {tanggal}. Undangan: {link}"
+	got := applyInvitationTemplate(tpl, "Budi", "Siti & Budi", "Minggu, 12 Oktober 2026", "https://x/?guest=abc")
+	want := "Halo Budi, kami mengundang Anda ke pernikahan Siti & Budi pada Minggu, 12 Oktober 2026. Undangan: https://x/?guest=abc"
+	if got != want {
+		t.Fatalf("applyInvitationTemplate() = %q, want %q", got, want)
+	}
+}
+
+func TestApplyInvitationTemplate_JumlahDibiarkanUtuh(t *testing.T) {
+	got := applyInvitationTemplate("Halo {nama}, {jumlah} orang", "Budi", "A & B", "1 Jan 2026", "https://x")
+	want := "Halo Budi, {jumlah} orang"
+	if got != want {
+		t.Fatalf("applyInvitationTemplate() = %q, want %q", got, want)
+	}
+}
+
 // timeoutError meniru net.Error timeout supaya os.IsTimeout mengenalinya,
 // tanpa koneksi jaringan apa pun.
 type timeoutError struct{}

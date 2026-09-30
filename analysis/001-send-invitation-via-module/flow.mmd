@@ -1,0 +1,9 @@
+flowchart TD
+    A[Klik Kirim WA/TG di baris tamu] --> B[GET invitation-preview channel=wa_tg]
+    B --> C{Preview ok_}
+    C -->|tidak| Z[Pesan error, tanpa modal]
+    C -->|ya| D[Modal: nama + tujuan + pesan]
+    D -->|Batal| E[Tutup, tanpa efek]
+    D -->|Kirim| F[POST send-invitation]
+    F -->|sukses| G[Toast + badge Dihubungi]
+    F -->|gagal 4xx_503| H[Pesan error, contacted utuh]

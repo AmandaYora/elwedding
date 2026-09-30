@@ -31,6 +31,17 @@ export const guestSchema = z.object({
   souvenirType: z.enum(['regular', 'vip'], { message: 'Jenis souvenir wajib dipilih' }),
   email: z.union([z.literal(''), z.string().email('Format email tidak valid')]),
   phone: z.string(),
+  // Username Telegram (opsional): "" = tidak punya. Aturan KEMBAR dengan
+  // telegramUsernameRe di guest/application/service.go - browser tidak bisa
+  // memanggil konstanta Go. Yang di sini hanya memberi pesan lebih cepat;
+  // penegakan sebenarnya tetap di backend. @ di depan & huruf besar
+  // diizinkan di form (dinormalisasi backend), jadi regex-nya lebih longgar.
+  usernameTelegram: z.union([
+    z.literal(''),
+    z
+      .string()
+      .regex(/^@?[a-zA-Z0-9_]{5,32}$/, 'Username Telegram tidak valid (5-32 karakter: huruf, angka, garis bawah)'),
+  ]),
   address: z.string(),
   notes: z.string(),
   isExpectedAttending: z.boolean(),

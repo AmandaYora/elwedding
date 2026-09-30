@@ -46,7 +46,7 @@ WHERE (? IS NULL OR rsvp_status = ?)
   AND (? IS NULL OR invitation_type = ?)
   AND (? IS NULL OR souvenir_type = ?)
   AND (? IS NULL OR group_id = ?)
-  AND (? IS NULL OR name LIKE ? OR phone LIKE ? OR email LIKE ?)
+  AND (? IS NULL OR name LIKE ? OR phone LIKE ? OR email LIKE ? OR username_telegram LIKE ?)
 `
 
 type CountGuestsFilteredParams struct {
@@ -73,6 +73,7 @@ func (q *Queries) CountGuestsFiltered(ctx context.Context, arg CountGuestsFilter
 		arg.SouvenirType,
 		arg.GroupID,
 		arg.GroupID,
+		arg.Q,
 		arg.Q,
 		arg.Q,
 		arg.Q,
@@ -337,8 +338,8 @@ func (q *Queries) CountGuestsGroupedByStatus(ctx context.Context) ([]CountGuests
 }
 
 const createGuest = `-- name: CreateGuest :execlastid
-INSERT INTO guests (name, phone, side, group_id, token, rsvp_status, gender, invitation_type, souvenir_type, email, address, notes, is_expected_attending, pax_quota)
-VALUES (?, ?, ?, ?, ?, 'pending', ?, ?, ?, ?, ?, ?, ?, ?)
+INSERT INTO guests (name, phone, side, group_id, token, rsvp_status, gender, invitation_type, souvenir_type, email, username_telegram, address, notes, is_expected_attending, pax_quota)
+VALUES (?, ?, ?, ?, ?, 'pending', ?, ?, ?, ?, ?, ?, ?, ?, ?)
 `
 
 type CreateGuestParams struct {
@@ -351,6 +352,7 @@ type CreateGuestParams struct {
 	InvitationType      GuestsInvitationType
 	SouvenirType        GuestsSouvenirType
 	Email               string
+	UsernameTelegram    string
 	Address             sql.NullString
 	Notes               sql.NullString
 	IsExpectedAttending bool
@@ -372,6 +374,7 @@ func (q *Queries) CreateGuest(ctx context.Context, arg CreateGuestParams) (int64
 		arg.InvitationType,
 		arg.SouvenirType,
 		arg.Email,
+		arg.UsernameTelegram,
 		arg.Address,
 		arg.Notes,
 		arg.IsExpectedAttending,
@@ -433,7 +436,7 @@ func (q *Queries) GetCheckinSummary(ctx context.Context) (GetCheckinSummaryRow, 
 }
 
 const getGuestByID = `-- name: GetGuestByID :one
-SELECT id, name, phone, side, token, rsvp_status, rsvp_responded_at, created_at, updated_at, gender, invitation_type, souvenir_type, email, address, notes, attending_count, is_expected_attending, checked_in_at, group_id, pax_quota, contacted_at FROM guests WHERE id = ? LIMIT 1
+SELECT id, name, phone, side, token, rsvp_status, rsvp_responded_at, created_at, updated_at, gender, invitation_type, souvenir_type, email, address, notes, attending_count, is_expected_attending, checked_in_at, group_id, pax_quota, contacted_at, username_telegram FROM guests WHERE id = ? LIMIT 1
 `
 
 func (q *Queries) GetGuestByID(ctx context.Context, id uint64) (Guest, error) {
@@ -461,12 +464,13 @@ func (q *Queries) GetGuestByID(ctx context.Context, id uint64) (Guest, error) {
 		&i.GroupID,
 		&i.PaxQuota,
 		&i.ContactedAt,
+		&i.UsernameTelegram,
 	)
 	return i, err
 }
 
 const getGuestByToken = `-- name: GetGuestByToken :one
-SELECT id, name, phone, side, token, rsvp_status, rsvp_responded_at, created_at, updated_at, gender, invitation_type, souvenir_type, email, address, notes, attending_count, is_expected_attending, checked_in_at, group_id, pax_quota, contacted_at FROM guests WHERE token = ? LIMIT 1
+SELECT id, name, phone, side, token, rsvp_status, rsvp_responded_at, created_at, updated_at, gender, invitation_type, souvenir_type, email, address, notes, attending_count, is_expected_attending, checked_in_at, group_id, pax_quota, contacted_at, username_telegram FROM guests WHERE token = ? LIMIT 1
 `
 
 func (q *Queries) GetGuestByToken(ctx context.Context, token string) (Guest, error) {
@@ -494,6 +498,7 @@ func (q *Queries) GetGuestByToken(ctx context.Context, token string) (Guest, err
 		&i.GroupID,
 		&i.PaxQuota,
 		&i.ContactedAt,
+		&i.UsernameTelegram,
 	)
 	return i, err
 }
@@ -555,7 +560,7 @@ func (q *Queries) ListCheckedInGuests(ctx context.Context, arg ListCheckedInGues
 }
 
 const listGuestsFiltered = `-- name: ListGuestsFiltered :many
-SELECT id, name, phone, side, token, rsvp_status, rsvp_responded_at, created_at, updated_at, gender, invitation_type, souvenir_type, email, address, notes, attending_count, is_expected_attending, checked_in_at, group_id, pax_quota, contacted_at FROM guests
+SELECT id, name, phone, side, token, rsvp_status, rsvp_responded_at, created_at, updated_at, gender, invitation_type, souvenir_type, email, address, notes, attending_count, is_expected_attending, checked_in_at, group_id, pax_quota, contacted_at, username_telegram FROM guests
 WHERE (? IS NULL OR rsvp_status = ?)
   AND (CAST(? AS UNSIGNED) = 0 OR rsvp_status != 'pending')
   AND (CAST(? AS UNSIGNED) = 0
@@ -564,7 +569,7 @@ WHERE (? IS NULL OR rsvp_status = ?)
   AND (? IS NULL OR invitation_type = ?)
   AND (? IS NULL OR souvenir_type = ?)
   AND (? IS NULL OR group_id = ?)
-  AND (? IS NULL OR name LIKE ? OR phone LIKE ? OR email LIKE ?)
+  AND (? IS NULL OR name LIKE ? OR phone LIKE ? OR email LIKE ? OR username_telegram LIKE ?)
 ORDER BY created_at DESC
 LIMIT ? OFFSET ?
 `
@@ -613,6 +618,7 @@ func (q *Queries) ListGuestsFiltered(ctx context.Context, arg ListGuestsFiltered
 		arg.Q,
 		arg.Q,
 		arg.Q,
+		arg.Q,
 		arg.Limit,
 		arg.Offset,
 	)
@@ -645,6 +651,7 @@ func (q *Queries) ListGuestsFiltered(ctx context.Context, arg ListGuestsFiltered
 			&i.GroupID,
 			&i.PaxQuota,
 			&i.ContactedAt,
+			&i.UsernameTelegram,
 		); err != nil {
 			return nil, err
 		}
@@ -778,7 +785,7 @@ func (q *Queries) UnmarkGuestContacted(ctx context.Context, id uint64) error {
 }
 
 const updateGuest = `-- name: UpdateGuest :exec
-UPDATE guests SET name = ?, phone = ?, side = ?, group_id = ?, gender = ?, invitation_type = ?, souvenir_type = ?, email = ?, address = ?, notes = ?, is_expected_attending = ?, pax_quota = ?
+UPDATE guests SET name = ?, phone = ?, side = ?, group_id = ?, gender = ?, invitation_type = ?, souvenir_type = ?, email = ?, username_telegram = ?, address = ?, notes = ?, is_expected_attending = ?, pax_quota = ?
 WHERE id = ?
 `
 
@@ -791,6 +798,7 @@ type UpdateGuestParams struct {
 	InvitationType      GuestsInvitationType
 	SouvenirType        GuestsSouvenirType
 	Email               string
+	UsernameTelegram    string
 	Address             sql.NullString
 	Notes               sql.NullString
 	IsExpectedAttending bool
@@ -810,6 +818,7 @@ func (q *Queries) UpdateGuest(ctx context.Context, arg UpdateGuestParams) error 
 		arg.InvitationType,
 		arg.SouvenirType,
 		arg.Email,
+		arg.UsernameTelegram,
 		arg.Address,
 		arg.Notes,
 		arg.IsExpectedAttending,

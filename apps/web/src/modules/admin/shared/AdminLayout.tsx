@@ -112,6 +112,16 @@ const NAV_ITEMS: NavItem[] = [
     ),
   },
   {
+    to: ROUTE_PATHS.telegram,
+    label: 'Telegram',
+    end: false,
+    icon: (active) => (
+      <svg className={`w-4.5 h-4.5 transition-colors ${active ? 'text-blue-400' : 'text-slate-400 group-hover:text-slate-200'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M22 2L11 13m0 0l-4.5 5.5a.75.75 0 01-1.16-.12L3 15l8-8m3 6l7 3-3-7-4 4z" />
+      </svg>
+    ),
+  },
+  {
     to: ROUTE_PATHS.users,
     label: 'Pengguna',
     end: false,

@@ -1,0 +1,16 @@
+erDiagram
+    telegram_config {
+        BIGINT id PK
+        TEXT message_template
+        TEXT invitation_template
+        BOOLEAN is_enabled
+        TIMESTAMP updated_at
+    }
+    guests {
+        BIGINT id PK
+        VARCHAR phone
+        VARCHAR username_telegram
+        VARCHAR token
+        DATETIME contacted_at
+    }
+    guests ||--o{ telegram_config : "tanpa FK (aturan monolith, relasi via contracts)"

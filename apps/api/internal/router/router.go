@@ -24,6 +24,7 @@ import (
 	contentPresentation "undangan-digital/internal/modules/content/presentation"
 	guestPresentation "undangan-digital/internal/modules/guest/presentation"
 	whatsappPresentation "undangan-digital/internal/modules/whatsapp/presentation"
+	telegramPresentation "undangan-digital/internal/modules/telegram/presentation"
 	"undangan-digital/internal/shared/authmw"
 	"undangan-digital/internal/shared/response"
 	"undangan-digital/internal/shared/storage"
@@ -34,6 +35,7 @@ type Deps struct {
 	ContentHandler  *contentPresentation.Handler
 	GuestHandler    *guestPresentation.Handler
 	WhatsAppHandler *whatsappPresentation.Handler
+	TelegramHandler *telegramPresentation.Handler
 	JWTSecret       string
 	PublicDir       string
 	Storage         *storage.Client
@@ -138,6 +140,15 @@ func New(d Deps) http.Handler {
 	admin.HandleFunc("DELETE /api/v1/admin/guests/{id}/rsvp", d.GuestHandler.ResetRsvp)
 	admin.HandleFunc("PATCH /api/v1/admin/guests/{id}/contacted", d.GuestHandler.SetContacted)
 
+	// Undangan manual per tamu (tombol kirim di menu Tamu): preview di-render
+	// server dari template milik modul pengirim, kirim sinkron via contracts.
+	// Segmen path lebih panjang dari PUT/DELETE /guests/{id}, jadi ServeMux
+	// memilih yang paling spesifik - alasan yang sama dengan .../rsvp di atas.
+	// Didaftarkan di mux `admin` (RequireFullAdmin): hanya admin penuh yang
+	// membuka menu Tamu.
+	admin.HandleFunc("GET /api/v1/admin/guests/{id}/invitation-preview", d.GuestHandler.PreviewInvitation)
+	admin.HandleFunc("POST /api/v1/admin/guests/{id}/send-invitation", d.GuestHandler.SendInvitation)
+
 	// --- admin: ucapan tamu (docs/plan/wedding-wish/PLAN.md T12) ---
 	// Didaftarkan di mux `admin`, jadi otomatis di balik RequireFullAdmin
 	// seperti seluruh menu admin lain - petugas gate menerima 403.
@@ -171,6 +182,19 @@ func New(d Deps) http.Handler {
 	admin.HandleFunc("PUT /api/v1/admin/whatsapp/config", d.WhatsAppHandler.UpdateConfig)
 	admin.HandleFunc("GET /api/v1/admin/whatsapp/logs", d.WhatsAppHandler.ListLogs)
 	admin.HandleFunc("POST /api/v1/admin/whatsapp/logs/{id}/resend", d.WhatsAppHandler.ResendLog)
+
+	// --- admin: telegram (JWT) - userbot MTProto (gotd/td), cermin
+	// /api/v1/admin/whatsapp/*. Login memakai kode OTP ke nomor HP akun
+	// (bukan scan QR): login/start mengirim kode, login/complete menukarnya
+	// (+ password bila akun ber-2FA) jadi sesi.
+	admin.HandleFunc("GET /api/v1/admin/telegram/status", d.TelegramHandler.GetStatus)
+	admin.HandleFunc("POST /api/v1/admin/telegram/login/start", d.TelegramHandler.StartLogin)
+	admin.HandleFunc("POST /api/v1/admin/telegram/login/complete", d.TelegramHandler.CompleteLogin)
+	admin.HandleFunc("POST /api/v1/admin/telegram/logout", d.TelegramHandler.Logout)
+	admin.HandleFunc("GET /api/v1/admin/telegram/config", d.TelegramHandler.GetConfig)
+	admin.HandleFunc("PUT /api/v1/admin/telegram/config", d.TelegramHandler.UpdateConfig)
+	admin.HandleFunc("GET /api/v1/admin/telegram/logs", d.TelegramHandler.ListLogs)
+	admin.HandleFunc("POST /api/v1/admin/telegram/logs/{id}/resend", d.TelegramHandler.ResendLog)
 
 	// --- admin: check-in di gate (docs/plan/scan-checkin-gate/PLAN.md T9/D6) ---
 	// Didaftarkan langsung di mux ROOT sebagai pola SPESIFIK, bukan lewat mux

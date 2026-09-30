@@ -14,6 +14,10 @@ export interface Guest {
   invitationType: InvitationType
   souvenirType: SouvenirType
   email: string
+  /** Username Telegram tamu TANPA @ ("" = tidak punya). Dipakai pengiriman
+   * QR otomatis lewat userbot Telegram saat tamu RSVP 'attending' - cermin
+   * `phone` untuk WhatsApp. */
+  usernameTelegram: string
   address: string
   notes: string
   attendingCount: number
@@ -22,12 +26,13 @@ export interface Guest {
    * Jangan tertukar dengan `attendingCount` di atas: itu JANJI tamu, diisi
    * tamu sendiri saat RSVP. `attendingCount` tidak pernah melebihi ini. */
   paxQuota: number
-  /** Kapan admin membuka WhatsApp lewat tombol "Kirim Undangan". `null` =
-   * belum pernah dihubungi.
+  /** Kapan admin menghubungi tamu. `null` = belum pernah dihubungi.
    *
-   * BUKAN bukti pesan terkirim — wa.me tidak bisa melaporkan balik apa pun,
-   * jadi yang tercatat hanyalah bahwa admin membuka WhatsApp untuk tamu ini.
-   * Label di UI harus berbunyi "Dihubungi", jangan pernah "Terkirim". */
+   * Dulu ini hanya berarti "admin membuka WhatsApp" (jalur wa.me murni klien
+   * yang tidak bisa membuktikan pengiriman). Sejak undangan dikirim lewat
+   * modul WhatsApp/Telegram, sukses kirim server-side MENYALAKANNYA otomatis -
+   * pesannya benar-benar diterima server WA/TG. Tetap bisa dibatalkan manual
+   * bila salah. */
   contactedAt: string | null
   /** null = tamu lama yang belum pernah disunting sejak migration 000016
    * (guest-groups §2.6). Namanya dipetakan di halaman dari daftar group yang
@@ -43,6 +48,9 @@ export interface GuestInput {
   invitationType: InvitationType
   souvenirType: SouvenirType
   email: string
+  /** Opsional: "" = tamu tidak punya Telegram dan dilewati jalur kirim
+   * Telegram. Boleh diawali @, dinormalisasi backend. */
+  usernameTelegram: string
   address: string
   notes: string
   isExpectedAttending: boolean
@@ -205,8 +213,36 @@ export async function resetRsvp(id: number): Promise<void> {
 }
 
 /** Menyalakan/mematikan penanda "sudah dihubungi". Dipanggil otomatis saat
- * admin menekan "Kirim Undangan" (`true`), dan saat ia membatalkan penandanya
- * (`false`). */
+ * undangan terkirim lewat modul (`true`), saat admin menandai manual
+ * (`true`), dan saat ia membatalkan penandanya (`false`). */
 export async function setContacted(id: number, contacted: boolean): Promise<void> {
   await httpClient.patch(`/api/v1/admin/guests/${id}/contacted`, { contacted })
+}
+
+/** Kanal undangan manual per tamu: `wa` lewat modul WhatsApp (whatsmeow),
+ * `tg` lewat userbot Telegram. */
+export type InvitationChannel = 'wa' | 'tg'
+
+/** Preview undangan yang di-render server dari template milik modul pengirim
+ * (source of truth) - ditampilkan di modal sebelum admin menekan Kirim. */
+export interface InvitationPreview {
+  channel: InvitationChannel
+  /** Nomor HP tujuan (wa) atau `@username` (tg). */
+  target: string
+  text: string
+}
+
+/** Mengambil preview pesan undangan untuk satu tamu. Tanpa efek samping. */
+export async function previewInvitation(id: number, channel: InvitationChannel): Promise<InvitationPreview> {
+  const res = await httpClient.get<{ data: InvitationPreview }>(`/api/v1/admin/guests/${id}/invitation-preview`, {
+    params: { channel },
+  })
+  return res.data.data
+}
+
+/** Mengirim undangan lewat modul pengirim. Sukses otomatis menyalakan
+ * penanda contacted_at di server; gagal melempar pesan yang layak tampil di
+ * modal (template kosong, belum tertaut, koneksi belum siap, ...). */
+export async function sendInvitation(id: number, channel: InvitationChannel): Promise<void> {
+  await httpClient.post(`/api/v1/admin/guests/${id}/send-invitation`, { channel })
 }
